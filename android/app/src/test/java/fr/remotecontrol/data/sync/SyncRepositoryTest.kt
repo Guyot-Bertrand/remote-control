@@ -41,8 +41,6 @@ class SyncRepositoryTest {
     @After fun tearDown() = db.close()
 
     private val dao get() = db.catalogDao()
-    private suspend fun playableIds() = dao.worksByType("film", false).first().filter { it.playable }.map { it.id }.toSet() +
-        dao.worksByType("serie", false).first().filter { it.playable }.map { it.id }.toSet()
     private suspend fun ftsIds(q: String) = dao.search(buildFtsQuery(q)!!, false).first().map { it.id }
 
     private suspend fun fullThenIncremental(inc: SyncDto = incr) {
@@ -69,6 +67,7 @@ class SyncRepositoryTest {
         assertFalse(dao.hasWork(3))
         assertTrue(dao.mediaFilesOfWork(3).first().isEmpty())
         assertTrue(dao.mediaFilesOfEpisode(3).first().isEmpty())
+        assertEquals(0, db.query("SELECT COUNT(*) FROM episode WHERE id = 3", null).use { it.moveToFirst(); it.getInt(0) })
         assertEquals("Ava la sauvage", dao.work(1).first()!!.titleAlt)
         assertTrue(dao.work(4).first()!!.playable)
         assertEquals(5L, repo.localRevision())
@@ -125,6 +124,14 @@ class SyncRepositoryTest {
         assertEquals(5, dao.workCount())
         assertNull(dao.work(1).first()!!.titleAlt)
         assertEquals(3L, repo.localRevision())
+    }
+
+    @Test fun write_failure_reports_failed_and_resets_syncing() = runTest {
+        val failing = SyncRepository(db, api, SyncWriter(db, afterUpserts = { error("panne") }))
+        api.syncResponses.addLast(ApiResult.Ok(full))
+        assertEquals(SyncOutcome.Failed(ApiError.BadResponse), failing.sync())
+        assertFalse(failing.syncing.value)
+        assertEquals(0, dao.workCount())
     }
 
     @Test fun network_failure_reports_failed() = runTest {

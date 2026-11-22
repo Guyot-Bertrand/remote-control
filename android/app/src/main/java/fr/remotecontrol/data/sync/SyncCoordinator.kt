@@ -10,15 +10,19 @@ class SyncCoordinator(
     /** Collects until cancelled; syncs when the server revision differs from the local one. */
     suspend fun run() {
         events.collect { event ->
-            val r = when (event) {
-                is ServerEvent.Hello -> event.revision
-                is ServerEvent.Catalog -> event.revision
-                else -> return@collect
-            }
             val local = sync.localRevision()
-            when {
-                local == null || r < local -> sync.sync(forceFull = true)
-                r > local -> sync.sync()
+            when (event) {
+                // Hello: a lower server revision means a reset server, so resync fully.
+                is ServerEvent.Hello -> when {
+                    local == null || event.revision < local -> sync.sync(forceFull = true)
+                    event.revision > local -> sync.sync()
+                }
+                // Catalog: r <= local is a stale buffered event and is ignored.
+                is ServerEvent.Catalog -> when {
+                    local == null -> sync.sync(forceFull = true)
+                    event.revision > local -> sync.sync()
+                }
+                else -> Unit
             }
         }
     }

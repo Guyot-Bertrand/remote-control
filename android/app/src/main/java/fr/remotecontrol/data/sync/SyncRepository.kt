@@ -5,6 +5,7 @@ import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.RcApi
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +35,14 @@ class SyncRepository(
             when (val r = api.sync(since)) {
                 is ApiResult.Err -> SyncOutcome.Failed(r.error)
                 is ApiResult.Ok -> {
-                    writer.apply(r.value)
-                    SyncOutcome.Done(r.value.revision, r.value.full)
+                    try {
+                        writer.apply(r.value)
+                        SyncOutcome.Done(r.value.revision, r.value.full)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        SyncOutcome.Failed(ApiError.BadResponse)
+                    }
                 }
             }
         } finally {

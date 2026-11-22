@@ -67,10 +67,30 @@ class SyncCoordinatorTest {
         assertEquals(emptyList<String>(), api.calls)
     }
 
-    @Test fun lower_revision_forces_full() = runTest {
+    @Test fun lower_revision_hello_forces_full() = runTest {
         seedLocal(5)
-        emit(ServerEvent.Catalog(2), full.copy(revision = 2))
+        emit(hello(2), full.copy(revision = 2))
         assertEquals(listOf("sync(null)"), api.calls)
+    }
+
+    @Test fun stale_catalog_ignored() = runTest {
+        seedLocal(5)
+        emit(ServerEvent.Catalog(2))
+        emit(ServerEvent.Catalog(5))
+        assertEquals(emptyList<String>(), api.calls)
+    }
+
+    @Test fun survives_failing_writer() = runTest {
+        val bad = SyncRepository(db, api, SyncWriter(db, afterUpserts = { error("panne") }))
+        api.syncResponses.addLast(ApiResult.Ok(full))
+        api.syncResponses.addLast(ApiResult.Ok(full))
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(bad, events).run() }
+        while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        events.emit(hello(3))
+        events.emit(hello(4))
+        events.emit(ServerEvent.Tv(TvStateDto("home")))
+        job.cancel()
+        assertEquals(listOf("sync(null)", "sync(null)"), api.calls)
     }
 
     @Test fun empty_cache_forces_full() = runTest {
