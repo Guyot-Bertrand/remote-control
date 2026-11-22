@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 SIZES = {"thumb": 300, "tv": 600}
 QUALITY = 85
 MAX_POSTER_BYTES = 50 * 1024 * 1024
+MAX_PIXELS = 40_000_000
 ALLOWED_FORMATS = ["JPEG", "PNG", "WEBP"]
 
 
@@ -28,16 +29,25 @@ def asset_path(assets_dir: Path, hash: str, size: str) -> Path:
 
 
 def process_image(src: Path, assets_dir: Path) -> str:
-    st = os.lstat(src)
-    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
-        raise ValueError(f"pas un fichier régulier : {src}")
-    if st.st_size > MAX_POSTER_BYTES:
+    fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError(f"pas un fichier régulier : {src}")
+        if st.st_size > MAX_POSTER_BYTES:
+            raise ValueError(f"fichier trop gros : {src}")
+        with os.fdopen(fd, "rb", closefd=False) as f:
+            data = f.read(MAX_POSTER_BYTES + 1)
+    finally:
+        os.close(fd)
+    if len(data) > MAX_POSTER_BYTES:
         raise ValueError(f"fichier trop gros : {src}")
-    data = src.read_bytes()
     h = hashlib.sha256(data).hexdigest()[:16]
     if all(asset_path(assets_dir, h, s).is_file() for s in ("orig", *SIZES)):
         return h
     with Image.open(io.BytesIO(data), formats=ALLOWED_FORMATS) as im:
+        if im.width * im.height > MAX_PIXELS:
+            raise ValueError(f"image trop grande : {src}")
         im.load()
         is_jpeg = im.format == "JPEG" and im.mode == "RGB"
         rgb = im.convert("RGB")

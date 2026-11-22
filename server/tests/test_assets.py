@@ -9,7 +9,7 @@ from rc.catalog.importer import import_catalog
 from rc.catalog.parser import parse_catalog
 from rc.db import open_db
 from rc.fake_tree import make_fake_tree
-from rc.volumes import build_index
+from rc.volumes import build_index, normalize
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
 
@@ -97,12 +97,26 @@ def test_unreadable_poster_skipped(conn, tmp_path, caplog):
     assert any("rc.assets" == r.name for r in caplog.records)
 
 
-def test_symlink_refused(tmp_path):
+def test_symlink_refused(conn, tmp_path, caplog):
+    indexes, disk = setup(conn, tmp_path)
+    row = ava(conn)
     real = make_image(tmp_path / "real.jpg", (100, 150))
     link = tmp_path / "link.jpg"
     link.symlink_to(real)
-    with pytest.raises(ValueError):
+    indexes = {"U1": {normalize(row["poster_relpath"]): link}}
+    with caplog.at_level(logging.WARNING, logger="rc.assets"):
+        ingest_posters(conn, tmp_path / "assets", indexes)
+    assert ava(conn)["poster_asset"] is None
+    assert any(r.name == "rc.assets" for r in caplog.records)
+    with pytest.raises(OSError):
         process_image(link, tmp_path / "assets")
+
+
+def test_pixel_cap(tmp_path, monkeypatch):
+    src = make_image(tmp_path / "p.jpg", (100, 150))
+    monkeypatch.setattr("rc.assets.MAX_PIXELS", 1000)
+    with pytest.raises(ValueError):
+        process_image(src, tmp_path / "assets")
 
 
 def test_oversized_refused(tmp_path, monkeypatch):
