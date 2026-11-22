@@ -1,7 +1,14 @@
 package fr.remotecontrol.net
 
 import fr.remotecontrol.testing.Fixtures
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -157,5 +164,26 @@ class OkHttpRcApiTest {
         assertNull(api.probe(server.url("/")))
         server.enqueue(ok(Fixtures.text("info.json")))
         assertNotNull(api.probe(server.url("/")))
+    }
+
+    @Test
+    fun invalid_2xx_body_maps_to_BadResponse() = runTest {
+        server.enqueue(ok("<html>"))
+        assertEquals(ApiResult.Err(ApiError.BadResponse), api.info())
+        assertEquals("Réponse inattendue du serveur.", ApiError.BadResponse.messageFr())
+    }
+
+    @Test
+    fun cancelling_coroutine_cancels_call() = runBlocking {
+        val client = rcOkHttpClient()
+        val slow = OkHttpRcApi(client, { server.url("/") })
+        server.enqueue(MockResponse.Builder().body(Fixtures.text("info.json")).headersDelay(10, TimeUnit.SECONDS).build())
+        val job = async(Dispatchers.IO, start = CoroutineStart.DEFAULT) { slow.info() }
+        server.takeRequest()
+        withTimeout(5_000) {
+            job.cancelAndJoin()
+            while (client.dispatcher.runningCallsCount() != 0) Thread.sleep(10)
+        }
+        assertEquals(0, client.dispatcher.runningCallsCount())
     }
 }

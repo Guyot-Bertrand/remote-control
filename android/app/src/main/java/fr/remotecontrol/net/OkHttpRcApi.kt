@@ -2,20 +2,23 @@ package fr.remotecontrol.net
 
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.toRequestBody
 
 fun rcOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
@@ -69,70 +72,84 @@ class OkHttpRcApi(
 
     override suspend fun playerState() = get("api/player/state", PlayerSnapshotDto.serializer())
 
-    override suspend fun probe(base: HttpUrl): InfoDto? = withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder().url(base.newBuilder().addPathSegments("api/info").build()).build()
-            client.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) return@use null
-                val info = json.decodeFromString(InfoDto.serializer(), resp.body.string())
-                info.takeIf { it.api == 1 }
-            }
-        } catch (_: IOException) {
-            null
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
-        }
+    override suspend fun probe(base: HttpUrl): InfoDto? {
+        val request = Request.Builder().url(base.newBuilder().addPathSegments("api/info").build()).build()
+        val r = execute(request) { json.decodeFromString(InfoDto.serializer(), it) }
+        return (r as? ApiResult.Ok)?.value?.takeIf { it.api == 1 }
     }
 
     private fun obj(vararg fields: Pair<String, JsonElement>): String = JsonObject(mapOf(*fields)).toString()
 
     private suspend fun postUnit(path: String, body: String): ApiResult<Unit> =
-        when (val r = post(path, body, Unit.serializer())) {
-            is ApiResult.Ok -> r
-            is ApiResult.Err -> r
-        }
+        execute(buildRequest(path, {}) { it.post(body.toRequestBody(jsonType)) }) { }
 
     private suspend fun <T> get(
         path: String,
         serializer: KSerializer<T>,
         query: HttpUrl.Builder.() -> Unit = {},
-    ): ApiResult<T> = execute(serializer, path, query) { it }
+    ): ApiResult<T> = execute(buildRequest(path, query) { it }) { json.decodeFromString(serializer, it) }
 
     private suspend fun <T> post(path: String, body: String, serializer: KSerializer<T>): ApiResult<T> =
-        execute(serializer, path, {}) { it.post(body.toRequestBody(jsonType)) }
+        execute(buildRequest(path, {}) { it.post(body.toRequestBody(jsonType)) }) {
+            json.decodeFromString(serializer, it)
+        }
 
-    private suspend fun <T> execute(
-        serializer: KSerializer<T>,
+    /** `null` si aucune base n'est disponible (le fournisseur est relu à chaque appel). */
+    private fun buildRequest(
         path: String,
         query: HttpUrl.Builder.() -> Unit,
         configure: (Request.Builder) -> Request.Builder,
-    ): ApiResult<T> {
-        val base = baseUrl() ?: return ApiResult.Err(ApiError.NoServer)
+    ): Request? {
+        val base = baseUrl() ?: return null
         val url = base.newBuilder().addPathSegments(path).apply(query).build()
-        val request = configure(Request.Builder().url(url)).build()
-        return withContext(Dispatchers.IO) {
-            try {
-                client.newCall(request).execute().use { resp ->
-                    val text = resp.body.string()
-                    when {
-                        resp.code == 409 -> {
-                            val err = runCatching { json.decodeFromString(ErrorDto.serializer(), text) }.getOrNull()
-                            if (err != null) ApiResult.Err(ApiError.Server(err.error, err.volumeLabel))
-                            else ApiResult.Err(ApiError.Http(409))
-                        }
-                        !resp.isSuccessful -> ApiResult.Err(ApiError.Http(resp.code))
-                        serializer === Unit.serializer() -> {
-                            @Suppress("UNCHECKED_CAST")
-                            ApiResult.Ok(Unit as T)
-                        }
-                        else -> ApiResult.Ok(json.decodeFromString(serializer, text))
-                    }
-                }
-            } catch (_: IOException) {
-                ApiResult.Err(ApiError.Unreachable)
+        return configure(Request.Builder().url(url)).build()
+    }
+
+    /** Le corps d'une réponse 2xx n'est décodé que par `decode` (ignoré pour `postUnit`). */
+    private suspend fun <T> execute(request: Request?, decode: (String) -> T): ApiResult<T> {
+        if (request == null) return ApiResult.Err(ApiError.NoServer)
+        val (code, text) = try {
+            call(request)
+        } catch (_: IOException) {
+            return ApiResult.Err(ApiError.Unreachable)
+        }
+        return when {
+            code == 409 -> {
+                val err = runCatching { json.decodeFromString(ErrorDto.serializer(), text) }.getOrNull()
+                if (err != null) ApiResult.Err(ApiError.Server(err.error, err.volumeLabel))
+                else ApiResult.Err(ApiError.Http(409))
+            }
+            code !in 200..299 -> ApiResult.Err(ApiError.Http(code))
+            else -> try {
+                ApiResult.Ok(decode(text))
+            } catch (_: SerializationException) {
+                ApiResult.Err(ApiError.BadResponse)
+            } catch (_: IllegalArgumentException) {
+                ApiResult.Err(ApiError.BadResponse)
             }
         }
     }
+
+    /** Appel annulable : l'annulation de la coroutine annule le `Call` OkHttp. */
+    private suspend fun call(request: Request): Pair<Int, String> =
+        suspendCancellableCoroutine { cont ->
+            val call = client.newCall(request)
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (cont.isActive) cont.resumeWithException(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        try {
+                            val text = it.body.string()
+                            cont.resume(it.code to text)
+                        } catch (e: IOException) {
+                            if (cont.isActive) cont.resumeWithException(e)
+                        }
+                    }
+                }
+            })
+        }
 }

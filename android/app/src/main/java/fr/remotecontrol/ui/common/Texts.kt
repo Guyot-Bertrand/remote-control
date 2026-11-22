@@ -41,6 +41,7 @@ object Texts {
     const val searching = "Recherche du serveur…"
     const val notPlayable = "Aucun fichier lisible pour cette œuvre"
     const val notFound = "Fichier introuvable"
+    const val badResponse = "Réponse inattendue du serveur."
     const val idle = "Aucune lecture en cours"
     const val notDigitized = "Non numérisé"
     const val playFromStart = "Lire depuis le début"

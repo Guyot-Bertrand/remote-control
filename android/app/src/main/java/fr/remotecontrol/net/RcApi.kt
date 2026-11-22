@@ -13,6 +13,7 @@ sealed interface ApiError {
     data object Unreachable : ApiError
     data class Server(val code: String, val volumeLabel: String?) : ApiError
     data class Http(val status: Int) : ApiError
+    data object BadResponse : ApiError
 }
 
 fun ApiError.messageFr(): String = when (this) {
@@ -26,6 +27,7 @@ fun ApiError.messageFr(): String = when (this) {
         else -> Texts.httpError(409)
     }
     is ApiError.Http -> Texts.httpError(status)
+    ApiError.BadResponse -> Texts.badResponse
 }
 
 interface RcApi {
