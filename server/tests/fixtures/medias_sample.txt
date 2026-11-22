@@ -1,0 +1,57 @@
+# commentaire
+GB ; VER ; 1.11 ; 2024-08-29 ; Tag '[FR]' désormais obligatoire
+GN ; Alien [1979-]
+GD ; ...
+GL ; https://fr.wikipedia.org/wiki/Alien_(s%C3%A9rie_de_films)
+GM ; 1979 ; Alien, le huitième passager
+
+MD ; 0 ; Films
+MD ; 1 ; A
+MN ; film ; Ava [2017] ; Ava ; *
+MI ; 1h39 ; 2017 ; Léa Mysius ; comédie dramatique
+MC ; Juan Cano, Noée Abita, Laure Calamy
+MP ; Ava, 13 ans, est en vacances au bord de l'océan...
+MF ; AF ; Ava [2017] [0h01].jpg
+MF ; VI ; FHD ; 3.8G ; Ava [2017] [1h45,1920x1038,16x9,FR,sEN].mp4 ; *.1.fr.srt
+MF ; VI ; HD ; 1.6G ; Ava [2017] [1h39,1280x720,16x9,FR].mp4 ; *.1.fr.vtt
+MF ; TG ; [FR] [ST*] [RU]
+MQ ; IM ; 6.7 ; https://www.imdb.com/title/tt6194530/
+MG ; 2017 ; Les 1000 plus grands films de tous les temps [2020]
+MN ; film ; Alien, le huitieme passager [1979] ; Alien, le huitième passager ; Alien ; L'Étranger
+MI ; 1h57 ; 1979 ; Ridley Scott ; Science-fiction, Horreur
+MF ; VI ; DVD
+MG ; Alien [1979-]
+MD ; 1 ; L
+MN ; film ; Le prenom [2012] ; Le Prénom ; *
+MI ; 1h49 ; 2012 ; Alexandre de La Patellière, Matthieu Delaporte ; comédie
+MF ; VI ; HD ; 1.1G ; Le prenom [2012] [1h49,1280x720,16x9,FR].mp4
+MD ; 0 ; Theatre
+MN ; theatre ; Le prenom [2012] ; Le Prénom ; *
+MI ; 1h50 ; 2012 ; Bernard Murat ;
+MF ; VI ; SD ; 700M ; Le prenom [2012] [1h50,720x576,4x3,FR].mp4
+MD ; 0 ; Series
+MN ; serie ; Back to Life [2019] ; Back to Life ; *
+MI ; 12/12 ; 2019 ; Laura Solon, Daisy Haggard ; comédie
+MD ; 1 ; *
+MD ; 2 ; Saison 01 ; Saison 1
+MF ; VI ; FHD ; 383M ; S01E01 [0h27,1920x1080,16x9,EN].mp4 ; *.1.fr.vtt
+MF ; VI ; FHD ; 429M ; S01E02 [0h24,1920x1080,16x9,EN].mp4 ; *.1.fr.vtt
+MD ; 2 ; Saison 02 ; Saison 2
+MF ; VI ; FHD ; 384M ; S02E01 [0h27,1920x1080,16x9,EN].mp4 ; *.1.fr.vtt
+MD ; 1 ;
+MF ; TG ; [FR-] [VO]
+MN ; serie ; Agatha Cristie - Dix petits negres [2015] ; Agatha Christie : Dix Petits Nègres ; And Then There Were None
+MD ; 1 ; *
+MF ; VI ; HD ; ? ; Dix petits negres - 1 [0h51,1280x720,16x9,FR].mp4
+MF ; VI ; HD ; ? ; Dix petits negres - 2 [0h54,1280x720,16x9,FR].mp4
+MD ; 1 ;
+MD ; 0 ; Docs
+MD ; 1 ; Inventions
+MN ; doc ; Le Fabuleux Destin des Inventions [2002] ; Le Fabuleux Destin des Inventions ; *
+MI ; 16/16 ; 2002 ; Axel Engstfeld ; technologie
+MD ; 2 ; *
+MD ; 3 ; Saison 01 ; Saison 1
+MF ; VI ; BD ; 202M ; S01E01 - Le Telegraphe Transatlantique [0h52,610x360,16x9,FR].mp4
+MF ; VI ; BD ; 171M ; S01E02 - Et la longitude fut [0h51,640x360,16x9,FR].mp4
+MD ; 2 ;
+ZZ ; ligne inconnue
