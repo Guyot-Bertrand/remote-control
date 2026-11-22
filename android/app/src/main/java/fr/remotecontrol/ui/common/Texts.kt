@@ -1,5 +1,7 @@
 package fr.remotecontrol.ui.common
 
+import java.util.Locale
+
 /** Tous les textes visibles par l'utilisateur, en français. */
 object Texts {
     // Libellés d'écran
@@ -89,7 +91,7 @@ object Texts {
     }
 
     fun episodeCode(season: Int, number: Int): String =
-        if (season == 0) "Épisode $number" else "S%02dE%02d".format(season, number)
+        if (season == 0) "Épisode $number" else "S%02dE%02d".format(Locale.ROOT, season, number)
 
     fun episodeTitle(work: String, season: Int, number: Int): String =
         if (season == 0) "$work — épisode $number" else "$work — ${episodeCode(season, number)}"

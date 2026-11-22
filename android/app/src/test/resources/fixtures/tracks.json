@@ -1,0 +1,6 @@
+{"audio": [{"index": 1, "lang": "en", "title": null, "codec": "aac", "default": true},
+           {"index": 2, "lang": "fr", "title": "Français", "codec": "ac3", "default": false}],
+ "subtitles": [{"index": 1, "lang": "en", "title": null, "codec": "subrip", "default": false}],
+ "external": [{"path": "/media/beber/DISK1/Films/A/Ava [2017] [1h45,1920x1038,16x9,FR,sEN].1.fr.srt", "lang": "fr"}],
+ "video_codec": "h264", "height": 1038,
+ "default": {"audio": 2, "subtitle": {"kind": "none"}}}

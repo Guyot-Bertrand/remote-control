@@ -1,5 +1,6 @@
 package fr.remotecontrol.ui.common
 
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,5 +40,19 @@ class FormatTest {
         assertEquals("FHD · 3.8G", Texts.versionLabel("FHD", "3.8G"))
         assertEquals("−60 s", Texts.skipLabel(-60))
         assertEquals("+10 s", Texts.skipLabel(10))
+    }
+
+    @Test
+    fun digitsStayLatinOnAnyLocale() {
+        val saved = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+            assertEquals("1 h 02", formatDuration(62))
+            assertEquals("1:02:05", formatClock(3725.0))
+            assertEquals("01:12", formatHhMm(4320.0))
+            assertEquals("S01E02", Texts.episodeCode(1, 2))
+        } finally {
+            Locale.setDefault(saved)
+        }
     }
 }

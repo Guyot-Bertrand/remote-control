@@ -1,0 +1,213 @@
+package fr.remotecontrol.net
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class InfoDto(val name: String, val api: Int, val revision: Long)
+
+@Serializable
+data class SyncDto(
+    val revision: Long,
+    val full: Boolean,
+    val works: List<WorkDto> = emptyList(),
+    val seasons: List<SeasonDto> = emptyList(),
+    val episodes: List<EpisodeDto> = emptyList(),
+    @SerialName("media_files") val mediaFiles: List<MediaFileDto> = emptyList(),
+    val collections: List<CollectionDto> = emptyList(),
+    @SerialName("work_collections") val workCollections: List<WorkCollectionDto> = emptyList(),
+    val progress: List<ProgressDto> = emptyList(),
+    val volumes: List<VolumeDto> = emptyList(),
+    val deleted: DeletedDto = DeletedDto(),
+)
+
+@Serializable
+data class DeletedDto(
+    val work: List<Long> = emptyList(),
+    val season: List<Long> = emptyList(),
+    val episode: List<Long> = emptyList(),
+    @SerialName("media_file") val mediaFile: List<Long> = emptyList(),
+    val collection: List<Long> = emptyList(),
+)
+
+@Serializable
+data class WorkDto(
+    val id: Long,
+    val type: String,
+    val key: String,
+    @SerialName("title_fr") val titleFr: String,
+    @SerialName("title_vo") val titleVo: String? = null,
+    @SerialName("title_alt") val titleAlt: String? = null,
+    val year: Int? = null,
+    @SerialName("duration_min") val durationMin: Int? = null,
+    @SerialName("episode_count") val episodeCount: String? = null,
+    val directors: List<String> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val cast: List<String> = emptyList(),
+    val synopsis: String? = null,
+    @SerialName("imdb_id") val imdbId: String? = null,
+    val tags: List<String> = emptyList(),
+    val episodic: Boolean = false,
+    val poster: String? = null,
+)
+
+@Serializable
+data class SeasonDto(
+    val id: Long,
+    @SerialName("work_id") val workId: Long,
+    val number: Int,
+    val label: String,
+)
+
+@Serializable
+data class EpisodeDto(
+    val id: Long,
+    @SerialName("season_id") val seasonId: Long,
+    val number: Int,
+    val title: String? = null,
+)
+
+@Serializable
+data class MediaFileDto(
+    val id: Long,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("episode_id") val episodeId: Long? = null,
+    val quality: String,
+    val size: String? = null,
+    val relpath: String,
+    @SerialName("volume_uuid") val volumeUuid: String? = null,
+    val present: Boolean = false,
+)
+
+@Serializable
+data class CollectionDto(
+    val id: Long,
+    val name: String,
+    val description: String? = null,
+    val link: String? = null,
+)
+
+@Serializable
+data class WorkCollectionDto(
+    @SerialName("work_id") val workId: Long,
+    @SerialName("collection_id") val collectionId: Long,
+    val rank: String? = null,
+)
+
+@Serializable
+data class ProgressDto(
+    @SerialName("target_kind") val targetKind: String,
+    @SerialName("target_id") val targetId: Long,
+    @SerialName("media_file_id") val mediaFileId: Long? = null,
+    val position: Double,
+    val duration: Double? = null,
+    val watched: Boolean = false,
+    @SerialName("updated_at") val updatedAt: Double,
+)
+
+@Serializable
+data class VolumeDto(
+    val uuid: String,
+    val label: String? = null,
+    val mount: String? = null,
+    val present: Boolean = false,
+)
+
+@Serializable
+data class TrackDto(
+    val index: Int,
+    val lang: String? = null,
+    val title: String? = null,
+    val codec: String? = null,
+    val default: Boolean = false,
+)
+
+@Serializable
+data class ExternalSubDto(val path: String, val lang: String? = null)
+
+@Serializable
+data class TrackDefaultsDto(val audio: Int? = null, val subtitle: SubSel = SubSel.None)
+
+@Serializable
+data class MediaTracksDto(
+    val audio: List<TrackDto> = emptyList(),
+    val subtitles: List<TrackDto> = emptyList(),
+    val external: List<ExternalSubDto> = emptyList(),
+    @SerialName("video_codec") val videoCodec: String? = null,
+    val height: Int? = null,
+    val default: TrackDefaultsDto = TrackDefaultsDto(),
+)
+
+@Serializable
+sealed interface SubSel {
+    @Serializable
+    @SerialName("none")
+    data object None : SubSel
+
+    @Serializable
+    @SerialName("embedded")
+    data class Embedded(val index: Int) : SubSel
+
+    @Serializable
+    @SerialName("external")
+    data class External(val path: String) : SubSel
+}
+
+@Serializable
+data class PlayerStateDto(
+    val position: Double = 0.0,
+    val duration: Double? = null,
+    val paused: Boolean = false,
+    val volume: Int = 100,
+    val audio: Int? = null,
+    val subtitle: SubSel = SubSel.None,
+    val ended: Boolean = false,
+    val error: String? = null,
+    val running: Boolean = false,
+)
+
+@Serializable
+data class CurrentDto(
+    @SerialName("target_kind") val targetKind: String,
+    @SerialName("target_id") val targetId: Long,
+    @SerialName("media_file_id") val mediaFileId: Long,
+    @SerialName("work_id") val workId: Long,
+    @SerialName("season_id") val seasonId: Long? = null,
+    val title: String? = null,
+)
+
+@Serializable
+data class PlayerSnapshotDto(
+    val state: PlayerStateDto = PlayerStateDto(),
+    val current: CurrentDto? = null,
+)
+
+@Serializable
+data class TvStateDto(
+    val screen: String,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("season_id") val seasonId: Long? = null,
+    val message: String? = null,
+)
+
+@Serializable
+data class PlayRequestDto(
+    @SerialName("target_kind") val targetKind: String,
+    @SerialName("target_id") val targetId: Long,
+    val start: String,
+    @SerialName("media_file_id") val mediaFileId: Long? = null,
+    val audio: Int? = null,
+    val subtitle: SubSel? = null,
+)
+
+@Serializable
+data class TvShowRequestDto(val screen: String, val id: Long? = null)
+
+@Serializable
+data class TvShowResultDto(val shown: Boolean)
+
+@Serializable
+data class ErrorDto(
+    val error: String,
+    @SerialName("volume_label") val volumeLabel: String? = null,
+)

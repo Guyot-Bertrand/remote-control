@@ -1,0 +1,1 @@
+{"type": "hello", "revision": 5, "tv": {"screen": "home", "work_id": null, "season_id": null, "message": null}, "player": {"state": {"position": 0, "duration": null, "paused": false, "volume": 100, "audio": null, "subtitle": {"kind": "none"}, "ended": false, "error": null, "running": false}, "current": null}}
