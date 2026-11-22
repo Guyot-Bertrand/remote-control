@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -22,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -180,10 +182,13 @@ class OkHttpRcApiTest {
         server.enqueue(MockResponse.Builder().body(Fixtures.text("info.json")).headersDelay(10, TimeUnit.SECONDS).build())
         val job = async(Dispatchers.IO, start = CoroutineStart.DEFAULT) { slow.info() }
         server.takeRequest()
-        withTimeout(5_000) {
-            job.cancelAndJoin()
-            while (client.dispatcher.runningCallsCount() != 0) Thread.sleep(10)
+        val start = System.nanoTime()
+        job.cancelAndJoin()
+        withTimeout(3_000) {
+            while (client.dispatcher.runningCallsCount() != 0) delay(10)
         }
-        assertEquals(0, client.dispatcher.runningCallsCount())
+        val elapsedMs = (System.nanoTime() - start) / 1_000_000
+        assertTrue("call still running after ${elapsedMs}ms", elapsedMs < 3_000)
+        assertTrue(job.isCancelled)
     }
 }

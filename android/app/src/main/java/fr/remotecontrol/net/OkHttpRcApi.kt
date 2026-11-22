@@ -145,8 +145,9 @@ class OkHttpRcApi(
                         try {
                             val text = it.body.string()
                             cont.resume(it.code to text)
-                        } catch (e: IOException) {
-                            if (cont.isActive) cont.resumeWithException(e)
+                        } catch (e: Exception) {
+                            // jamais de continuation laissée en suspens
+                            if (cont.isActive) cont.resumeWithException(e as? IOException ?: IOException(e))
                         }
                     }
                 }
