@@ -128,3 +128,9 @@ def test_build_index_skips_special_dirs(tmp_path):
         (tmp_path / d / "f.mp4").touch()
     (tmp_path / ".dot.mp4").touch()
     assert set(build_index(tmp_path)) == {"ok/f.mp4"}
+
+
+def test_build_index_ignores_symlinks(tmp_path):
+    (tmp_path / "real.jpg").touch()
+    (tmp_path / "link.jpg").symlink_to(tmp_path / "real.jpg")
+    assert set(build_index(tmp_path)) == {"real.jpg"}

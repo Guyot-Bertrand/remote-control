@@ -95,3 +95,29 @@ def test_unreadable_poster_skipped(conn, tmp_path, caplog):
         ingest_posters(conn, tmp_path / "assets", indexes)
     assert ava(conn)["poster_asset"] is None
     assert any("rc.assets" == r.name for r in caplog.records)
+
+
+def test_symlink_refused(tmp_path):
+    real = make_image(tmp_path / "real.jpg", (100, 150))
+    link = tmp_path / "link.jpg"
+    link.symlink_to(real)
+    with pytest.raises(ValueError):
+        process_image(link, tmp_path / "assets")
+
+
+def test_oversized_refused(tmp_path, monkeypatch):
+    src = make_image(tmp_path / "p.jpg", (100, 150))
+    monkeypatch.setattr("rc.assets.MAX_POSTER_BYTES", 10)
+    with pytest.raises(ValueError):
+        process_image(src, tmp_path / "assets")
+
+
+def test_disallowed_format_skipped(conn, tmp_path, caplog):
+    indexes, disk = setup(conn, tmp_path)
+    for p in disk.rglob("*"):
+        if p.is_file() and "Ava" in str(p) and p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+            Image.new("RGB", (10, 10)).save(p, "GIF")
+    with caplog.at_level(logging.WARNING, logger="rc.assets"):
+        ingest_posters(conn, tmp_path / "assets", indexes)
+    assert ava(conn)["poster_asset"] is None
+    assert any(r.name == "rc.assets" for r in caplog.records)

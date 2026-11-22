@@ -72,6 +72,8 @@ def build_index(mount: Path) -> dict[str, Path]:
         for entry in entries:
             if entry.name.startswith(".") or entry.name in _SKIP_DIRS:
                 continue
+            if entry.is_symlink():
+                continue
             path = Path(entry.path)
             if entry.is_dir(follow_symlinks=False):
                 if depth < MAX_DEPTH:

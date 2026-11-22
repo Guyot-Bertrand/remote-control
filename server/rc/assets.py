@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import logging
-import shutil
+import os
 import sqlite3
+import stat
 from pathlib import Path
 
 from PIL import Image
@@ -17,6 +19,8 @@ log = logging.getLogger(__name__)
 
 SIZES = {"thumb": 300, "tv": 600}
 QUALITY = 85
+MAX_POSTER_BYTES = 50 * 1024 * 1024
+ALLOWED_FORMATS = ["JPEG", "PNG", "WEBP"]
 
 
 def asset_path(assets_dir: Path, hash: str, size: str) -> Path:
@@ -24,17 +28,22 @@ def asset_path(assets_dir: Path, hash: str, size: str) -> Path:
 
 
 def process_image(src: Path, assets_dir: Path) -> str:
-    h = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
-    out = assets_dir / h
+    st = os.lstat(src)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+        raise ValueError(f"pas un fichier régulier : {src}")
+    if st.st_size > MAX_POSTER_BYTES:
+        raise ValueError(f"fichier trop gros : {src}")
+    data = src.read_bytes()
+    h = hashlib.sha256(data).hexdigest()[:16]
     if all(asset_path(assets_dir, h, s).is_file() for s in ("orig", *SIZES)):
         return h
-    out.mkdir(parents=True, exist_ok=True)
-    with Image.open(src) as im:
+    with Image.open(io.BytesIO(data), formats=ALLOWED_FORMATS) as im:
         im.load()
         is_jpeg = im.format == "JPEG" and im.mode == "RGB"
         rgb = im.convert("RGB")
+    (assets_dir / h).mkdir(parents=True, exist_ok=True)
     if is_jpeg:
-        shutil.copyfile(src, asset_path(assets_dir, h, "orig"))
+        asset_path(assets_dir, h, "orig").write_bytes(data)
     else:
         rgb.save(asset_path(assets_dir, h, "orig"), "JPEG", quality=QUALITY)
     for name, width in SIZES.items():
