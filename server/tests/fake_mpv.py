@@ -27,6 +27,7 @@ class FakeMpv:
         self._writers: list[asyncio.StreamWriter] = []
         self._server = None
         self._script_started = False
+        self._tasks: list[asyncio.Task] = []
 
     async def start(self):
         self._server = await asyncio.start_unix_server(self._client, self.socket_path)
@@ -59,15 +60,24 @@ class FakeMpv:
                     reply["error"] = "property unavailable"
                 elif cmd[0] == "get_property":
                     reply["data"] = self.props.get(cmd[1])
-                writer.write(json.dumps(reply).encode() + b"\n")
-                await writer.drain()
+                data = json.dumps(reply).encode() + b"\n"
+                if cmd[0] == "get_property" and cmd[1] == "slow":
+                    self._tasks.append(asyncio.create_task(self._late(writer, data)))
+                else:
+                    writer.write(data)
+                    await writer.drain()
                 if cmd[0] == "quit":
                     self.exit_event.set()
-                if cmd[:3] == ["observe_property", cmd[1], "eof-reached"] and not self._script_started:
+                if cmd[0] == "observe_property" and cmd[2:3] == ["eof-reached"] and not self._script_started:
                     self._script_started = True
-                    asyncio.create_task(self._run_script())
+                    self._tasks.append(asyncio.create_task(self._run_script()))
         except ConnectionError:
             pass
+
+    async def _late(self, writer, data):
+        await asyncio.sleep(0.05)
+        writer.write(data)
+        await writer.drain()
 
     async def _run_script(self):
         for step in self.script:

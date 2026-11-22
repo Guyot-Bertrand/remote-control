@@ -1,4 +1,9 @@
-"""Types communs du lecteur (Player/PlayerState arrivent avec la Task 8)."""
+"""Types communs du lecteur."""
+
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Protocol
 
 # Sélection de sous-titres, trois formes :
 #   {"kind": "none"}
@@ -6,11 +11,6 @@
 #   {"kind": "external", "path": "<chemin>"}
 SubSel = dict
 
-
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Protocol
 
 
 @dataclass

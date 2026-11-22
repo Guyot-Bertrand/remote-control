@@ -1,5 +1,7 @@
 import asyncio
+import gc
 import json
+import warnings
 import stat
 import sys
 from pathlib import Path
@@ -34,13 +36,12 @@ async def client(fake, sock):
 
 
 async def test_command_roundtrip_and_request_id(fake, client):
-    fake.props["volume"] = 42
+    fake.props.update(slow=1, fast=2)
+    # "slow" est répondu après "fast" : chaque appelant doit recevoir sa propre réponse
     a, b = await asyncio.gather(
-        client.command("get_property", "volume"), client.command("get_property", "volume")
+        client.command("get_property", "slow"), client.command("get_property", "fast")
     )
-    assert a == b == 42
-    ids = [c for c in fake.commands]
-    assert len(ids) == 2
+    assert (a, b) == (1, 2)
 
 
 async def test_error_raises_mpverror(fake, client):
@@ -141,3 +142,45 @@ async def test_eof_marks_ended(make_player, tmp_path):
     await wait_for(lambda: states and not states[-1].running)
     assert states[-1].ended and states[-1].error is None
     await p.stop()
+
+
+async def test_callback_exception_does_not_stop_pump(make_player, tmp_path):
+    ev = lambda n, d: {"event": {"event": "property-change", "id": 1, "name": n, "data": d}}
+    p, states, _ = make_player([ev("volume", 10), ev("volume", 20), ev("volume", 30)])
+    calls = []
+
+    def cb(s):
+        calls.append(s)
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+
+    p.on_state = cb
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await wait_for(lambda: any(c.volume == 30 for c in calls))
+    assert all(c.error is None for c in calls)
+    await p.stop()
+
+
+async def test_unexpected_exit_cleans_up_without_stop(make_player, tmp_path):
+    p, states, _ = make_player([{"exit": True}])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ResourceWarning)
+        await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+        sock = p._sock
+        await wait_for(lambda: states and not states[-1].running)
+        assert states[-1].error == "process_exit"
+        assert not sock.exists()
+        pump, proc = p._pump, p._proc
+        await pump
+        assert proc.returncode is not None
+        del p, pump, proc
+        gc.collect()
+
+
+async def test_start_failure_reports_error(tmp_path):
+    p = MpvPlayer(str(tmp_path / "absent"), [], tmp_path / "run")
+    states = []
+    p.on_state = states.append
+    with pytest.raises(FileNotFoundError):
+        await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    assert states[-1].running is False and states[-1].error == "start_failed"

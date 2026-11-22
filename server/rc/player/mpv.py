@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import copy
 import json
+import logging
 import sys
 import uuid
 from collections.abc import AsyncIterator
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from rc.player.base import PlayerState, SubSel
+
+log = logging.getLogger("rc.player.mpv")
 
 OBSERVED = ("time-pos", "duration", "pause", "volume", "aid", "sid", "eof-reached")
 
@@ -155,37 +158,52 @@ class MpvPlayer:
             *("--sub-file=" + str(p) for p in self._external),
             *self.extra_args, str(path),
         ]
-        self._proc = await asyncio.create_subprocess_exec(*args)
         client = MpvClient(self._sock)
         self._client = client
         try:
+            self._proc = await asyncio.create_subprocess_exec(*args)
             await client.connect()
             for name in OBSERVED:
                 await client.observe(name)
         except BaseException:
             await self._cleanup()
+            self.state.running = False
+            self.state.error = "start_failed"
+            self._emit()
             raise
         self._pump = asyncio.create_task(self._run(client, self._proc))
 
     async def _run(self, client: MpvClient, proc: asyncio.subprocess.Process) -> None:
         try:
             async for ev in client.events():
-                await self._handle(client, ev)
-        except (ConnectionError, MpvError):
+                try:
+                    await self._handle(client, ev)
+                except MpvError:
+                    log.exception("erreur mpv pendant le traitement de %s", ev.get("event"))
+        except ConnectionError:
             pass
         finally:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(proc.wait(), 3)
+            await client.close()
+            if self._sock is not None:
+                self._sock.unlink(missing_ok=True)
             self.state.running = False
             if not self.state.ended and not self._stopping:
                 self.state.error = "process_exit"
+            self._emit()
+
+    def _emit(self) -> None:
+        try:
             self.on_state(copy.copy(self.state))
+        except Exception:
+            log.exception("on_state a levé une exception")
 
     async def _handle(self, client: MpvClient, ev: dict) -> None:
         name = ev.get("event")
         if name == "property-change":
             self._apply(ev.get("name"), ev.get("data"))
-            self.on_state(copy.copy(self.state))
+            self._emit()
         elif name == "file-loaded":
             tracks = await client.command("get_property", "track-list") or []
             self._embedded = sum(
@@ -196,7 +214,7 @@ class MpvPlayer:
             await client.set_property("sid", self._sid(self._subtitle))
         elif name == "end-file" and ev.get("reason") == "eof":
             self.state.ended = True
-            self.on_state(copy.copy(self.state))
+            self._emit()
 
     def _apply(self, prop: str | None, data: Any) -> None:
         s = self.state
