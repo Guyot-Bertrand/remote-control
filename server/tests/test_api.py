@@ -1,9 +1,10 @@
 import subprocess
+import logging
 import threading
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.testclient import TestClient
 
 from rc.api import Services, install_api
@@ -261,7 +262,8 @@ def test_play_and_player_commands(env):
                                     ("set_volume", 80), ("set_audio", None),
                                     ("set_subtitle", {"kind": "none"}), ("stop",)]
     assert env.client.post("/api/player/volume", json={"level": 101}).status_code == 422
-    assert env.client.post("/api/player/subtitle", json={"kind": "bogus"}).status_code == 422
+    r = env.client.post("/api/player/subtitle", json={"kind": "bogus"})
+    assert r.status_code == 422 and r.json() == {"error": "invalid", "volume_label": None}
 
 
 def test_play_volume_absent_409(env):
@@ -293,7 +295,8 @@ def test_tv_show_and_state(env):
     assert env.client.get("/api/tv/state").json() == {
         "screen": "season", "work_id": 5, "season_id": 1, "message": None}
     assert env.client.post("/api/tv/show", json={"screen": "work", "id": 999}).status_code == 404
-    assert env.client.post("/api/tv/show", json={"screen": "work"}).status_code == 422
+    r = env.client.post("/api/tv/show", json={"screen": "work"})
+    assert r.status_code == 422 and r.json() == {"error": "invalid", "volume_label": None}
     env.client.post("/api/play", json={"target_kind": "work", "target_id": 1, "start": "start"})
     assert env.client.post("/api/tv/show", json={"screen": "home"}).json() == {"shown": False}
     assert env.client.post("/api/tv/show", json={"screen": "home", "force": True}).json() == {
@@ -311,4 +314,48 @@ def test_ws_hello_then_tv_event(env):
         msg = ws.receive_json()
         assert msg == {"type": "tv", "state": {"screen": "work", "work_id": 1,
                                                "season_id": None, "message": None}}
-    assert env.playback.bus._queues == set()  # désabonné à la déconnexion
+    assert env.playback.bus.subscriber_count == 0  # désabonné à la déconnexion
+
+
+def test_null_season_label_and_progress_fields_are_filled(env):
+    env.conn.execute("UPDATE season SET label = NULL, rev = 900 WHERE id IN (2, 3)")
+    env.conn.execute("INSERT INTO progress (target_kind, target_id, watched, rev)"
+                     " VALUES ('episode', 3, 0, 900)")
+    env.conn.execute("INSERT INTO progress (target_kind, target_id, watched, rev)"
+                     " VALUES ('work', 1, 0, 900)")
+    inc = env.client.get("/api/sync?since=899").json()
+    assert {s["id"]: s["label"] for s in inc["seasons"]} == {2: "Saison 2", 3: "Épisodes"}
+    assert all((p["position"], p["updated_at"]) == (0.0, 0.0) for p in inc["progress"])
+    assert [s["label"] for s in env.client.get("/api/works/5").json()["seasons"]] == [
+        "Saison 1", "Saison 2"]
+    season = env.client.get("/api/seasons/2").json()
+    assert season["label"] == "Saison 2"
+    assert season["episodes"][0]["progress"]["position"] == 0.0
+    assert season["highlight_episode_id"] == 3
+    work = env.client.get("/api/works/1").json()
+    assert (work["progress"]["position"], work["progress"]["updated_at"]) == (0.0, 0.0)
+
+
+def test_ws_unserialisable_event_is_logged_and_skipped(env, caplog):
+    with caplog.at_level(logging.ERROR, logger="rc.api.ws"):
+        with env.client.websocket_connect("/api/events") as ws:
+            ws.receive_json()  # hello
+            env.client.portal.call(env.playback.bus.publish, {"type": "x", "bad": object()})
+            env.client.post("/api/tv/show", json={"screen": "work", "id": 1})
+            assert ws.receive_json()["type"] == "tv"  # connexion toujours active
+    assert any("non sérialisable" in r.getMessage() for r in caplog.records)
+    assert env.client.get("/api/info").status_code == 200
+
+
+def test_ws_unexpected_error_is_logged_and_closes(env, caplog, monkeypatch):
+    def boom(self):
+        raise RuntimeError("état illisible")
+
+    monkeypatch.setattr(PlaybackService, "state", property(boom))
+    with caplog.at_level(logging.ERROR, logger="rc.api.ws"):
+        with env.client.websocket_connect("/api/events") as ws:
+            with pytest.raises(WebSocketDisconnect) as exc:
+                ws.receive_json()
+    assert exc.value.code == 1011
+    assert any(r.exc_info and "état illisible" in str(r.exc_info[1]) for r in caplog.records)
+    assert env.playback.bus.subscriber_count == 0

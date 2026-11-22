@@ -19,6 +19,10 @@ class EventBus:
     def unsubscribe(self, q: asyncio.Queue[dict]) -> None:
         self._queues.discard(q)
 
+    @property
+    def subscriber_count(self) -> int:
+        return len(self._queues)
+
     def publish(self, msg: dict) -> None:
         for q in list(self._queues):
             if q.full():

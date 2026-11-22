@@ -10,7 +10,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, RootModel
 
@@ -109,13 +110,23 @@ def conflict(code: str, volume_label: str | None = None) -> JSONResponse:
     return JSONResponse({"error": code, "volume_label": volume_label}, status_code=409)
 
 
+def invalid() -> JSONResponse:
+    return JSONResponse({"error": "invalid", "volume_label": None}, status_code=422)
+
+
+async def validation_error_handler(request: Request,
+                                   exc: RequestValidationError) -> JSONResponse:
+    return invalid()
+
+
 def _db_file(conn: sqlite3.Connection) -> str:
     return next(r["file"] for r in conn.execute("PRAGMA database_list") if r["name"] == "main")
 
 
 def _tracks_in_thread(db_file: str, mf: sqlite3.Row, path: Path) -> MediaTracks:
     # Connexion propre au thread : sqlite3 interdit le partage de connexion entre threads.
-    conn = sqlite3.connect(db_file, isolation_level=None)
+    conn = sqlite3.connect(db_file, isolation_level=None, timeout=5)
+    conn.execute("PRAGMA foreign_keys=ON")
     try:
         return load_tracks(conn, mf, path)
     finally:
@@ -182,7 +193,7 @@ def build_router(services: Services) -> APIRouter:
         if body.screen == "home":
             return {"shown": s.tv.show("home", force=body.force)}
         if body.id is None:
-            raise HTTPException(422, "id requis pour cet écran")
+            return invalid()
         if body.screen == "work":
             if s.conn.execute("SELECT 1 FROM work WHERE id = ?", (body.id,)).fetchone() is None:
                 return not_found()

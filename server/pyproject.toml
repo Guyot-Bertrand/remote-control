@@ -15,11 +15,7 @@ dependencies = [
 rc = "rc.cli:main"
 
 [dependency-groups]
-dev = [
-    "httpx2>=2.16.2",
-    "pytest",
-    "pytest-asyncio",
-]
+dev = ["pytest", "pytest-asyncio"]
 
 [build-system]
 requires = ["hatchling"]
@@ -32,3 +28,7 @@ packages = ["rc"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+filterwarnings = [
+    # Starlette 1.10 : TestClient sur httpx (httpx2 volontairement non installé).
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]

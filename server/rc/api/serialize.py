@@ -36,8 +36,19 @@ def row(r: sqlite3.Row) -> dict:
     return d
 
 
-def progress(r: sqlite3.Row) -> dict:
+def season(r: sqlite3.Row) -> dict:
+    """Saison ; libellé jamais nul (« Épisodes » pour la saison 0, sinon « Saison n »)."""
     d = row(r)
+    if d["label"] is None:
+        d["label"] = "Épisodes" if d["number"] == 0 else f"Saison {d['number']}"
+    return d
+
+
+def progress(r: sqlite3.Row) -> dict:
+    """Progression ; position et date jamais nulles (0.0 à défaut)."""
+    d = row(r)
+    d["position"] = d["position"] if d["position"] is not None else 0.0
+    d["updated_at"] = d["updated_at"] if d["updated_at"] is not None else 0.0
     d["audio"] = decode_audio(r["audio"])
     d["subtitle"] = decode_subtitle(r["subtitle"])
     return d
@@ -69,7 +80,7 @@ def sync(conn: sqlite3.Connection, since: int | None) -> dict:
             "revision": current_revision(conn),
             "full": full,
             "works": [row(w) for w in works],
-            "seasons": [row(r) for r in changed("season")],
+            "seasons": [season(r) for r in changed("season")],
             "episodes": [row(r) for r in changed("episode")],
             "media_files": [row(r) for r in changed("media_file")],
             "collections": [row(r) for r in changed("collection")],
@@ -107,7 +118,7 @@ def work_detail(conn: sqlite3.Connection, work_id: int) -> dict | None:
     if w is None:
         return None
     d = row(w)
-    d["seasons"] = [row(s) for s in conn.execute(
+    d["seasons"] = [season(s) for s in conn.execute(
         "SELECT * FROM season WHERE work_id = ? ORDER BY number", (work_id,))]
     d["media_files"] = _media_files(conn, "work_id", work_id)
     d["collections"] = [row(c) for c in conn.execute(
@@ -121,7 +132,7 @@ def season_detail(conn: sqlite3.Connection, season_id: int) -> dict | None:
     s = conn.execute("SELECT * FROM season WHERE id = ?", (season_id,)).fetchone()
     if s is None:
         return None
-    d = row(s)
+    d = season(s)
     work = row(conn.execute("SELECT * FROM work WHERE id = ?", (s["work_id"],)).fetchone())
     d["work"] = {k: work[k] for k in _WORK_SUMMARY}
     episodes = []
@@ -140,5 +151,5 @@ def _highlight(episodes: list[dict]) -> int | None:
     """Dernier épisode entamé ou vu, sinon le premier non vu."""
     touched = [e for e in episodes if e["progress"] is not None]
     if touched:
-        return max(touched, key=lambda e: e["progress"]["updated_at"] or 0)["id"]
+        return max(touched, key=lambda e: e["progress"]["updated_at"])["id"]
     return episodes[0]["id"] if episodes else None
