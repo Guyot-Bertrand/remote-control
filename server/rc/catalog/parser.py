@@ -5,9 +5,23 @@ from collections.abc import Callable
 
 from rc.catalog.model import (
     CollectionRef,
+    ParsedEpisode,
     ParsedGroup,
+    ParsedSeason,
     ParsedWork,
     ParseResult,
+    PosterRef,
+    SubtitleRef,
+    VideoFile,
+)
+from rc.catalog.paths import (
+    QUALITY_ORDER,
+    base_name,
+    episode_info,
+    resolve_dir,
+    season_number,
+    subtitle_filename,
+    subtitle_lang,
 )
 
 KNOWN_CODES = frozenset("GB TG GN GD GL GM GC GS MN MI MC MP MD MF MQ MG".split())
@@ -24,6 +38,11 @@ class _State:
         self.work: ParsedWork | None = None
         self.group: ParsedGroup | None = None
         self.line_no = 0
+        self.stack: list[str] = []
+        # saison ouverte : (niveau, numéro)
+        self.season: tuple[int, int] | None = None
+        # vidéos de l'œuvre courante avec le numéro de saison ouverte à ce moment
+        self.entries: list[tuple[VideoFile, int | None]] = []
 
 
 Handler = Callable[[_State, list[str]], None]
@@ -58,6 +77,8 @@ def _on_gl(st: _State, f: list[str]) -> None:
 
 
 def _on_mn(st: _State, f: list[str]) -> None:
+    _finalize(st)
+    st.season = None
     vo = _field(f, 4)
     alt = _field(f, 5)
     key = _field(f, 2)
@@ -111,7 +132,7 @@ def _on_mc(st: _State, f: list[str]) -> None:
 
 def _on_mp(st: _State, f: list[str]) -> None:
     if st.work and _field(f, 1):
-        st.work.synopsis = f[1]
+        st.work.synopsis = " ; ".join(f[1:])
 
 
 def _on_mq(st: _State, f: list[str]) -> None:
@@ -131,14 +152,123 @@ def _on_mg(st: _State, f: list[str]) -> None:
     st.work.collections.append(ref)
 
 
+def _warn(st: _State, msg: str) -> None:
+    st.result.warnings.append(f"ligne {st.line_no} : {msg}")
+
+
+def _on_md(st: _State, f: list[str]) -> None:
+    level_txt = _field(f, 1)
+    if not level_txt.isdigit():
+        _warn(st, "MD sans niveau valide")
+        return
+    n = int(level_txt)
+    name = _field(f, 2)
+    if st.season and n <= st.season[0]:
+        st.season = None
+    if not name:
+        st.stack = st.stack[:n]
+        return
+    work_key = st.work.key if st.work else None
+    if name == "*" and work_key is None:
+        _warn(st, "MD * sans œuvre courante")
+    st.stack = st.stack[:n] + [resolve_dir(name, work_key)]
+    label = _field(f, 3) or None
+    num = season_number(name, label)
+    if num is not None and st.work:
+        st.work.seasons.append(ParsedSeason(num, label or name))
+        st.season = (n, num)
+
+
+def _on_video(st: _State, f: list[str]) -> None:
+    if not st.work:
+        _warn(st, "MF ; VI sans œuvre courante")
+        return
+    quality = _field(f, 2)
+    size = _field(f, 3)
+    filename = _field(f, 4) or None
+    subs = []
+    if filename:
+        for ref in f[5:]:
+            if ref:
+                sub = subtitle_filename(filename, ref)
+                subs.append(SubtitleRef(sub, subtitle_lang(sub)))
+    video = VideoFile(
+        quality=quality,
+        size=None if size in ("", "?") else size,
+        filename=filename,
+        rel_dir=tuple(st.stack),
+        subtitles=subs,
+        playable=filename is not None and quality in QUALITY_ORDER,
+    )
+    st.entries.append((video, st.season[1] if st.season else None))
+
+
 def _on_mf(st: _State, f: list[str]) -> None:
-    if _field(f, 1) == "TG" and st.work:
+    kind = _field(f, 1)
+    if kind == "TG" and st.work:
         st.work.tags.extend(re.findall(r"\[[^\]]+\]", " ".join(f[2:])))
-    # MF ; VI / AF : Task 3
+    elif kind == "VI":
+        _on_video(st, f)
+    elif kind == "AF":
+        if not st.work:
+            _warn(st, "MF ; AF sans œuvre courante")
+        elif _field(f, 2):
+            st.work.poster = PosterRef(f[2], tuple(st.stack))
+
+
+def _finalize(st: _State) -> None:
+    """Range les vidéos de l'œuvre courante : fichiers ou épisodes."""
+    w = st.work
+    entries, st.entries = st.entries, []
+    if not w:
+        return
+    playable = [(v, s) for v, s in entries if v.playable]
+    w.episodic = (
+        w.type == "serie"
+        or bool(w.seasons)
+        or any(episode_info(v.filename or "")[0] is not None for v, _ in playable)
+        or len({base_name(v.filename or "") for v, _ in playable}) >= 2
+    )
+    if not w.episodic:
+        w.videos = [v for v, _ in entries]
+        return
+    w.videos = [v for v, _ in entries if not v.playable]
+    known = {s.number for s in w.seasons}
+    counters: dict[int, int] = {}
+    by_base: dict[tuple[int, str], int] = {}
+    episodes: dict[tuple[int, int], ParsedEpisode] = {}
+    for v, open_season in playable:
+        filename = v.filename or ""
+        p_season, p_number, p_title = episode_info(filename)
+        season = open_season if open_season is not None else p_season
+        if season is None:
+            season = 0
+        if season not in known:
+            known.add(season)
+            w.seasons.append(
+                ParsedSeason(season, "Épisodes" if season == 0 else f"Saison {season}")
+            )
+        if p_number is not None:
+            number, title = p_number, p_title
+        else:
+            base = base_name(filename)
+            title = base
+            if (season, base) in by_base:
+                number = by_base[(season, base)]
+            else:
+                number = counters.get(season, 0) + 1
+                counters[season] = number
+                by_base[(season, base)] = number
+        key = (season, number)
+        if key in episodes:
+            episodes[key].videos.append(v)
+        else:
+            episodes[key] = ParsedEpisode(season, number, title, [v])
+    w.episodes = list(episodes.values())
 
 
 def _accept(st: _State, f: list[str]) -> None:
-    """Code accepted but not interpreted yet (MD: Task 3)."""
+    """Code accepté mais non interprété."""
 
 
 HANDLERS: dict[str, Handler] = {
@@ -152,7 +282,7 @@ HANDLERS: dict[str, Handler] = {
     "MQ": _on_mq,
     "MG": _on_mg,
     "MF": _on_mf,
-    "MD": _accept,
+    "MD": _on_md,
     "GB": _accept,
     "TG": _accept,
     "GM": _accept,
@@ -174,4 +304,5 @@ def parse_catalog(text: str) -> ParseResult:
             st.result.warnings.append(f"ligne {n} : code inconnu {code}")
             continue
         HANDLERS[code](st, fields)
+    _finalize(st)
     return st.result
