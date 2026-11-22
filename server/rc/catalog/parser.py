@@ -24,7 +24,7 @@ from rc.catalog.paths import (
     subtitle_lang,
 )
 
-KNOWN_CODES = frozenset("GB TG GN GD GL GM GC GS MN MI MC MP MD MF MQ MG".split())
+KNOWN_CODES = frozenset("GB TG GN GD GL GM GC GS MN MI MC MP MD MF MQ MG RN RF RC QS".split())
 
 _SEP = re.compile(r"\s;(?:\s+|$)")
 _IMDB = re.compile(r"imdb\.com/title/(tt\d+)")
@@ -49,7 +49,11 @@ Handler = Callable[[_State, list[str]], None]
 
 
 def _split(line: str) -> list[str]:
-    return [f.strip() for f in _SEP.split(line.strip())]
+    code, sep, rest = line.strip().partition(";")
+    rest = rest.strip()
+    if not sep or not rest:
+        return [code.strip()]
+    return [code.strip(), *(f.strip() for f in _SEP.split(rest))]
 
 
 def _csv(value: str) -> list[str]:
@@ -175,7 +179,8 @@ def _on_md(st: _State, f: list[str]) -> None:
     label = _field(f, 3) or None
     num = season_number(name, label)
     if num is not None and st.work:
-        st.work.seasons.append(ParsedSeason(num, label or name))
+        if all(x.number != num for x in st.work.seasons):
+            st.work.seasons.append(ParsedSeason(num, label or name))
         st.season = (n, num)
 
 
@@ -238,6 +243,11 @@ def _finalize(st: _State) -> None:
     by_base: dict[tuple[int, str], int] = {}
     episodes: dict[tuple[int, int], ParsedEpisode] = {}
     for v, open_season in playable:
+        p_season, p_number, _ = episode_info(v.filename or "")
+        season = open_season if open_season is not None else (p_season or 0)
+        if p_number is not None:
+            counters[season] = max(counters.get(season, 0), p_number)
+    for v, open_season in playable:
         filename = v.filename or ""
         p_season, p_number, p_title = episode_info(filename)
         season = open_season if open_season is not None else p_season
@@ -288,6 +298,10 @@ HANDLERS: dict[str, Handler] = {
     "GM": _accept,
     "GC": _accept,
     "GS": _accept,
+    "RN": _accept,
+    "RF": _accept,
+    "RC": _accept,
+    "QS": _accept,
 }
 
 

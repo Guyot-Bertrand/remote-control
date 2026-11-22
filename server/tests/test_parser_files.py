@@ -165,3 +165,39 @@ def test_paths_units():
     assert season_number("Saison 02", None) == 2
     assert season_number("x", "Saison 3") == 3
     assert season_number("Extras", None) is None
+
+
+def test_index_codes_accepted_silently():
+    r = parse_catalog("RN ; Scott, Ridley\nRF ; x\nRC ; y\nQS ; z\n")
+    assert r.warnings == []
+
+
+def test_missing_space_after_first_separator():
+    r = parse_catalog(
+        "MN ; film ; X [2000] ; X ; *\nMI ;1h44 ; 2000 ; Dir ; drame\nMP ;un ; deux\n"
+    )
+    assert r.warnings == []
+    assert r.works[0].duration_min == 104
+    assert r.works[0].directors == ["Dir"]
+    assert r.works[0].synopsis == "un ; deux"
+
+
+def test_unpatterned_episode_never_collides_with_explicit_number():
+    r = parse_catalog(
+        "MN ; serie ; X [2000] ; X ; *\n"
+        "MF ; VI ; HD ; 1G ; Bonus [0h05,1x1,16x9,FR].mp4\n"
+        "MF ; VI ; HD ; 1G ; S00E01 [0h20,1x1,16x9,FR].mp4\n"
+    )
+    nums = sorted((e.season, e.number) for e in r.works[0].episodes)
+    assert nums == [(0, 1), (0, 2)]
+
+
+def test_reopened_season_not_duplicated():
+    r = parse_catalog(
+        "MN ; serie ; X [2000] ; X ; *\n"
+        "MD ; 1 ; Saison 01 ; Saison 1\n"
+        "MF ; VI ; HD ; 1G ; S01E01 [0h20,1x1,16x9,FR].mp4\n"
+        "MD ; 1 ; Saison 01 bis ; Saison 1\n"
+        "MF ; VI ; HD ; 1G ; S01E02 [0h20,1x1,16x9,FR].mp4\n"
+    )
+    assert r.works[0].seasons == [ParsedSeason(1, "Saison 1")]
