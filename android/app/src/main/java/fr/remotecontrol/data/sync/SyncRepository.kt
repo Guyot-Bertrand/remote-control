@@ -1,0 +1,45 @@
+package fr.remotecontrol.data.sync
+
+import fr.remotecontrol.data.META_REVISION
+import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.net.ApiError
+import fr.remotecontrol.net.ApiResult
+import fr.remotecontrol.net.RcApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+sealed interface SyncOutcome {
+    data class Done(val revision: Long, val full: Boolean) : SyncOutcome
+    data class Failed(val error: ApiError) : SyncOutcome
+}
+
+class SyncRepository(
+    private val db: AppDatabase,
+    private val api: RcApi,
+    private val writer: SyncWriter = SyncWriter(db),
+) {
+    private val mutex = Mutex()
+    private val _syncing = MutableStateFlow(false)
+    val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
+
+    suspend fun localRevision(): Long? = db.metaDao().get(META_REVISION)?.toLongOrNull()
+
+    suspend fun sync(forceFull: Boolean = false): SyncOutcome = mutex.withLock {
+        _syncing.value = true
+        try {
+            val since = if (forceFull) null else localRevision()
+            when (val r = api.sync(since)) {
+                is ApiResult.Err -> SyncOutcome.Failed(r.error)
+                is ApiResult.Ok -> {
+                    writer.apply(r.value)
+                    SyncOutcome.Done(r.value.revision, r.value.full)
+                }
+            }
+        } finally {
+            _syncing.value = false
+        }
+    }
+}

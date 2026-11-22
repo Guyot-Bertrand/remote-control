@@ -3,7 +3,9 @@ package fr.remotecontrol.net
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -57,5 +59,5 @@ class EventsClient(
             }
         }
         awaitClose { loop.cancel() }
-    }
+    }.buffer(Channel.UNLIMITED) // events are low-rate state snapshots: never drop the newest for a slow collector
 }

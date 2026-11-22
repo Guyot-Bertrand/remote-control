@@ -1,0 +1,80 @@
+package fr.remotecontrol.data.sync
+
+import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.net.ApiResult
+import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.net.RcJson
+import fr.remotecontrol.net.ServerEvent
+import fr.remotecontrol.net.SyncDto
+import fr.remotecontrol.net.TvStateDto
+import fr.remotecontrol.testing.FakeRcApi
+import fr.remotecontrol.testing.Fixtures
+import fr.remotecontrol.testing.testDb
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+class SyncCoordinatorTest {
+    private lateinit var db: AppDatabase
+    private val api = FakeRcApi()
+    private lateinit var repo: SyncRepository
+    private val full: SyncDto = RcJson.decodeFromString(Fixtures.text("sync_full.json"))
+    private val events = MutableSharedFlow<ServerEvent>()
+
+    @Before fun setUp() {
+        db = testDb()
+        repo = SyncRepository(db, api)
+    }
+
+    @After fun tearDown() = db.close()
+
+    private suspend fun seedLocal(revision: Long) {
+        api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = revision)))
+        repo.sync()
+        api.calls.clear()
+    }
+
+    private fun hello(r: Long) = ServerEvent.Hello(r, TvStateDto("home"), PlayerSnapshotDto())
+
+    private suspend fun kotlinx.coroutines.test.TestScope.emit(e: ServerEvent, response: SyncDto? = null) {
+        response?.let { api.syncResponses.addLast(ApiResult.Ok(it)) }
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
+        events.subscriptionCount.let { while (it.value == 0) kotlinx.coroutines.yield() }
+        events.emit(e)
+        events.emit(ServerEvent.Tv(TvStateDto("home"))) // barrier: accepted only once e has been fully handled
+        job.cancel()
+    }
+
+    @Test fun hello_newer_triggers_incremental() = runTest {
+        seedLocal(3)
+        emit(hello(5), full.copy(revision = 5, full = false))
+        assertEquals(listOf("sync(3)"), api.calls)
+    }
+
+    @Test fun same_revision_no_sync() = runTest {
+        seedLocal(3)
+        emit(hello(3))
+        assertEquals(emptyList<String>(), api.calls)
+    }
+
+    @Test fun lower_revision_forces_full() = runTest {
+        seedLocal(5)
+        emit(ServerEvent.Catalog(2), full.copy(revision = 2))
+        assertEquals(listOf("sync(null)"), api.calls)
+    }
+
+    @Test fun empty_cache_forces_full() = runTest {
+        emit(hello(3), full)
+        assertEquals(listOf("sync(null)"), api.calls)
+    }
+}
