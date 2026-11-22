@@ -1,0 +1,260 @@
+"""Routes HTTP de l'API (/api/...)."""
+
+from __future__ import annotations
+
+import asyncio
+import re
+import sqlite3
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field, RootModel
+
+from rc.api import serialize
+from rc.assets import SIZES, asset_path
+from rc.config import Config
+from rc.db import current_revision
+from rc.events import EventBus
+from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
+                               load_tracks, pick_tracks, resolve_version)
+from rc.probe import MediaTracks
+
+CACHE_IMMUTABLE = "public, max-age=31536000, immutable"
+ASSET_SIZES = {"orig", *SIZES}
+_HASH = re.compile(r"[0-9a-f]{1,64}")
+
+
+@dataclass
+class Services:
+    conn: sqlite3.Connection
+    config: Config
+    bus: EventBus
+    tv: TvController
+    playback: PlaybackService
+    indexes_getter: Callable[[], dict[str, dict[str, Path]]]
+
+    def player_snapshot(self) -> dict:
+        return {"state": asdict(self.playback.state), "current": self.playback.current}
+
+
+# -- corps des requêtes ---------------------------------------------------
+
+class SubNone(BaseModel):
+    kind: Literal["none"]
+
+
+class SubEmbedded(BaseModel):
+    kind: Literal["embedded"]
+    index: int
+
+
+class SubExternal(BaseModel):
+    kind: Literal["external"]
+    path: str
+
+
+SubSelModel = Annotated[SubNone | SubEmbedded | SubExternal, Field(discriminator="kind")]
+
+
+class SubSelBody(RootModel[SubSelModel]):
+    pass
+
+
+class TvShowBody(BaseModel):
+    screen: Literal["home", "work", "season"]
+    id: int | None = None
+    force: bool = False
+
+
+class PlayBody(BaseModel):
+    target_kind: Literal["work", "episode"]
+    target_id: int
+    start: Literal["start", "resume"]
+    media_file_id: int | None = None
+    audio: int | None = None
+    subtitle: SubSelModel | None = None
+
+
+class PauseBody(BaseModel):
+    paused: bool
+
+
+class SeekBody(BaseModel):
+    seconds: float
+    relative: bool
+
+
+class VolumeBody(BaseModel):
+    level: int = Field(ge=0, le=100)
+
+
+class AudioBody(BaseModel):
+    index: int | None
+
+
+# -- réponses -------------------------------------------------------------
+
+OK = {"ok": True}
+
+
+def not_found() -> JSONResponse:
+    return JSONResponse({"error": "not_found"}, status_code=404)
+
+
+def conflict(code: str, volume_label: str | None = None) -> JSONResponse:
+    return JSONResponse({"error": code, "volume_label": volume_label}, status_code=409)
+
+
+def _db_file(conn: sqlite3.Connection) -> str:
+    return next(r["file"] for r in conn.execute("PRAGMA database_list") if r["name"] == "main")
+
+
+def _tracks_in_thread(db_file: str, mf: sqlite3.Row, path: Path) -> MediaTracks:
+    # Connexion propre au thread : sqlite3 interdit le partage de connexion entre threads.
+    conn = sqlite3.connect(db_file, isolation_level=None)
+    try:
+        return load_tracks(conn, mf, path)
+    finally:
+        conn.close()
+
+
+def build_router(services: Services) -> APIRouter:
+    s = services
+    router = APIRouter(prefix="/api")
+
+    @router.get("/info")
+    async def info():
+        return {"name": "Remote-Control", "api": 1, "revision": current_revision(s.conn)}
+
+    @router.get("/sync")
+    async def sync(since: int | None = None):
+        return serialize.sync(s.conn, since)
+
+    @router.get("/works/{work_id}")
+    async def work(work_id: int):
+        d = serialize.work_detail(s.conn, work_id)
+        return not_found() if d is None else d
+
+    @router.get("/seasons/{season_id}")
+    async def season(season_id: int):
+        d = serialize.season_detail(s.conn, season_id)
+        return not_found() if d is None else d
+
+    @router.get("/media/{media_file_id}/tracks")
+    async def media_tracks(media_file_id: int):
+        mf = s.conn.execute("SELECT * FROM media_file WHERE id = ?",
+                            (media_file_id,)).fetchone()
+        if mf is None:
+            return not_found()
+        try:
+            path = resolve_version(s.conn, mf, s.indexes_getter())
+        except PlayError as exc:
+            return conflict(exc.code, exc.volume_label)
+        db_file = _db_file(s.conn)
+        if db_file:
+            tracks = await asyncio.to_thread(_tracks_in_thread, db_file, mf, path)
+        else:  # base en mémoire : pas de seconde connexion possible
+            tracks = load_tracks(s.conn, mf, path)
+        kind, target = ("work", mf["work_id"]) if mf["work_id"] is not None else (
+            "episode", mf["episode_id"])
+        prog = s.conn.execute(
+            "SELECT * FROM progress WHERE target_kind = ? AND target_id = ?",
+            (kind, target)).fetchone()
+        audio, subtitle = pick_tracks(prog, tracks)
+        return serialize.tracks(tracks, audio, subtitle)
+
+    @router.get("/assets/{hash}/{size}.jpg")
+    async def asset(hash: str, size: str):
+        if size not in ASSET_SIZES or not _HASH.fullmatch(hash):
+            return not_found()
+        path = asset_path(s.config.data_dir / "assets", hash, size)
+        if not path.is_file():
+            return not_found()
+        return FileResponse(path, media_type="image/jpeg",
+                            headers={"Cache-Control": CACHE_IMMUTABLE})
+
+    @router.post("/tv/show")
+    async def tv_show(body: TvShowBody):
+        if body.screen == "home":
+            return {"shown": s.tv.show("home", force=body.force)}
+        if body.id is None:
+            raise HTTPException(422, "id requis pour cet écran")
+        if body.screen == "work":
+            if s.conn.execute("SELECT 1 FROM work WHERE id = ?", (body.id,)).fetchone() is None:
+                return not_found()
+            return {"shown": s.tv.show("work", work_id=body.id, force=body.force)}
+        r = s.conn.execute("SELECT work_id FROM season WHERE id = ?", (body.id,)).fetchone()
+        if r is None:
+            return not_found()
+        return {"shown": s.tv.show("season", work_id=r["work_id"], season_id=body.id,
+                                   force=body.force)}
+
+    @router.get("/tv/state")
+    async def tv_state():
+        return asdict(s.tv.state)
+
+    @router.post("/play")
+    async def play(body: PlayBody):
+        req = PlayRequest(body.target_kind, body.target_id, body.start, body.media_file_id,
+                          body.audio,
+                          None if body.subtitle is None else body.subtitle.model_dump())
+        try:
+            await s.playback.play(req)
+        except PlayError as exc:
+            return conflict(exc.code, exc.volume_label)
+        return OK
+
+    def idle() -> bool:
+        return s.playback.current is None
+
+    @router.post("/player/pause")
+    async def pause(body: PauseBody):
+        if idle():
+            return conflict("idle")
+        await s.playback.pause(body.paused)
+        return OK
+
+    @router.post("/player/seek")
+    async def seek(body: SeekBody):
+        if idle():
+            return conflict("idle")
+        await s.playback.seek(body.seconds, body.relative)
+        return OK
+
+    @router.post("/player/volume")
+    async def volume(body: VolumeBody):
+        if idle():
+            return conflict("idle")
+        await s.playback.set_volume(body.level)
+        return OK
+
+    @router.post("/player/audio")
+    async def audio(body: AudioBody):
+        if idle():
+            return conflict("idle")
+        await s.playback.set_audio(body.index)
+        return OK
+
+    @router.post("/player/subtitle")
+    async def subtitle(body: SubSelBody):
+        if idle():
+            return conflict("idle")
+        await s.playback.set_subtitle(body.root.model_dump())
+        return OK
+
+    @router.post("/player/stop")
+    async def stop():
+        if idle():
+            return conflict("idle")
+        await s.playback.stop()
+        return OK
+
+    @router.get("/player/state")
+    async def player_state():
+        return s.player_snapshot()
+
+    return router

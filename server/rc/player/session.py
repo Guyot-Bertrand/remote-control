@@ -93,6 +93,60 @@ def decode_subtitle(text: str | None) -> SubSel | None:
     return None if text is None else json.loads(text)
 
 
+def resolve_version(conn: sqlite3.Connection, mf: sqlite3.Row,
+                    indexes: dict[str, dict[str, Path]]) -> Path:
+    """Chemin du fichier d'une version, ou PlayError (volume_absent / not_found)."""
+    path = resolve_media_path(conn, mf["id"], indexes)
+    if path is not None:
+        return path
+    uuid = mf["volume_uuid"]
+    if uuid is not None and uuid not in indexes:
+        row = conn.execute("SELECT label FROM volume WHERE uuid = ?", (uuid,)).fetchone()
+        raise PlayError("volume_absent", (row["label"] if row else None) or uuid)
+    raise PlayError("not_found")
+
+
+def load_tracks(conn: sqlite3.Connection, mf: sqlite3.Row, path: Path) -> MediaTracks:
+    """Pistes d'une version (analyse en cache) et sous-titres externes ; appel bloquant.
+
+    Une analyse impossible donne des pistes intégrées vides, jamais une erreur."""
+    try:
+        tracks = cached_tracks(conn, mf["id"], path)
+    except (subprocess.CalledProcessError, FileNotFoundError,
+            json.JSONDecodeError, OSError) as exc:
+        log.warning("analyse des pistes impossible pour %s : %s", path, exc)
+        tracks = MediaTracks([], [], [], None, None)
+    declared = [str(path.parent / s["filename"]) for s in json.loads(mf["subtitles_json"])]
+    tracks.external = find_external_subs(path, declared)
+    return tracks
+
+
+def sub_valid(sel: SubSel | None, tracks: MediaTracks) -> bool:
+    if sel is None:
+        return False
+    kind = sel.get("kind")
+    if kind == "embedded":
+        return sel.get("index") in {t.index for t in tracks.subtitles}
+    if kind == "external":
+        path = str(sel.get("path", ""))
+        known = {str(e.path) for e in tracks.external}
+        return path in known and Path(path).is_file()
+    return kind == "none"
+
+
+def pick_tracks(prog: sqlite3.Row | None, tracks: MediaTracks, audio: int | None = None,
+                subtitle: SubSel | None = None) -> tuple[int | None, SubSel]:
+    """Choix explicite, sinon dernier choix enregistré s'il est encore valide, sinon défaut."""
+    default_audio, default_sub = default_selection(tracks)
+    if audio is None:
+        stored = decode_audio(prog["audio"]) if prog is not None else None
+        audio = stored if stored in {t.index for t in tracks.audio} else default_audio
+    if subtitle is None:
+        stored_sub = decode_subtitle(prog["subtitle"]) if prog is not None else None
+        subtitle = stored_sub if sub_valid(stored_sub, tracks) else default_sub
+    return audio, subtitle
+
+
 def _quality_rank(quality: str) -> int:
     return QUALITY_ORDER.index(quality) if quality in QUALITY_ORDER else len(QUALITY_ORDER)
 
@@ -140,8 +194,8 @@ class PlaybackService:
         start_at = 0.0
         if req.start == "resume" and prog is not None:
             start_at = prog["position"] or 0.0
-        tracks = self._tracks(mf, path)
-        audio, subtitle = self._pick_tracks(req, prog, tracks)
+        tracks = load_tracks(self.conn, mf, path)
+        audio, subtitle = pick_tracks(prog, tracks, req.audio, req.subtitle)
         external = [e.path for e in tracks.external]
         try:
             await self.player.start(path, start_at, audio, subtitle, external)
@@ -175,57 +229,12 @@ class PlaybackService:
         return min(rows, key=lambda r: (not r["present"], _quality_rank(r["quality"])))
 
     def _resolve(self, mf: sqlite3.Row) -> Path:
-        indexes = self.indexes_getter()
-        path = resolve_media_path(self.conn, mf["id"], indexes)
-        if path is not None:
-            return path
-        uuid = mf["volume_uuid"]
-        if uuid is not None and uuid not in indexes:
-            row = self.conn.execute(
-                "SELECT label FROM volume WHERE uuid = ?", (uuid,)).fetchone()
-            label = (row["label"] if row else None) or uuid
-            if self._session is None:
-                self.tv.playback_ended(f"Disque « {label} » non branché")
-            raise PlayError("volume_absent", label)
-        raise PlayError("not_found")
-
-    def _tracks(self, mf: sqlite3.Row, path: Path) -> MediaTracks:
         try:
-            tracks = cached_tracks(self.conn, mf["id"], path)
-        except (subprocess.CalledProcessError, FileNotFoundError,
-                json.JSONDecodeError, OSError) as exc:
-            log.warning("analyse des pistes impossible pour %s : %s", path, exc)
-            tracks = MediaTracks([], [], [], None, None)
-        declared = [str(path.parent / s["filename"])
-                    for s in json.loads(mf["subtitles_json"])]
-        tracks.external = find_external_subs(path, declared)
-        return tracks
-
-    def _pick_tracks(self, req: PlayRequest, prog: sqlite3.Row | None,
-                     tracks: MediaTracks) -> tuple[int | None, SubSel]:
-        default_audio, default_sub = default_selection(tracks)
-        audio, subtitle = req.audio, req.subtitle
-        if audio is None:
-            stored = decode_audio(prog["audio"]) if prog is not None else None
-            valid = stored in {t.index for t in tracks.audio}
-            audio = stored if valid else default_audio
-        if subtitle is None:
-            stored_sub = decode_subtitle(prog["subtitle"]) if prog is not None else None
-            subtitle = stored_sub if self._sub_valid(stored_sub, tracks) else default_sub
-        return audio, subtitle
-
-    @staticmethod
-    def _sub_valid(sel: SubSel | None, tracks: MediaTracks) -> bool:
-        if sel is None:
-            return False
-        kind = sel.get("kind")
-        if kind == "embedded":
-            return sel.get("index") in {t.index for t in tracks.subtitles}
-        if kind == "external":
-            path = str(sel.get("path", ""))
-            known = {str(e.path) for e in tracks.external}
-            return path in known and Path(path).is_file()
-        return kind == "none"
+            return resolve_version(self.conn, mf, self.indexes_getter())
+        except PlayError as exc:
+            if exc.code == "volume_absent" and self._session is None:
+                self.tv.playback_ended(f"Disque « {exc.volume_label} » non branché")
+            raise
 
     def _describe(self, req: PlayRequest, media_file_id: int) -> dict:
         if req.target_kind == "work":

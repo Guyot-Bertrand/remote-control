@@ -15,7 +15,11 @@ dependencies = [
 rc = "rc.cli:main"
 
 [dependency-groups]
-dev = ["pytest", "pytest-asyncio"]
+dev = [
+    "httpx2>=2.16.2",
+    "pytest",
+    "pytest-asyncio",
+]
 
 [build-system]
 requires = ["hatchling"]
