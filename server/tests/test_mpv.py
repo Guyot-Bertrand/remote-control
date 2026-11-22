@@ -1,0 +1,143 @@
+import asyncio
+import json
+import stat
+import sys
+from pathlib import Path
+
+import pytest
+
+from rc.player.mpv import MpvClient, MpvError, MpvPlayer
+from tests.fake_mpv import FakeMpv
+
+FAKE = Path(__file__).parent / "fake_mpv.py"
+
+
+@pytest.fixture
+def sock(tmp_path):
+    return tmp_path / "s.sock"
+
+
+@pytest.fixture
+async def fake(sock):
+    f = FakeMpv(sock)
+    await f.start()
+    yield f
+    await f.close()
+
+
+@pytest.fixture
+async def client(fake, sock):
+    c = MpvClient(sock)
+    await c.connect(retries=5, delay=0.01)
+    yield c
+    await c.close()
+
+
+async def test_command_roundtrip_and_request_id(fake, client):
+    fake.props["volume"] = 42
+    a, b = await asyncio.gather(
+        client.command("get_property", "volume"), client.command("get_property", "volume")
+    )
+    assert a == b == 42
+    ids = [c for c in fake.commands]
+    assert len(ids) == 2
+
+
+async def test_error_raises_mpverror(fake, client):
+    fake.fail.add("bogus")
+    with pytest.raises(MpvError, match="property unavailable"):
+        await client.command("bogus")
+
+
+async def test_observe_property_change_yields_event(fake, client):
+    pid = await client.observe("time-pos")
+    await fake.emit({"event": "property-change", "id": pid, "name": "time-pos", "data": 3.5})
+    ev = await asyncio.wait_for(anext(client.events()), 1)
+    assert ev == {"event": "property-change", "id": pid, "name": "time-pos", "data": 3.5}
+
+
+# -- MpvPlayer contre un mpv factice (sous-processus) ------------------------
+
+
+@pytest.fixture
+def make_player(tmp_path, monkeypatch):
+    wrapper = tmp_path / "mpv"
+    wrapper.write_text(f'#!/bin/sh\nexec {sys.executable} {FAKE} "$@"\n')
+    wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
+    log = tmp_path / "log.jsonl"
+    players = []
+
+    def make(script, props=None):
+        cfg = tmp_path / "cfg.json"
+        cfg.write_text(json.dumps({"script": script, "props": props or {}, "log": str(log)}))
+        monkeypatch.setenv("FAKE_MPV_CONFIG", str(cfg))
+        p = MpvPlayer(str(wrapper), ["--foo"], tmp_path / "run")
+        states = []
+        p.on_state = states.append
+        players.append(p)
+        return p, states, log
+
+    yield make
+    # filet de sécurité : rien ne doit rester vivant
+
+
+async def wait_for(cond, timeout=5):
+    async with asyncio.timeout(timeout):
+        while not cond():
+            await asyncio.sleep(0.01)
+
+
+def logged(log):
+    return [json.loads(l) for l in log.read_text().splitlines()] if log.exists() else []
+
+
+async def test_start_sends_tracks_after_file_loaded(make_player, tmp_path):
+    ext = tmp_path / "x.srt"
+    tracks = [
+        {"type": "audio", "id": 1},
+        {"type": "sub", "id": 1, "external": False},
+        {"type": "sub", "id": 2, "external": True},
+    ]
+    p, states, log = make_player(
+        [{"event": {"event": "file-loaded"}}], {"track-list": tracks}
+    )
+    await p.start(tmp_path / "f.mkv", 12, 2, {"kind": "external", "path": str(ext)}, [ext])
+    await wait_for(lambda: ["set_property", "sid", 2] in logged(log))
+    cmds = logged(log)
+    assert cmds.index(["set_property", "aid", 2]) < cmds.index(["set_property", "sid", 2])
+    argv = next(c for c in cmds if c[0] == "argv")
+    assert "--start=12" in argv and f"--sub-file={ext}" in argv and "--foo" in argv
+    assert argv[-1] == str(tmp_path / "f.mkv")
+    await p.stop()
+    assert p.state.running is False
+
+
+async def test_state_updates_position(make_player, tmp_path):
+    ev = lambda n, d: {"event": {"event": "property-change", "id": 1, "name": n, "data": d}}
+    p, states, log = make_player(
+        [ev("time-pos", 12.5), ev("duration", 100.0), ev("pause", True), ev("volume", 80)]
+    )
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await wait_for(lambda: states and states[-1].volume == 80)
+    s = states[-1]
+    assert (s.position, s.duration, s.paused, s.running) == (12.5, 100.0, True, True)
+    await p.stop()
+    assert states[-1].running is False and states[-1].error is None
+
+
+async def test_process_exit_without_eof_sets_error(make_player, tmp_path):
+    p, states, _ = make_player([{"exit": True}])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await wait_for(lambda: states and not states[-1].running)
+    assert states[-1].error == "process_exit" and not states[-1].ended
+    await p.stop()
+
+
+async def test_eof_marks_ended(make_player, tmp_path):
+    p, states, _ = make_player(
+        [{"event": {"event": "end-file", "reason": "eof"}}, {"exit": True}]
+    )
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await wait_for(lambda: states and not states[-1].running)
+    assert states[-1].ended and states[-1].error is None
+    await p.stop()
