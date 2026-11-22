@@ -10,7 +10,7 @@ from rc.catalog.importer import import_catalog
 from rc.catalog.parser import parse_catalog
 from rc.db import open_db
 from rc.fake_tree import make_fake_tree
-from rc.volumes import (Volume, build_index, find_catalog_source, list_volumes,
+from rc.volumes import (Volume, VolumeUnreadable, build_index, find_catalog_source, list_volumes,
                         locate_files, resolve_media_path)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
@@ -95,3 +95,36 @@ def test_find_catalog_source_newest(tmp_path):
     assert find_catalog_source(vols, None) == b / "medias.txt"
     assert find_catalog_source(vols, tmp_path / "o.txt") == tmp_path / "o.txt"
     assert find_catalog_source([], None) is None
+
+
+def test_unreadable_root_raises(tmp_path):
+    with pytest.raises(VolumeUnreadable):
+        build_index(tmp_path / "missing")
+
+
+def test_unreadable_volume_leaves_rows_untouched(conn, tmp_path):
+    _, vol = setup_disk(conn, tmp_path)
+    locate_files(conn, [vol], {"U1": build_index(vol.mount)})
+    rev = conn.execute("SELECT value FROM meta WHERE key = 'revision'").fetchone()[0]
+    assert not locate_files(conn, [vol], {})
+    assert conn.execute("SELECT value FROM meta WHERE key = 'revision'").fetchone()[0] == rev
+    assert all(r["present"] == 1 for r in ava_rows(conn))
+    assert conn.execute("SELECT present FROM volume WHERE uuid = 'U1'").fetchone()[0] == 1
+
+
+def test_list_volumes_dedupes_uuid():
+    payload = {"filesystems": [
+        {"target": "/media/a", "uuid": "U1", "label": "A"},
+        {"target": "/media/b", "uuid": "U1", "label": "B"},
+    ]}
+    runner = lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(payload), "")
+    assert list_volumes([Path("/media")], runner=runner) == [
+        Volume("U1", "A", Path("/media/a"))]
+
+
+def test_build_index_skips_special_dirs(tmp_path):
+    for d in (".hidden", "lost+found", "System Volume Information", "ok"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "f.mp4").touch()
+    (tmp_path / ".dot.mp4").touch()
+    assert set(build_index(tmp_path)) == {"ok/f.mp4"}

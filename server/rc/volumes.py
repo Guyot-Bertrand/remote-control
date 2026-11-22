@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import subprocess
@@ -12,8 +13,14 @@ from pathlib import Path
 
 from rc.db import next_revision
 
+log = logging.getLogger(__name__)
+
 MAX_DEPTH = 6
 _SKIP_DIRS = {"lost+found", "System Volume Information"}
+
+
+class VolumeUnreadable(OSError):
+    """La racine du disque monté ne peut pas être listée."""
 
 
 @dataclass
@@ -34,7 +41,8 @@ def list_volumes(scan_roots: list[Path], runner=subprocess.run) -> list[Volume]:
     )
     data = json.loads(proc.stdout)
     roots = [Path(r) for r in scan_roots]
-    volumes = []
+    volumes: list[Volume] = []
+    seen: set[str] = set()
     for fs in data.get("filesystems", []):
         uuid, target = fs.get("uuid"), fs.get("target")
         if not uuid or not target:
@@ -42,6 +50,9 @@ def list_volumes(scan_roots: list[Path], runner=subprocess.run) -> list[Volume]:
         mount = Path(target)
         if not any(mount.is_relative_to(r) for r in roots):
             continue
+        if uuid in seen:
+            continue
+        seen.add(uuid)
         volumes.append(Volume(uuid, fs.get("label") or mount.name, mount))
     return volumes
 
@@ -51,8 +62,12 @@ def build_index(mount: Path) -> dict[str, Path]:
 
     def walk(directory: Path, depth: int) -> None:
         try:
-            entries = list(os.scandir(directory))
-        except OSError:
+            with os.scandir(directory) as it:
+                entries = list(it)
+        except OSError as exc:
+            if directory == mount:
+                raise VolumeUnreadable(f"{mount}: {exc}") from exc
+            log.warning("répertoire illisible, ignoré : %s (%s)", directory, exc)
             return
         for entry in entries:
             if entry.name.startswith(".") or entry.name in _SKIP_DIRS:
@@ -71,6 +86,8 @@ def build_index(mount: Path) -> dict[str, Path]:
 def locate_files(conn: sqlite3.Connection, volumes: list[Volume],
                  indexes: dict[str, dict[str, Path]]) -> bool:
     present = [v for v in volumes if v.uuid in indexes]
+    # Monté mais sans index (illisible) : on ne touche à rien de ce qui s'y trouve.
+    unreadable = {v.uuid for v in volumes if v.uuid not in indexes}
     conn.execute("BEGIN IMMEDIATE")
     try:
         rev: int | None = None
@@ -95,7 +112,8 @@ def locate_files(conn: sqlite3.Connection, volumes: list[Volume],
                 )
         present_ids = {v.uuid for v in present}
         for uuid, old in known.items():
-            if uuid not in present_ids and old["present"]:
+            if (uuid not in present_ids and uuid not in unreadable
+                    and old["present"]):
                 conn.execute("UPDATE volume SET present = 0, rev = ? WHERE uuid = ?",
                              (bump(), uuid))
 
@@ -106,6 +124,8 @@ def locate_files(conn: sqlite3.Connection, volumes: list[Volume],
             found = next((v.uuid for v in present if key in indexes[v.uuid]), None)
             if found is not None:
                 new = (found, 1)
+            elif row["volume_uuid"] in unreadable:
+                continue
             else:
                 new = (row["volume_uuid"], 0)
             if new != (row["volume_uuid"], row["present"]):
