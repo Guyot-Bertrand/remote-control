@@ -64,9 +64,36 @@ class CatalogDaoTest {
     }
 
     @Test fun search_special_chars_never_throw() = runTest {
-        listOf("\"", "*", "-", "OR", "a\"b", "((", "NEAR/3").forEach {
-            buildFtsQuery(it)?.let { q -> dao.search(q, false).first() }
+        val expected = mapOf(
+            "\"" to null, "*" to null, "-" to null, "OR" to "or*", "a\"b" to "a* b*",
+            "((" to null, "NEAR/3" to "near* 3*", "" to null,
+        )
+        expected.forEach { (input, query) ->
+            assertEquals(query, buildFtsQuery(input))
+            query?.let { q -> dao.search(q, false).first() }
         }
+    }
+
+    @Test fun fts_reupsert_replaces_text() = runTest {
+        db.syncDao().upsertFts(listOf(WorkFtsEntity(1, "zorglub")))
+        db.syncDao().upsertFts(listOf(WorkFtsEntity(1, "bidule")))
+        assertEquals(listOf(1L), ids("bidule"))
+        assertEquals(emptyList<Long>(), ids("zorglub"))
+    }
+
+    @Test fun fts_delete() = runTest {
+        db.syncDao().deleteFts(listOf(1L, 2L))
+        assertEquals(emptyList<Long>(), ids("etranger"))
+        assertEquals(listOf(3L), ids("patelliere"))
+    }
+
+    @Test fun search_typographic_punctuation() = runTest {
+        addWork(6, "L\u2019\u00c9tranger")
+        addWork(7, "\u00ab Jules\u2014et\u2013Jim \u00bb")
+        assertEquals(listOf(2L, 6L), ids("etranger"))
+        assertEquals(listOf(2L, 6L), ids("l etr"))
+        assertEquals(listOf(7L), ids("jim"))
+        assertEquals(listOf(7L), ids("jules et"))
     }
 
     @Test fun playable_filter() = runTest {

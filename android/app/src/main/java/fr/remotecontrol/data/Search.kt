@@ -18,6 +18,7 @@ fun fold(s: String): String =
 fun ftsText(w: WorkDto): String =
     (listOfNotNull(w.titleFr, w.titleVo, w.titleAlt) + w.directors + w.cast)
         .joinToString(" ") { fold(it) }
+        .replace(NON_ALNUM, " ").trim()
 
 fun buildFtsQuery(input: String): String? {
     val tokens = fold(input).split(NON_ALNUM).filter { it.isNotEmpty() }
