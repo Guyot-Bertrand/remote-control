@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -28,10 +29,15 @@ class FakePlayer:
         self.on_state = lambda s: None
         self.calls = []
         self.fail_start = False
+        self.start_gate: asyncio.Event | None = None  # start lent
+        self.stop_gate: asyncio.Event | None = None  # stop lent
+        self.stop_state: PlayerState | None = None  # état final émis par stop (comme mpv)
 
     async def start(self, path, start_at, audio, subtitle, external_subs):
         self.calls.append(("start", dict(path=path, start_at=start_at, audio=audio,
                                          subtitle=subtitle, external_subs=external_subs)))
+        if self.start_gate is not None:
+            await self.start_gate.wait()
         if self.fail_start:
             raise OSError("boom")
 
@@ -52,6 +58,11 @@ class FakePlayer:
 
     async def stop(self):
         self.calls.append(("stop",))
+        gate, self.stop_gate = self.stop_gate, None  # seul le premier stop est lent
+        if gate is not None:
+            await gate.wait()
+        if self.stop_state is not None:
+            self.on_state(self.stop_state)
 
     def starts(self):
         return [c[1] for c in self.calls if c[0] == "start"]
@@ -286,3 +297,93 @@ async def test_bus_drops_oldest_when_full():
     bus.unsubscribe(q)
     bus.publish({"i": 999})
     assert q.qsize() == 99
+
+
+async def test_concurrent_plays_are_serialized(env):
+    env.player.start_gate = asyncio.Event()
+    first = asyncio.create_task(env.svc.play(PlayRequest("work", 1, "start")))
+    second = asyncio.create_task(env.svc.play(PlayRequest("work", 3, "start")))
+    await asyncio.sleep(0.01)
+    env.player.start_gate.set()
+    await asyncio.gather(first, second)
+    assert [c[0] for c in env.player.calls] == ["start", "stop", "start"]
+    assert env.svc.current["target_id"] == 3
+    assert progress(env.conn) is not None  # la première lecture a été enregistrée
+
+
+async def test_stop_does_not_finish_a_newer_session(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    gate = env.player.stop_gate = asyncio.Event()
+    stopping = asyncio.create_task(env.svc.stop())
+    await asyncio.sleep(0.01)
+    playing = asyncio.create_task(env.svc.play(PlayRequest("work", 3, "start")))
+    await asyncio.sleep(0.01)
+    gate.set()
+    await asyncio.gather(stopping, playing)
+    assert env.svc.current["target_id"] == 3
+    assert env.tv.state.screen == "playing"
+    assert progress(env.conn, "work", 3) is None
+
+
+async def test_reentrant_stop_saves_first_and_keeps_tv(env):
+    env.player.stop_state = PlayerState(position=300, duration=6000, running=False)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    q = env.bus.subscribe()
+    await env.svc.play(PlayRequest("work", 3, "start"))
+    assert progress(env.conn)["position"] == 300
+    assert env.svc.current["target_id"] == 3
+    assert env.svc.state.running is True
+    tv = []
+    while not q.empty():
+        m = q.get_nowait()
+        if m["type"] == "tv":
+            tv.append(m["state"]["screen"])
+    assert tv == ["playing"]  # pas de retour intermédiaire à la fiche
+
+
+async def test_finish_clears_session_when_save_fails(env, monkeypatch):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+
+    def boom(state):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(env.svc, "_save", boom)
+    await env.svc.stop()
+    assert env.svc.current is None
+    assert env.svc.state.running is False
+
+
+async def test_stored_external_sub_must_belong_to_version(env, tmp_path):
+    other = tmp_path / "ailleurs.fr.srt"
+    other.touch()
+    env.conn.execute("INSERT INTO progress (target_kind, target_id, position, watched,"
+                     " subtitle, rev) VALUES ('work', 1, 10, 0, ?, 1)",
+                     ('{"kind": "external", "path": "%s"}' % other,))
+    await env.svc.play(PlayRequest("work", 1, "resume"))
+    assert env.player.starts()[-1]["subtitle"] == {"kind": "none"}  # défaut (audio fr)
+
+
+async def test_start_failure_publishes_player_state(env):
+    env.player.fail_start = True
+    q = env.bus.subscribe()
+    with pytest.raises(PlayError):
+        await env.svc.play(PlayRequest("work", 1, "start"))
+    msgs = []
+    while not q.empty():
+        msgs.append(q.get_nowait())
+    player = [m for m in msgs if m["type"] == "player"]
+    assert player and player[-1]["state"]["running"] is False
+    assert player[-1]["current"] is None
+
+
+async def test_resume_rewatch_uses_position_even_if_watched(env):
+    env.conn.execute("INSERT INTO progress (target_kind, target_id, position, duration,"
+                     " watched, rev) VALUES ('work', 1, 1200, 6000, 1, 1)")
+    await env.svc.play(PlayRequest("work", 1, "resume"))
+    assert env.player.starts()[-1]["start_at"] == 1200
+    env.clock.t = 10
+    emit(env, position=1500, duration=6000)
+    row = progress(env.conn)
+    assert (row["position"], row["watched"]) == (1500, 1)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    assert env.player.starts()[-1]["start_at"] == 0

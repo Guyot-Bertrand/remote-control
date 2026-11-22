@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import logging
@@ -113,6 +114,8 @@ class PlaybackService:
         self.indexes_getter, self.clock = indexes_getter, clock
         self._state = PlayerState()
         self._session: _Session | None = None
+        self._lock = asyncio.Lock()
+        self._replacing = False  # arrêt interne avant une nouvelle lecture : télé inchangée
         player.on_state = self._on_state
 
     @property
@@ -126,13 +129,16 @@ class PlaybackService:
     # -- lancement ------------------------------------------------------
 
     async def play(self, req: PlayRequest) -> None:
+        async with self._lock:
+            await self._play_locked(req)
+
+    async def _play_locked(self, req: PlayRequest) -> None:
         mf = self._choose_version(req)
         path = self._resolve(mf)
-        if self._session is not None:
-            await self.stop()
+        await self._stop_locked(show_tv=False)
         prog = self._progress(req.target_kind, req.target_id)
         start_at = 0.0
-        if req.start == "resume" and prog is not None and not prog["watched"]:
+        if req.start == "resume" and prog is not None:
             start_at = prog["position"] or 0.0
         tracks = self._tracks(mf, path)
         audio, subtitle = self._pick_tracks(req, prog, tracks)
@@ -143,6 +149,7 @@ class PlaybackService:
             log.exception("échec du démarrage de la lecture de %s", path)
             self._state = replace(self._state, running=False)
             self.tv.playback_ended(MSG_INTERRUPTED)
+            self._publish()
             raise PlayError("not_found") from None
         current = self._describe(req, mf["id"])
         self._session = _Session(current, audio, subtitle, self.clock())
@@ -215,7 +222,9 @@ class PlaybackService:
         if kind == "embedded":
             return sel.get("index") in {t.index for t in tracks.subtitles}
         if kind == "external":
-            return Path(sel.get("path", "")).is_file()
+            path = str(sel.get("path", ""))
+            known = {str(e.path) for e in tracks.external}
+            return path in known and Path(path).is_file()
         return kind == "none"
 
     def _describe(self, req: PlayRequest, media_file_id: int) -> dict:
@@ -257,11 +266,20 @@ class PlaybackService:
             self._session.subtitle = sel
 
     async def stop(self) -> None:
-        if self._session is None:
+        async with self._lock:
+            await self._stop_locked(show_tv=True)
+
+    async def _stop_locked(self, show_tv: bool) -> None:
+        s = self._session
+        if s is None:
             return
-        await self.player.stop()
-        if self._session is not None:  # le lecteur n'a pas signalé la fin
-            self._finish(self._state, None)
+        self._replacing = not show_tv
+        try:
+            await self.player.stop()
+            if self._session is s:  # le lecteur n'a pas signalé la fin
+                self._finish(self._state, None)
+        finally:
+            self._replacing = False
 
     # -- suivi ----------------------------------------------------------
 
@@ -283,11 +301,16 @@ class PlaybackService:
         self._publish()
 
     def _finish(self, state: PlayerState, message: str | None) -> None:
-        self._save(state)
-        self._session = None
-        self._state = replace(state, running=False)
-        self.tv.playback_ended(message)
-        self._publish()
+        try:
+            self._save(state)
+        except Exception:
+            log.exception("enregistrement de la progression impossible")
+        finally:
+            self._session = None
+            self._state = replace(state, running=False)
+            if not self._replacing:
+                self.tv.playback_ended(message)
+            self._publish()
 
     def _save(self, state: PlayerState) -> None:
         s = self._session
