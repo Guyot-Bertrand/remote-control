@@ -20,3 +20,17 @@ const val SORT_RECENT = "recent"
 @Serializable data object ScanRoute
 
 @Serializable data object SettingsRoute
+
+/**
+ * Cible d'un onglet de la barre de navigation. [reset] : re-toucher « Parcourir » alors qu'un parcours est
+ * affiché (« Tout voir », un autre type, une collection) repart du type et du tri par défaut ; sinon l'onglet
+ * retrouve l'état qu'il avait quand on l'a quitté.
+ */
+data class TopNavigation(val route: Any, val reset: Boolean)
+
+fun topNavigation(target: TopDestination, current: TopDestination?): TopNavigation = when (target) {
+    TopDestination.Home -> TopNavigation(HomeRoute, reset = false)
+    TopDestination.Browse -> TopNavigation(BrowseRoute(type = WORK_TYPES.first()), reset = current == TopDestination.Browse)
+    TopDestination.Search -> TopNavigation(SearchRoute, reset = false)
+    TopDestination.Scan -> TopNavigation(ScanRoute, reset = false)
+}

@@ -48,6 +48,7 @@ class NsdServerDiscovery(context: Context) : ServerDiscovery {
                     if (Build.VERSION.SDK_INT >= 34) {
                         emit(serviceInfo, serviceInfo.hostAddresses)
                     } else {
+                        @Suppress("DEPRECATION")
                         emit(serviceInfo, listOfNotNull(serviceInfo.host))
                     }
                     done()

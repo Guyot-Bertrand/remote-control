@@ -24,3 +24,10 @@ fun formatHhMm(seconds: Double): String {
 /** Minutes restantes, arrondies (0 si la position dépasse la durée). */
 fun remainingMinutes(position: Double, duration: Double): Int =
     ((duration - position).coerceAtLeast(0.0) / 60.0).roundToInt()
+
+/** Entier groupé par milliers à la française, avec une espace fine insécable : « 1 912 ». */
+fun formatCount(n: Int): String {
+    val digits = kotlin.math.abs(n.toLong()).toString()
+    val grouped = digits.reversed().chunked(3).joinToString(" ").reversed()
+    return if (n < 0) "-$grouped" else grouped
+}

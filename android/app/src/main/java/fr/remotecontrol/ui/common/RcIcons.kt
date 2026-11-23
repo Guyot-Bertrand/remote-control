@@ -25,6 +25,10 @@ object RcIcons {
     )
     val Collection = icon("Collection", "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01")
     val ChevronRight = icon("ChevronRight", "m9 5 7 7-7 7")
+    val Back = icon("Back", "M15 5l-7 7 7 7")
+    val Check = icon("Check", "m5 12.5 4.5 4.5L19 7.5")
+    val Sort = icon("Sort", "M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5")
+    val Clear = icon("Clear", "M6 6l12 12M18 6 6 18")
 
     private fun circle(cx: Float, cy: Float, r: Float) =
         "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0"

@@ -10,6 +10,9 @@ data class WorkSummary(
     val episodic: Boolean,
 )
 
+/** Rang (texte libre, souvent numérique) d'une œuvre dans une collection. */
+data class WorkRank(val workId: Long, val rank: String)
+
 /** [count] : toutes les œuvres de la collection ; [playableCount] : celles qui sont lisibles. */
 data class CollectionSummary(val id: Long, val name: String, val count: Int, val playableCount: Int)
 

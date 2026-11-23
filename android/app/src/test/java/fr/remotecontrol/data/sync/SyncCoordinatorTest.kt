@@ -46,10 +46,12 @@ class SyncCoordinatorTest {
 
     private fun hello(r: Long) = ServerEvent.Hello(r, TvStateDto("home"), PlayerSnapshotDto())
 
+    /** Starts the coordinator, forgets its start-up sync, then delivers [e] (with [response] queued for it). */
     private suspend fun kotlinx.coroutines.test.TestScope.emit(e: ServerEvent, response: SyncDto? = null) {
-        response?.let { api.syncResponses.addLast(ApiResult.Ok(it)) }
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
         events.subscriptionCount.let { while (it.value == 0) kotlinx.coroutines.yield() }
+        api.calls.clear()
+        response?.let { api.syncResponses.addLast(ApiResult.Ok(it)) }
         events.emit(e)
         events.emit(ServerEvent.Tv(TvStateDto("home"))) // barrier: accepted only once e has been fully handled
         job.cancel()
@@ -96,5 +98,22 @@ class SyncCoordinatorTest {
     @Test fun empty_cache_forces_full() = runTest {
         emit(hello(3), full)
         assertEquals(listOf("sync(null)"), api.calls)
+    }
+
+    @Test fun startup_incremental_when_local_exists() = runTest {
+        seedLocal(3)
+        api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = 4, full = false)))
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
+        while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        job.cancel()
+        assertEquals(listOf("sync(3)"), api.calls)
+        assertEquals(4L, repo.localRevision())
+    }
+
+    @Test fun startup_no_sync_without_local() = runTest {
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
+        while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        job.cancel()
+        assertEquals(emptyList<String>(), api.calls)
     }
 }

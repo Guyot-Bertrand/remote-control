@@ -37,6 +37,18 @@ object Texts {
     const val work = "Fiche de l'œuvre"
     const val season = "Saison"
 
+    // Parcours et recherche
+    const val allTypes = "Tout"
+    const val allWorks = "Toutes les œuvres"
+    const val sortTitle = "Titre"
+    const val sortRecent = "Ajout récent"
+    const val changeSort = "Changer le tri"
+    const val byRank = "par rang"
+    const val nothingToShow = "Aucune œuvre à afficher"
+    const val noResults = "Aucun résultat"
+    const val searchHelp = "Titres, titres originaux et alternatifs, réalisation, casting — sans tenir compte des accents."
+    const val clear = "Effacer"
+
     // Barre de navigation
     const val navHome = "Accueil"
     const val navBrowse = "Parcourir"
@@ -93,6 +105,38 @@ object Texts {
         "spectacle" -> "Spectacles"
         else -> type
     }
+
+    /** Type au singulier, pour la ligne de détail d'une œuvre (« 2017 · Film »). */
+    fun typeSingular(type: String): String = when (type) {
+        "film" -> "Film"
+        "serie" -> "Série"
+        "doc" -> "Documentaire"
+        "theatre" -> "Théâtre"
+        "tele" -> "Téléfilm"
+        "spectacle" -> "Spectacle"
+        else -> type
+    }
+
+    /** « 1 912 films », « 1 série », « 3 œuvres » (type nul : tous types). */
+    fun countOfType(type: String?, count: Int): String {
+        val plural = count > 1
+        val noun = when (type) {
+            "film" -> if (plural) "films" else "film"
+            "serie" -> if (plural) "séries" else "série"
+            "doc" -> if (plural) "documentaires" else "documentaire"
+            "theatre" -> if (plural) "pièces de théâtre" else "pièce de théâtre"
+            "tele" -> if (plural) "téléfilms" else "téléfilm"
+            "spectacle" -> if (plural) "spectacles" else "spectacle"
+            else -> if (plural) "œuvres" else "œuvre"
+        }
+        return "${formatCount(count)}\u00A0$noun"
+    }
+
+    fun sortLabel(recent: Boolean) = if (recent) sortRecent else sortTitle
+    fun browseSummary(type: String?, count: Int, recent: Boolean) = "${countOfType(type, count)} · ${sortLabel(recent)}"
+    fun collectionSummary(count: Int, playable: Int, ranked: Boolean) =
+        if (ranked) "${collectionCounts(count, playable)} · $byRank" else collectionCounts(count, playable)
+    fun workLine(year: Int?, type: String) = listOfNotNull(year?.toString(), typeSingular(type)).joinToString(" · ")
 
     fun languageName(code: String?): String = when (code) {
         null -> "Langue inconnue"

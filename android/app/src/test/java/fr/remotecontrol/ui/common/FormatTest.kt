@@ -69,4 +69,19 @@ class FormatTest {
             Locale.setDefault(saved)
         }
     }
+
+    @Test
+    fun formatCount_groups_thousands() {
+        assertEquals("7", formatCount(7))
+        assertEquals("1\u202F912", formatCount(1912))
+        assertEquals("1\u202F000\u202F000", formatCount(1_000_000))
+    }
+
+    @Test
+    fun count_of_type() {
+        assertEquals("1\u202F912\u00A0films", Texts.countOfType("film", 1912))
+        assertEquals("1\u00A0série", Texts.countOfType("serie", 1))
+        assertEquals("0\u00A0pièce de théâtre", Texts.countOfType("theatre", 0))
+        assertEquals("3\u00A0œuvres", Texts.countOfType(null, 3))
+    }
 }

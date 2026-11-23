@@ -11,6 +11,12 @@ interface CatalogDao {
     @Query("SELECT $SUMMARY FROM work WHERE type = :type AND (:playableOnly = 0 OR playable = 1) ORDER BY sortKey, id")
     fun worksByType(type: String, playableOnly: Boolean): Flow<List<WorkSummary>>
 
+    @Query("SELECT $SUMMARY FROM work WHERE (:playableOnly = 0 OR playable = 1) ORDER BY sortKey, id")
+    fun allWorks(playableOnly: Boolean): Flow<List<WorkSummary>>
+
+    @Query("SELECT workId, rank FROM work_collection WHERE collectionId = :collectionId AND rank IS NOT NULL")
+    fun collectionRanks(collectionId: Long): Flow<List<WorkRank>>
+
     @Query(
         "SELECT $SUMMARY FROM work JOIN work_collection wc ON wc.workId = work.id " +
             "WHERE wc.collectionId = :collectionId AND (:playableOnly = 0 OR work.playable = 1) " +

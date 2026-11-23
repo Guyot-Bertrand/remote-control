@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,10 +28,13 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.ui.browse.BrowseScreen
+import fr.remotecontrol.ui.browse.BrowseViewModel
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.HomeRoute
 import fr.remotecontrol.ui.common.LocalServerBaseUrl
@@ -44,10 +47,12 @@ import fr.remotecontrol.ui.common.SeasonRoute
 import fr.remotecontrol.ui.common.SettingsRoute
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.TopDestination
-import fr.remotecontrol.ui.common.WORK_TYPES
 import fr.remotecontrol.ui.common.WorkRoute
+import fr.remotecontrol.ui.common.topNavigation
 import fr.remotecontrol.ui.home.HomeScreen
 import fr.remotecontrol.ui.home.HomeViewModel
+import fr.remotecontrol.ui.search.SearchScreen
+import fr.remotecontrol.ui.search.SearchViewModel
 import fr.remotecontrol.ui.settings.SettingsScreen
 import fr.remotecontrol.ui.settings.SettingsViewModel
 import fr.remotecontrol.ui.theme.RcColors
@@ -79,17 +84,17 @@ private fun NavDestination.topLevel(): TopDestination? = when {
     else -> null
 }
 
-private fun NavController.navigateTop(d: TopDestination) {
-    val route: Any = when (d) {
-        TopDestination.Home -> HomeRoute
-        TopDestination.Browse -> BrowseRoute(type = WORK_TYPES.first())
-        TopDestination.Search -> SearchRoute
-        TopDestination.Scan -> ScanRoute
-    }
-    navigate(route) {
-        popUpTo<HomeRoute> { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+private fun NavController.navigateTop(d: TopDestination, current: TopDestination?) {
+    val target = topNavigation(d, current)
+    navigate(target.route) {
+        if (target.reset) {
+            // Re-toucher « Parcourir » : on retire le parcours affiché (sans le sauver) et on repart du défaut.
+            popUpTo<HomeRoute>()
+        } else {
+            popUpTo<HomeRoute> { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 }
 
@@ -105,7 +110,7 @@ private fun RcScaffold(c: AppContainer) {
             Modifier.safeDrawingPadding()
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
-        if (top != null) RcBottomBar(selected = top, onSelect = nav::navigateTop)
+        if (top != null) RcBottomBar(selected = top, onSelect = { nav.navigateTop(it, top) })
     }
 }
 
@@ -139,9 +144,34 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onBack = { nav.popBackStack() },
             )
         }
+        composable<BrowseRoute> { entry ->
+            val route = entry.toRoute<BrowseRoute>()
+            val vm = viewModel { BrowseViewModel(route, c.catalogDao, c.filter) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            BrowseScreen(
+                state = state,
+                server = server,
+                onPlayableOnly = vm::setPlayableOnly,
+                onType = vm::setType,
+                onToggleSort = vm::toggleSort,
+                onOpen = { nav.navigate(WorkRoute(it.id)) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable<SearchRoute> {
+            val vm = viewModel { SearchViewModel(c.catalogDao, c.filter) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            SearchScreen(
+                state = state,
+                server = server,
+                onQuery = vm::onQuery,
+                onPlayableOnly = vm::setPlayableOnly,
+                onOpen = { nav.navigate(WorkRoute(it.id)) },
+            )
+        }
         // Écrans des tâches suivantes : titre provisoire.
-        composable<BrowseRoute> { Placeholder(Texts.sectionBrowse) }
-        composable<SearchRoute> { Placeholder(Texts.search) }
         composable<WorkRoute> { Placeholder(Texts.work) }
         composable<SeasonRoute> { Placeholder(Texts.season) }
         composable<RemoteRoute> { Placeholder(Texts.remote) }
