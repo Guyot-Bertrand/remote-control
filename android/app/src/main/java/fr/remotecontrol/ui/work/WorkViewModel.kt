@@ -133,7 +133,8 @@ class WorkViewModel(
     }
 }
 
-private fun MediaFileRow.toVersionUi() = VersionUi(
+/** Version telle qu'affichée sur la fiche et sur la feuille de choix. */
+fun MediaFileRow.toVersionUi() = VersionUi(
     mediaFileId = id,
     label = Texts.versionLabel(quality, size),
     present = present,

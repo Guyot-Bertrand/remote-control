@@ -74,6 +74,8 @@ object Texts {
     const val fromStart = "Depuis le début"
     const val resume = "Reprendre"
     const val tracksAndVersion = "Version et pistes…"
+    const val prePlayTitle = "Avant la lecture"
+    const val choicesRemembered = "Ces choix seront repris la prochaine fois."
     const val watched = "Vu"
     const val subtitleNone = "Aucun"
     const val playableOnly = "Œuvres lisibles"

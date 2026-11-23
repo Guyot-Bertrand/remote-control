@@ -35,6 +35,9 @@ object RcIcons {
     val Tv = icon("Tv", rrect(3f, 4.5f, 18f, 12.5f, 2f), "M8.5 20.5h7")
     val Disk = icon("Disk", rrect(3f, 7f, 18f, 10f, 2f), fill(circle(7.5f, 12f, 1f)), "M11 12h6")
     val Disc = icon("Disc", circle(12f, 12f, 8.5f), circle(12f, 12f, 2.5f))
+    val Film = icon("Film", rrect(3.5f, 3.5f, 17f, 17f, 2f), "M7.5 3.5v17M16.5 3.5v17M3.5 8h4M3.5 12h4M3.5 16h4M16.5 8h4M16.5 12h4M16.5 16h4")
+    val Audio = icon("Audio", "M4 15v-3a8 8 0 0 1 16 0v3", rrect(3f, 14f, 4f, 6f, 1.5f), rrect(17f, 14f, 4f, 6f, 1.5f))
+    val Subtitles = icon("Subtitles", rrect(3f, 5f, 18f, 14f, 2f), "M7 12h3M13 12h4M7 15.5h6M15.5 15.5h1.5")
 
     /** Tracé plein (sans trait), comme les triangles « lecture » des maquettes. */
     private fun fill(path: String) = FILL + path

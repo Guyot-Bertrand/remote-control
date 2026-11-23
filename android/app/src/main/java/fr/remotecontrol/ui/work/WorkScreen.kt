@@ -52,6 +52,7 @@ import fr.remotecontrol.ui.common.SectionLabel
 import fr.remotecontrol.ui.common.ShownOnTv
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.Tone
+import fr.remotecontrol.ui.preplay.PrePlayLink
 import fr.remotecontrol.ui.theme.Fraunces
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
@@ -62,7 +63,7 @@ private const val LONG_TITLE = 24
  * Maquettes « Fiche œuvre », « Fiche — non numérisé » et « Fiche — disque non branché » : affiche et
  * identité, boutons de lecture (ou encart d'indisponibilité), synopsis, casting, saisons, collections,
  * versions et mention « Affichée sur la télé ».
- * [onPrePlay] (feuille « Version et pistes… ») est branché en Task 11 : le lien reste masqué d'ici là.
+ * [onPrePlay] ouvre la feuille « Version et pistes… » (reprise si l'œuvre est entamée, sinon depuis le début).
  */
 @Composable
 fun WorkScreen(
@@ -91,7 +92,7 @@ fun WorkScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Identity(state)
-            if (!state.work.episodic) PlayActions(state, onPlayFromStart, onResume)
+            if (!state.work.episodic) PlayActions(state, onPlayFromStart, onResume, onPrePlay)
             state.message?.let { MessageBanner(it, onDismissMessage) }
             state.work.synopsis?.let { Synopsis(it) }
             if (state.work.episodic && state.seasons.isNotEmpty()) Seasons(state.seasons, onOpenSeason)
@@ -149,7 +150,7 @@ private fun Identity(state: WorkUi) {
 }
 
 @Composable
-private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: () -> Unit) {
+private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: () -> Unit, onPrePlay: (StartMode) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(
             Texts.playFromStart, RcIcons.Play, onPlayFromStart, Modifier.fillMaxWidth(),
@@ -159,6 +160,12 @@ private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: ()
             PillButton(
                 state.resumeLabel, RcIcons.Resume, onResume, Modifier.fillMaxWidth(),
                 tone = Tone.Soft, enabled = !state.launching, progress = state.resumeProgress,
+            )
+        }
+        if (state.canPlay) {
+            PrePlayLink(
+                onClick = { onPrePlay(if (state.resumeLabel != null) StartMode.Resume else StartMode.Start) },
+                enabled = !state.launching,
             )
         }
         when (val a = state.availability) {

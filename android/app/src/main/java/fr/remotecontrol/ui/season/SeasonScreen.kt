@@ -58,6 +58,7 @@ import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.ScreenHeader
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.Tone
+import fr.remotecontrol.ui.preplay.PrePlayLink
 import fr.remotecontrol.ui.theme.Fraunces
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
@@ -68,7 +69,7 @@ private val HEADER_KEYS = listOf("header", "selector", "summary", "message")
 /**
  * Maquette « Fiche saison » : en-tête de la série, sélecteur de saison, puis les épisodes ; l'épisode mis en
  * évidence (carte laiton, « Reprendre » / « Depuis le début ») est amené à l'écran à l'ouverture.
- * [onPrePlay] (feuille « Version et pistes… ») est branché en Task 11.
+ * [onPrePlay] ouvre la feuille « Version et pistes… » pour l'épisode mis en évidence.
  */
 @Composable
 fun SeasonScreen(
@@ -110,7 +111,7 @@ fun SeasonScreen(
             items(state.episodes, key = { it.id }) { episode ->
                 Box(Modifier.padding(horizontal = 8.dp)) {
                     val enabled = episode.playable && !state.launching
-                    if (episode.highlighted) HighlightedEpisode(episode, enabled, onPlay) else EpisodeLine(episode, enabled, onPlay)
+                    if (episode.highlighted) HighlightedEpisode(episode, enabled, onPlay, onPrePlay) else EpisodeLine(episode, enabled, onPlay)
                 }
             }
         }
@@ -252,7 +253,12 @@ private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, Sta
 
 /** Épisode mis en évidence : carte laiton doux, badge « En cours », barre d'avancement et boutons. */
 @Composable
-private fun HighlightedEpisode(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit) {
+private fun HighlightedEpisode(
+    episode: EpisodeUi,
+    enabled: Boolean,
+    onPlay: (Long, StartMode) -> Unit,
+    onPrePlay: (Long, StartMode) -> Unit,
+) {
     Column(
         Modifier
             .padding(vertical = 6.dp)
@@ -304,5 +310,9 @@ private fun HighlightedEpisode(episode: EpisodeUi, enabled: Boolean, onPlay: (Lo
                 )
             }
         }
+        PrePlayLink(
+            onClick = { onPrePlay(episode.id, if (episode.canResume) StartMode.Resume else StartMode.Start) },
+            enabled = enabled,
+        )
     }
 }
