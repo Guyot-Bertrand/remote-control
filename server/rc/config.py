@@ -27,6 +27,10 @@ class Config:
     mpv_extra_args: list[str] = field(default_factory=list)
     tmdb_api_key: str = ""
     poll_interval: float = 30.0
+    # Développement : chaque sous-dossier de scan_roots est un disque (UUID = nom).
+    dev_dir_volumes: bool = False
+    mdns: bool = True
+    tv_ui_dir: Path | None = None  # None : tv-ui/ à la racine du dépôt
 
 
 def load_config(path: Path | None = None) -> Config:
@@ -41,7 +45,7 @@ def load_config(path: Path | None = None) -> Config:
         raw = tomllib.load(fh)
     known = {f.name for f in fields(Config)}
     values = {k: v for k, v in raw.items() if k in known}
-    for key in ("data_dir", "catalog_path"):
+    for key in ("data_dir", "catalog_path", "tv_ui_dir"):
         if values.get(key) is not None:
             values[key] = Path(values[key]).expanduser()
     if "scan_roots" in values:

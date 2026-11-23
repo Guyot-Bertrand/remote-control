@@ -134,3 +134,16 @@ def test_build_index_ignores_symlinks(tmp_path):
     (tmp_path / "real.jpg").touch()
     (tmp_path / "link.jpg").symlink_to(tmp_path / "real.jpg")
     assert set(build_index(tmp_path)) == {"real.jpg"}
+
+
+def test_dev_dir_volumes(tmp_path):
+    (tmp_path / "DISK1").mkdir()
+    (tmp_path / "DISK2").mkdir()
+    (tmp_path / "fichier.txt").write_text("x")
+
+    def runner(cmd, **kw):
+        raise AssertionError("findmnt ne doit pas être appelé")
+
+    vols = list_volumes([tmp_path, tmp_path / "absent"], runner=runner, dev_dir_volumes=True)
+    assert vols == [Volume("DISK1", "DISK1", tmp_path / "DISK1"),
+                    Volume("DISK2", "DISK2", tmp_path / "DISK2")]

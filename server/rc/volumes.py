@@ -34,7 +34,12 @@ def normalize(relpath: str) -> str:
     return unicodedata.normalize("NFC", relpath).casefold()
 
 
-def list_volumes(scan_roots: list[Path], runner=subprocess.run) -> list[Volume]:
+def list_volumes(scan_roots: list[Path], runner=subprocess.run, *,
+                 dev_dir_volumes: bool = False) -> list[Volume]:
+    if dev_dir_volumes:
+        return [Volume(d.name, d.name, d)
+                for root in map(Path, scan_roots) if root.is_dir()
+                for d in sorted(root.iterdir()) if d.is_dir()]
     proc = runner(
         ["findmnt", "--json", "--list", "-o", "TARGET,UUID,LABEL"],
         capture_output=True, text=True, check=True,
