@@ -4,8 +4,10 @@ import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.data.db.ResumeRow
 import fr.remotecontrol.data.sync.SyncWriter
+import fr.remotecontrol.discovery.ServerAddress
 import fr.remotecontrol.discovery.ServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
+import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.InfoDto
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.ServerProbe
@@ -67,6 +69,16 @@ class HomeViewModelTest {
         val row = ResumeRow("work", 1, 1, null, "Ava", null, null, null, 300.0, null, 0.0)
         assertEquals("Reprendre à 00:05", toResumeItem(row).label)
         assertEquals(0f, toResumeItem(row).progress)
+    }
+
+    @Test fun banner_follows_server_state() {
+        val here = ServerState.Connected(ServerAddress("10.0.0.1"), false)
+        assertEquals(HomeBanner.Searching, homeBanner(ServerState.Searching, catalogEmpty = true))
+        assertEquals(HomeBanner.NoServer, homeBanner(ServerState.NotFound, catalogEmpty = true))
+        assertEquals(HomeBanner.NoServer, homeBanner(ServerState.NotFound, catalogEmpty = false))
+        assertEquals(HomeBanner.Syncing, homeBanner(here, catalogEmpty = true))
+        assertEquals(null, homeBanner(here, catalogEmpty = false))
+        assertEquals(null, homeBanner(ServerState.Searching, catalogEmpty = false))
     }
 
     @Test fun collections_show_total_and_playable() = runBlocking {

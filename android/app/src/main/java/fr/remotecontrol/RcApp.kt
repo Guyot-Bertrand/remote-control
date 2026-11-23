@@ -20,11 +20,13 @@ class RcApp : Application(), SingletonImageLoader.Factory {
         container = AppContainer(this)
         // Au niveau du processus (et non de l'activité) : une rotation n'interrompt ni la
         // découverte ni la synchronisation. La synchronisation initiale passe uniquement
-        // par SyncCoordinator, sur le Hello du WebSocket.
+        // par SyncCoordinator, sur le Hello du WebSocket. Au premier plan seulement : le
+        // serveur est revérifié à chaque retour, recherché toutes les 20 s s'il manque, et
+        // revérifié quand le WebSocket échoue.
         ProcessLifecycleOwner.get().lifecycleScope.launch {
             ProcessLifecycleOwner.get().repeatOnLifecycle(Lifecycle.State.STARTED) {
-                container.locator.locate()
-                container.coordinator.run()
+                launch { container.coordinator.run() }
+                container.locator.monitor(container.eventsClient.failures)
             }
         }
     }

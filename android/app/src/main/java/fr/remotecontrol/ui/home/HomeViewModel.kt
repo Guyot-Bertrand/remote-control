@@ -46,6 +46,20 @@ fun toResumeItem(row: ResumeRow): ResumeItem {
     return ResumeItem(row.targetKind, row.targetId, row.workId, row.seasonId, title, row.poster, progress, label)
 }
 
+/** Bandeau d'état en tête de l'accueil. */
+enum class HomeBanner { Searching, NoServer, Syncing }
+
+/**
+ * Sans serveur : « Aucun serveur trouvé » (avec accès aux réglages), catalogue vide ou non.
+ * Catalogue vide : recherche du serveur en cours, ou synchronisation une fois connecté.
+ */
+fun homeBanner(server: ServerState, catalogEmpty: Boolean): HomeBanner? = when {
+    server == ServerState.NotFound -> HomeBanner.NoServer
+    !catalogEmpty -> null
+    server is ServerState.Connected -> HomeBanner.Syncing
+    else -> HomeBanner.Searching
+}
+
 data class HomeUi(
     val resume: List<ResumeItem> = emptyList(),
     val recent: List<WorkSummary> = emptyList(),
@@ -53,6 +67,7 @@ data class HomeUi(
     val playableOnly: Boolean = true,
     val catalogEmpty: Boolean = false,
     val server: ServerState = ServerState.Searching,
+    val banner: HomeBanner? = null,
 )
 
 private data class Filtered(
@@ -86,6 +101,7 @@ class HomeViewModel(
             playableOnly = f.playableOnly,
             catalogEmpty = count == 0,
             server = server,
+            banner = homeBanner(server, count == 0),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 

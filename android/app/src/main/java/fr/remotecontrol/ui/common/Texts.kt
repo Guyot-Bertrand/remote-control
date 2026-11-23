@@ -85,7 +85,8 @@ object Texts {
     const val playableOnly = "Œuvres lisibles"
     const val wholeCatalogue = "Tout le catalogue"
     const val seeAll = "Tout voir"
-    const val catalogEmpty = "Catalogue vide : recherche du serveur…"
+    const val catalogEmptySearching = "Catalogue vide : recherche du serveur…"
+    const val catalogEmptySyncing = "Catalogue vide : synchronisation…"
     const val qrUnknown = "QR-code non reconnu"
     const val cameraPermission = "Autorisez l'appareil photo pour scanner les QR-codes"
 

@@ -62,11 +62,11 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
         HomeHeader(state.server, onSettings)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-            if (state.server == ServerState.NotFound) {
-                item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
-            }
-            if (state.catalogEmpty) {
-                item { Banner(Texts.catalogEmpty, RcColors.surface2) }
+            when (state.banner) {
+                HomeBanner.NoServer -> item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
+                HomeBanner.Searching -> item { Banner(Texts.catalogEmptySearching, RcColors.surface2) }
+                HomeBanner.Syncing -> item { Banner(Texts.catalogEmptySyncing, RcColors.surface2) }
+                null -> Unit
             }
             item { FilterRow(state.playableOnly, onPlayableOnly, onRemote) }
             if (state.resume.isNotEmpty()) {

@@ -120,4 +120,24 @@ class EventsClientTest {
         delay(300)
         assertEquals(after, calls.get())
     }
+
+    @Test
+    fun counts_consecutive_failures_and_resets_on_open() = runBlocking {
+        val dead = MockWebServer().apply { start() }
+        val deadUrl = dead.url("/")
+        dead.close() // connexion refusée à chaque tentative
+        val useDead = java.util.concurrent.atomic.AtomicBoolean(true)
+        val c = eventsClient { if (useDead.get()) deadUrl else server.url("/") }
+        assertEquals(0, c.failures.value)
+        assertEquals(false, c.connected.value)
+        val job = launch(Dispatchers.Default) { c.events().collect {} }
+        withTimeout(5_000) { c.failures.first { it >= 3 } }
+        assertEquals(false, c.connected.value)
+        upgrade(sending(Fixtures.text("ws_hello.json")))
+        useDead.set(false)
+        withTimeout(5_000) { c.connected.first { it } }
+        assertEquals(0, c.failures.value)
+        job.cancelAndJoin()
+        assertEquals(false, c.connected.value)
+    }
 }

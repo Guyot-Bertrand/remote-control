@@ -8,6 +8,7 @@ import fr.remotecontrol.net.ServerProbe
 import fr.remotecontrol.testing.FakeKeyValueStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -16,13 +17,18 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServerLocatorTest {
     private val alive = mutableSetOf<String>()
     private var probes = 0
-    private val probe = ServerProbe { base -> probes++; if (base.host in alive) InfoDto("rc", 1, 1) else null }
+    private val probe = ServerProbe { base ->
+        probes++
+        if (base.host == "10.0.0.99") awaitCancellation() // serveur muet : ne répond jamais
+        if (base.host in alive) InfoDto("rc", 1, 1) else null
+    }
     private val store = FakeKeyValueStore()
     private var collected = false
     private var found: List<ServerAddress> = emptyList()
@@ -124,5 +130,99 @@ class ServerLocatorTest {
         assertEquals(true, l.setManual(ServerAddress("10.0.0.9")))
         l.locate()
         assertEquals(ServerState.Connected(ServerAddress("10.0.0.9"), true), l.state.value)
+    }
+
+    @Test fun refresh_keeps_connected_server_with_one_probe() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        val before = probes
+        l.refresh()
+        assertEquals(before + 1, probes)
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
+        assertFalse(collected)
+    }
+
+    @Test fun refresh_relocates_when_connected_server_is_gone() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        alive.clear()
+        found = listOf(ServerAddress("10.0.0.2")); alive += "10.0.0.2"
+        val before = probes
+        l.refresh()
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.2"), false), l.state.value)
+        assertEquals(before + 2, probes) // l'ancienne adresse une seule fois, puis le candidat découvert
+    }
+
+    @Test fun refresh_without_server_searches() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.refresh()
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
+    }
+
+    @Test fun silent_server_times_out_after_three_seconds() = runTest {
+        remember("10.0.0.99", false)
+        val l = locator()
+        val job = launch { l.locate() }
+        advanceTimeBy(2_999)
+        runCurrent()
+        assertFalse(collected)
+        advanceTimeBy(2)
+        runCurrent()
+        assertTrue(collected) // sonde abandonnée : découverte lancée
+        job.join()
+        assertEquals(ServerState.NotFound, l.state.value)
+    }
+
+    @Test fun monitor_retries_every_20_s_while_not_found() = runTest {
+        val l = locator()
+        val job = launch { l.monitor(MutableStateFlow(0)) }
+        advanceTimeBy(5_001)
+        runCurrent()
+        assertEquals(ServerState.NotFound, l.state.value)
+        found = listOf(ServerAddress("10.0.0.3")); alive += "10.0.0.3"
+        advanceTimeBy(19_000)
+        runCurrent()
+        assertEquals(ServerState.NotFound, l.state.value)
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.3"), false), l.state.value)
+        job.cancel()
+    }
+
+    @Test fun monitor_stops_retrying_when_cancelled() = runTest {
+        val l = locator()
+        val job = launch { l.monitor(MutableStateFlow(0)) }
+        advanceTimeBy(5_001)
+        runCurrent()
+        job.cancel()
+        val before = probes
+        found = listOf(ServerAddress("10.0.0.3")); alive += "10.0.0.3"
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(before, probes)
+        assertEquals(ServerState.NotFound, l.state.value)
+    }
+
+    @Test fun monitor_reprobes_after_three_websocket_failures() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val failures = MutableStateFlow(0)
+        val l = locator()
+        val job = launch { l.monitor(failures) }
+        runCurrent()
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
+        val before = probes
+        alive.clear()
+        failures.value = 1; runCurrent()
+        failures.value = 2; runCurrent()
+        assertEquals(before, probes)
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
+        failures.value = 3; runCurrent()
+        advanceTimeBy(5_001); runCurrent()
+        assertEquals(ServerState.NotFound, l.state.value)
+        assertNull(l.currentBaseUrl())
+        job.cancel()
     }
 }
