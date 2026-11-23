@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -43,6 +44,7 @@ import fr.remotecontrol.ui.theme.RcColors
  * Vignette d'affiche 2:3 et ses états (maquette « Composants récurrents ») :
  * entamée (barre laiton), vue (pastille cochée), indisponible (voile et libellé),
  * sans affiche (titre en Fraunces sur fond uni, filet laiton).
+ * [contentDescription] reste nul quand un titre visible suit la vignette (pas de double annonce).
  */
 @Composable
 fun PosterThumb(
@@ -53,12 +55,15 @@ fun PosterThumb(
     progress: Float? = null,
     watched: Boolean = false,
     unavailableLabel: String? = null,
+    contentDescription: String? = null,
 ) {
     BoxWithConstraints(
         modifier
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(6.dp))
-            .semantics { contentDescription = title },
+            .then(
+                if (contentDescription == null) Modifier else Modifier.semantics { this.contentDescription = contentDescription },
+            ),
     ) {
         val width = maxWidth
         if (hash == null) NoPoster(title, year, width) else Poster(hash, AssetSize.Thumb, Modifier.fillMaxSize())
@@ -82,7 +87,7 @@ fun PosterThumb(
         if (watched) {
             SeenBadge(
                 Modifier.align(Alignment.TopEnd).padding(width * 0.05f).size(width * 0.21f)
-                    .semantics { contentDescription = Texts.watched },
+                    .semantics { this.contentDescription = Texts.watched },
             )
         }
         if (progress != null) {
@@ -98,7 +103,8 @@ fun PosterThumb(
 @Composable
 private fun NoPoster(title: String, year: Int?, width: Dp) {
     val inset = width * 0.06f
-    Box(Modifier.fillMaxSize().background(RcColors.surface2).padding(inset)) {
+    // Le titre de remplacement est décoratif pour TalkBack : la vignette ou sa légende le portent déjà.
+    Box(Modifier.fillMaxSize().clearAndSetSemantics {}.background(RcColors.surface2).padding(inset)) {
         Column(
             Modifier
                 .fillMaxSize()

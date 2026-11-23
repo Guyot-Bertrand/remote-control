@@ -13,6 +13,7 @@ import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.testing.FakeKeyValueStore
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
+import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.testDb
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -36,13 +37,18 @@ class HomeViewModelTest {
         db = testDb()
     }
 
-    @After fun tearDown() = db.close()
+    private val vms = mutableListOf<HomeViewModel>()
+
+    @After fun tearDown() = runBlocking {
+        vms.forEach { it.clearAndJoin() }
+        db.close()
+    }
 
     private fun viewModel() = HomeViewModel(
         db.catalogDao(),
         CatalogFilter(),
         ServerLocator(FakeKeyValueStore(), ServerProbe { InfoDto("rc", 1, 1) }, ServerDiscovery { emptyFlow() }),
-    )
+    ).also { vms += it }
 
     // Room exécute ses requêtes hors du dispatcher de test : on attend l'état voulu.
     private suspend fun HomeViewModel.await(predicate: (HomeUi) -> Boolean) =

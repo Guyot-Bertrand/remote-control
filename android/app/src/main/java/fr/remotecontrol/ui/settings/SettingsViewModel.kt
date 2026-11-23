@@ -79,7 +79,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
             try {
-                locator.locate()
+                locator.locate(force = true)
             } finally {
                 _state.update { it.copy(busy = false) }
             }

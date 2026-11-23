@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 
 data class ResumeItem(
+    val targetKind: String,
+    val targetId: Long,
     val workId: Long,
     val seasonId: Long?,
     val title: String,
@@ -35,11 +37,13 @@ fun toResumeItem(row: ResumeRow): ResumeItem {
     }
     val duration = row.duration
     if (duration == null || duration <= 0.0) {
-        return ResumeItem(row.workId, row.seasonId, title, row.poster, 0f, Texts.resumeAt(row.position))
+        return ResumeItem(
+            row.targetKind, row.targetId, row.workId, row.seasonId, title, row.poster, 0f, Texts.resumeAt(row.position),
+        )
     }
     val progress = (row.position / duration).toFloat().coerceIn(0f, 1f)
     val label = Texts.remaining(remainingMinutes(row.position, duration))
-    return ResumeItem(row.workId, row.seasonId, title, row.poster, progress, label)
+    return ResumeItem(row.targetKind, row.targetId, row.workId, row.seasonId, title, row.poster, progress, label)
 }
 
 data class HomeUi(

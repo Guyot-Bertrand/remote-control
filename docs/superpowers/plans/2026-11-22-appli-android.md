@@ -357,7 +357,7 @@ tasks.named("preBuild") { dependsOn(checkNoGms) }
 - Produces (`AppDatabase.kt`) : `@Database(version = 1, exportSchema = true) abstract class AppDatabase : RoomDatabase` avec `catalogDao()`, `syncDao()`, `metaDao()`. `fun buildDatabase(context: Context): AppDatabase` (fichier `rc-cache.db`, `fallbackToDestructiveMigration(dropAllTables = true)` : ce n'est qu'un cache, et une base vidée perd sa révision, ce qui force une synchronisation complète).
 - Produces (`ReadModels.kt`) :
   - `WorkSummary(id: Long, type: String, titleFr: String, year: Int?, poster: String?, playable: Boolean, episodic: Boolean)`
-  - `CollectionSummary(id: Long, name: String, count: Int)`
+  - `CollectionSummary(id: Long, name: String, count: Int, playableCount: Int)` : `count` = toutes les œuvres de la collection (quel que soit le filtre), `playableCount` = celles qui sont lisibles (`work.playable`)
   - `ResumeRow(targetKind: String, targetId: Long, workId: Long, seasonId: Long?, titleFr: String, poster: String?, seasonNumber: Int?, episodeNumber: Int?, position: Double, duration: Double?, updatedAt: Double)`
   - `MediaFileRow(id: Long, workId: Long?, episodeId: Long?, quality: String, size: String?, present: Boolean, volumeLabel: String?)` (jointure `media_file.volumeUuid = volume.uuid`)
   - `EpisodeRow(id: Long, number: Int, title: String?, position: Double?, duration: Double?, watched: Boolean?, updatedAt: Double?, playable: Boolean)` (progression en `LEFT JOIN` sur `progress(targetKind = 'episode')`, `playable` = un fichier présent).
@@ -365,7 +365,7 @@ tasks.named("preBuild") { dependsOn(checkNoGms) }
   - `fun worksByType(type: String, playableOnly: Boolean): Flow<List<WorkSummary>>` (tri `sortKey, id`)
   - `fun worksInCollection(collectionId: Long, playableOnly: Boolean): Flow<List<WorkSummary>>` (tri `rank IS NULL, CAST(rank AS INTEGER), sortKey`)
   - `fun recentWorks(playableOnly: Boolean, limit: Int): Flow<List<WorkSummary>>` (tri `id DESC`)
-  - `fun collections(playableOnly: Boolean): Flow<List<CollectionSummary>>` (seulement les collections dont `count > 0` sous le filtre, tri par nom)
+  - `fun collections(playableOnly: Boolean): Flow<List<CollectionSummary>>` (seulement les collections non vides sous le filtre : `playableCount > 0` si `playableOnly`, sinon `count > 0` ; tri par nom)
   - `fun resumeRows(limit: Int): Flow<List<ResumeRow>>` (`watched = 0 AND position > 0`, œuvres et épisodes réunis par jointures **internes** : une progression dont l'œuvre ou l'épisode a été supprimé (le serveur ne supprime jamais les progressions) n'apparaît pas ; tri `updatedAt DESC`)
   - `fun search(match: String, playableOnly: Boolean, limit: Int = 200): Flow<List<WorkSummary>>` (`JOIN work_fts ON work_fts.rowid = work.id WHERE work_fts MATCH :match`, tri `sortKey, id`)
   - `fun work(id: Long): Flow<WorkEntity?>`, `fun collectionsOfWork(workId: Long): Flow<List<CollectionEntity>>`, `fun seasonsOfWork(workId: Long): Flow<List<SeasonEntity>>`, `fun season(id: Long): Flow<SeasonEntity?>`, `fun mediaFilesOfWork(workId: Long): Flow<List<MediaFileRow>>`, `fun mediaFilesOfEpisode(episodeId: Long): Flow<List<MediaFileRow>>`, `fun episodesOfSeason(seasonId: Long): Flow<List<EpisodeRow>>` (tri `number`), `fun progress(kind: String, id: Long): Flow<ProgressEntity?>`

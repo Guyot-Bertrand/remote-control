@@ -21,7 +21,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServerLocatorTest {
     private val alive = mutableSetOf<String>()
-    private val probe = ServerProbe { base -> if (base.host in alive) InfoDto("rc", 1, 1) else null }
+    private var probes = 0
+    private val probe = ServerProbe { base -> probes++; if (base.host in alive) InfoDto("rc", 1, 1) else null }
     private val store = FakeKeyValueStore()
     private var collected = false
     private var found: List<ServerAddress> = emptyList()
@@ -46,6 +47,25 @@ class ServerLocatorTest {
         l.locate()
         assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
         assertFalse(collected)
+    }
+
+    @Test fun locate_is_noop_when_connected() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        val before = probes
+        l.locate()
+        assertEquals(before, probes)
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
+    }
+
+    @Test fun forced_locate_reprobes_when_connected() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        alive.clear()
+        l.locate(force = true)
+        assertEquals(ServerState.NotFound, l.state.value)
     }
 
     @Test fun stored_address_fails_then_nsd_finds_new_one() = runTest {

@@ -39,7 +39,9 @@ class ServerLocator(
         false
     }
 
-    suspend fun locate() {
+    /** Sans [force], ne fait rien si un serveur est déjà connecté (retour au premier plan). */
+    suspend fun locate(force: Boolean = false) {
+        if (!force && _state.value is ServerState.Connected) return
         _state.value = ServerState.Searching
         try {
             val host = store.get(META_SERVER_HOST)

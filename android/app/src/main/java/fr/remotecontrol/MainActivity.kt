@@ -21,10 +21,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
@@ -55,19 +52,11 @@ import fr.remotecontrol.ui.settings.SettingsScreen
 import fr.remotecontrol.ui.settings.SettingsViewModel
 import fr.remotecontrol.ui.theme.RcColors
 import fr.remotecontrol.ui.theme.RcTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as RcApp).container
-        // La synchronisation initiale passe uniquement par SyncCoordinator (sur le Hello du WebSocket).
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                container.locator.locate()
-                container.coordinator.run()
-            }
-        }
         setContent {
             val server by container.locator.state.collectAsStateWithLifecycle()
             RcTheme {

@@ -76,7 +76,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(state.resume, key = { "${it.workId}/${it.seasonId}/${it.title}" }) { item ->
+                        items(state.resume, key = { "${it.targetKind}/${it.targetId}" }) { item ->
                             ResumeCard(item) {
                                 if (item.seasonId != null) onOpenSeason(item.seasonId) else onOpenWork(item.workId)
                             }

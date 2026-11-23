@@ -15,6 +15,7 @@ import fr.remotecontrol.testing.FakeKeyValueStore
 import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
+import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.testDb
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
@@ -38,24 +39,30 @@ class SettingsViewModelTest {
     private val probe = ServerProbe { if (reachable) InfoDto("rc", 1, 1) else null }
     private lateinit var locator: ServerLocator
     private lateinit var vm: SettingsViewModel
+    private val vms = mutableListOf<SettingsViewModel>()
+
+    private fun newVm(l: ServerLocator) = SettingsViewModel(l, SyncRepository(db, api), db.catalogDao()).also { vms += it }
 
     @Before fun setUp() {
         db = testDb()
         locator = ServerLocator(FakeKeyValueStore(), probe, ServerDiscovery { emptyFlow() })
-        vm = SettingsViewModel(locator, SyncRepository(db, api), db.catalogDao())
+        vm = newVm(locator)
     }
 
     // Room exécute ses requêtes suspendues hors du dispatcher de test.
     private suspend fun awaitMessage() = withTimeout(5_000) { vm.state.first { it.message != null } }
 
-    @After fun tearDown() = db.close()
+    @After fun tearDown() = runBlocking {
+        vms.forEach { it.clearAndJoin() }
+        db.close()
+    }
 
     @Test fun server_label_detected() = runBlocking {
         val store = FakeKeyValueStore(mutableMapOf(
             "server.host" to "192.168.1.20", "server.port" to "8765", "server.manual" to "false"))
         val l = ServerLocator(store, probe, ServerDiscovery { emptyFlow() })
         l.locate()
-        val v = SettingsViewModel(l, SyncRepository(db, api), db.catalogDao())
+        val v = newVm(l)
         assertEquals("192.168.1.20:8765 (détecté)", v.state.value.serverLabel)
     }
 
