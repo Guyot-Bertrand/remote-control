@@ -106,7 +106,7 @@ private fun NavController.navigateTop(d: TopDestination, current: TopDestination
         } else {
             popUpTo<HomeRoute> { saveState = true }
             launchSingleTop = true
-            restoreState = true
+            restoreState = target.restore
         }
     }
 }

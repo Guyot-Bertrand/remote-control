@@ -27,12 +27,13 @@ const val SORT_RECENT = "recent"
 /**
  * Cible d'un onglet de la barre de navigation. [reset] : re-toucher « Parcourir » alors qu'un parcours est
  * affiché (« Tout voir », un autre type, une collection) repart du type et du tri par défaut ; sinon l'onglet
- * retrouve l'état qu'il avait quand on l'a quitté.
+ * retrouve l'état qu'il avait quand on l'a quitté. [restore] faux : « Accueil » revient toujours à l'accueil lui-même
+ * (restaurer l'état sauvé y ramenait le parcours ouvert depuis l'accueil).
  */
-data class TopNavigation(val route: Any, val reset: Boolean)
+data class TopNavigation(val route: Any, val reset: Boolean, val restore: Boolean = true)
 
 fun topNavigation(target: TopDestination, current: TopDestination?): TopNavigation = when (target) {
-    TopDestination.Home -> TopNavigation(HomeRoute, reset = false)
+    TopDestination.Home -> TopNavigation(HomeRoute, reset = false, restore = false)
     TopDestination.Browse -> TopNavigation(BrowseRoute(type = WORK_TYPES.first()), reset = current == TopDestination.Browse)
     TopDestination.Search -> TopNavigation(SearchRoute, reset = false)
     TopDestination.Scan -> TopNavigation(ScanRoute, reset = false)
