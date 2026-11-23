@@ -5,6 +5,7 @@ import fr.remotecontrol.data.META_SERVER_HOST
 import fr.remotecontrol.data.META_SERVER_MANUAL
 import fr.remotecontrol.data.META_SERVER_PORT
 import fr.remotecontrol.net.ServerProbe
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,31 +30,50 @@ class ServerLocator(
 
     fun currentBaseUrl(): HttpUrl? = (state.value as? ServerState.Connected)?.address?.baseUrl
 
+    /** Une adresse inutilisable (hôte refusé par OkHttp, erreur de sonde) compte comme muette. */
+    private suspend fun alive(address: ServerAddress): Boolean = try {
+        probe.probe(address.baseUrl) != null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
     suspend fun locate() {
         _state.value = ServerState.Searching
-        val host = store.get(META_SERVER_HOST)
-        val port = store.get(META_SERVER_PORT)?.toIntOrNull()
-        val storedManual = store.get(META_SERVER_MANUAL) == "true"
-        if (host != null && port != null) {
-            val stored = ServerAddress(host, port)
-            if (probe.probe(stored.baseUrl) != null) {
-                _state.value = ServerState.Connected(stored, storedManual)
-                return
+        try {
+            val host = store.get(META_SERVER_HOST)
+            val port = store.get(META_SERVER_PORT)?.toIntOrNull()
+            val storedManual = store.get(META_SERVER_MANUAL) == "true"
+            if (host != null && port != null) {
+                val stored = ServerAddress(host, port)
+                if (alive(stored)) {
+                    _state.value = ServerState.Connected(stored, storedManual)
+                    return
+                }
             }
-        }
-        val found = withTimeoutOrNull(discoveryTimeoutMs) {
-            discovery.discover().firstOrNull { probe.probe(it.baseUrl) != null }
-        }
-        if (found != null) {
-            remember(found, manual = false)
-            _state.value = ServerState.Connected(found, manual = false)
-        } else {
-            _state.value = ServerState.NotFound
+            val found = try {
+                withTimeoutOrNull(discoveryTimeoutMs) {
+                    discovery.discover().firstOrNull { alive(it) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null // découverte en échec : NotFound, pas de plantage
+            }
+            if (found != null) {
+                remember(found, manual = false)
+                _state.value = ServerState.Connected(found, manual = false)
+            } else {
+                _state.value = ServerState.NotFound
+            }
+        } finally {
+            if (_state.value == ServerState.Searching) _state.value = ServerState.NotFound
         }
     }
 
     suspend fun setManual(address: ServerAddress): Boolean {
-        if (probe.probe(address.baseUrl) == null) return false
+        if (!alive(address)) return false
         remember(address, manual = true)
         _state.value = ServerState.Connected(address, manual = true)
         return true

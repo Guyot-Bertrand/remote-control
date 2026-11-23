@@ -14,7 +14,7 @@ data class ServerAddress(val host: String, val port: Int = DEFAULT_PORT) {
 
 fun parseManualAddress(input: String): ServerAddress? {
     var s = input.trim()
-    s = s.removePrefix("http://")
+    s = if (s.startsWith("http://", ignoreCase = true)) s.substring(7) else s
     s = s.substringBefore('/')
     if (s.isEmpty()) return null
     val host: String
@@ -39,5 +39,7 @@ fun parseManualAddress(input: String): ServerAddress? {
     if (host.isEmpty() || host.any { it.isWhitespace() }) return null
     val port = if (portText == null) DEFAULT_PORT else portText.toIntOrNull() ?: return null
     if (port !in 1..65535) return null
-    return ServerAddress(host, port)
+    val address = ServerAddress(host, port)
+    // OkHttp refuse certains hôtes (« a#b », « a<b »…) : on les rejette ici.
+    return if (runCatching { address.baseUrl }.isSuccess) address else null
 }

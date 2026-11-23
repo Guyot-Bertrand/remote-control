@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.InetAddress
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -20,11 +21,13 @@ class NsdServerDiscovery(context: Context) : ServerDiscovery {
     override fun discover(): Flow<ServerAddress> = callbackFlow {
         val lock = Any()
         val queue = ArrayDeque<NsdServiceInfo>()
+        val seen = mutableSetOf<String>()
         var resolving = false
 
         fun emit(info: NsdServiceInfo, addresses: List<InetAddress>) {
             // Les IPv6 de lien local portent un identifiant de zone que HttpUrl refuse.
-            val a = addresses.firstOrNull { it is Inet4Address } ?: addresses.firstOrNull()
+            val a = addresses.firstOrNull { it is Inet4Address }
+                ?: addresses.firstOrNull { it is Inet6Address && !it.isLinkLocalAddress && it.scopeId == 0 }
             a?.hostAddress?.let { trySend(ServerAddress(it, info.port)) }
         }
 
@@ -39,8 +42,7 @@ class NsdServerDiscovery(context: Context) : ServerDiscovery {
                 synchronized(lock) { resolving = false }
                 next()
             }
-            @Suppress("DEPRECATION")
-            nsd.resolveService(info, object : NsdManager.ResolveListener {
+            val resolver = object : NsdManager.ResolveListener {
                 override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) = done()
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     if (Build.VERSION.SDK_INT >= 34) {
@@ -50,21 +52,33 @@ class NsdServerDiscovery(context: Context) : ServerDiscovery {
                     }
                     done()
                 }
-            })
+            }
+            try {
+                @Suppress("DEPRECATION")
+                nsd.resolveService(info, resolver)
+            } catch (e: Exception) {
+                done()
+            }
         }
 
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) {}
             override fun onDiscoveryStopped(serviceType: String) {}
-            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) { close() }
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                close(IllegalStateException("NSD: démarrage de la découverte impossible ($errorCode)"))
+            }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
             override fun onServiceLost(serviceInfo: NsdServiceInfo) {}
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
-                synchronized(lock) { queue.addLast(serviceInfo) }
+                synchronized(lock) { if (seen.add(serviceInfo.serviceName)) queue.addLast(serviceInfo) }
                 next()
             }
         }
-        nsd.discoverServices("_rc._tcp", NsdManager.PROTOCOL_DNS_SD, listener)
+        try {
+            nsd.discoverServices("_rc._tcp", NsdManager.PROTOCOL_DNS_SD, listener)
+        } catch (e: Exception) {
+            close(e)
+        }
         awaitClose { runCatching { nsd.stopServiceDiscovery(listener) } }
     }
 }

@@ -10,6 +10,7 @@ import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.discovery.parseManualAddress
 import fr.remotecontrol.net.messageFr
 import fr.remotecontrol.ui.common.Texts
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,11 +34,13 @@ class SettingsViewModel(
     private val _state = MutableStateFlow(SettingsUi(serverLabel = label(locator.state.value)))
     val state: StateFlow<SettingsUi> = _state.asStateFlow()
 
+    private val initJob: Job
+
     init {
         viewModelScope.launch {
             locator.state.collect { s -> _state.update { it.copy(serverLabel = label(s)) } }
         }
-        viewModelScope.launch { refreshInfo() }
+        initJob = viewModelScope.launch { refreshInfo() }
     }
 
     private fun label(s: ServerState) = when (s) {
@@ -47,10 +50,11 @@ class SettingsViewModel(
             if (s.manual) Texts.serverManual(s.address.display) else Texts.serverDetected(s.address.display)
     }
 
-    private suspend fun refreshInfo() {
+    private suspend fun refreshInfo(): Int {
         val revision = sync.localRevision()
         val count = dao.workCount()
         _state.update { it.copy(revision = revision, workCount = count) }
+        return count
     }
 
     fun onManualInput(text: String) = _state.update { it.copy(manualInput = text) }
@@ -74,8 +78,11 @@ class SettingsViewModel(
     fun rediscover() {
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
-            locator.locate()
-            _state.update { it.copy(busy = false) }
+            try {
+                locator.locate()
+            } finally {
+                _state.update { it.copy(busy = false) }
+            }
         }
     }
 
@@ -87,12 +94,17 @@ class SettingsViewModel(
     }
 
     private suspend fun fullSync() {
-        val outcome = sync.sync(forceFull = true)
-        refreshInfo()
-        val message = when (outcome) {
-            is SyncOutcome.Done -> Texts.synced(_state.value.workCount)
-            is SyncOutcome.Failed -> outcome.error.messageFr()
+        initJob.join()
+        try {
+            val outcome = sync.sync(forceFull = true)
+            val count = refreshInfo()
+            val message = when (outcome) {
+                is SyncOutcome.Done -> Texts.synced(count)
+                is SyncOutcome.Failed -> outcome.error.messageFr()
+            }
+            _state.update { it.copy(message = message) }
+        } finally {
+            _state.update { it.copy(busy = false) }
         }
-        _state.update { it.copy(busy = false, message = message) }
     }
 }

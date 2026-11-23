@@ -8,7 +8,6 @@ import fr.remotecontrol.net.ServerProbe
 import fr.remotecontrol.testing.FakeKeyValueStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -27,11 +26,11 @@ class ServerLocatorTest {
     private var collected = false
     private var found: List<ServerAddress> = emptyList()
     private val discovery = ServerDiscovery {
-        flow {
+        flow<ServerAddress> {
             collected = true
             found.forEach { emit(it) }
             awaitCancellation()
-        } as Flow<ServerAddress>
+        }
     }
     private fun locator() = ServerLocator(store, probe, discovery)
 
@@ -63,6 +62,21 @@ class ServerLocatorTest {
         val l = locator()
         l.locate()
         assertEquals(ServerState.Connected(ServerAddress("10.0.0.6"), false), l.state.value)
+    }
+
+    @Test fun nsd_bad_host_is_skipped() = runTest {
+        found = listOf(ServerAddress("fe80::1%wlan0"), ServerAddress("a#b"), ServerAddress("10.0.0.7"))
+        alive += "10.0.0.7"
+        val l = locator()
+        l.locate()
+        assertEquals(ServerState.Connected(ServerAddress("10.0.0.7"), false), l.state.value)
+    }
+
+    @Test fun bad_stored_host_does_not_crash() = runTest {
+        remember("a#b", false)
+        val l = locator()
+        l.locate()
+        assertEquals(ServerState.NotFound, l.state.value)
     }
 
     @Test fun not_found_after_timeout() = runTest {
