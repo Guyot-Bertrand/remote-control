@@ -9,19 +9,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -50,7 +46,6 @@ import fr.remotecontrol.ui.common.ScanRoute
 import fr.remotecontrol.ui.common.SearchRoute
 import fr.remotecontrol.ui.common.SeasonRoute
 import fr.remotecontrol.ui.common.SettingsRoute
-import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.TopDestination
 import fr.remotecontrol.ui.common.WorkRoute
 import fr.remotecontrol.ui.common.topNavigation
@@ -63,6 +58,8 @@ import fr.remotecontrol.ui.preplay.toArgs
 import fr.remotecontrol.ui.preplay.toRoute
 import fr.remotecontrol.ui.remote.RemoteScreen
 import fr.remotecontrol.ui.remote.RemoteViewModel
+import fr.remotecontrol.ui.scan.ScanScreen
+import fr.remotecontrol.ui.scan.ScanViewModel
 import fr.remotecontrol.ui.search.SearchScreen
 import fr.remotecontrol.ui.season.SeasonScreen
 import fr.remotecontrol.ui.season.SeasonViewModel
@@ -278,8 +275,16 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onBack = { nav.popBackStack() },
             )
         }
-        // Écran de la tâche suivante : titre provisoire.
-        composable<ScanRoute> { Placeholder(Texts.scan) }
+        composable<ScanRoute> {
+            val vm = viewModel { ScanViewModel(c.catalogDao, c.sync) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) {
+                // Retour sur l'écran (depuis la fiche ouverte) : l'analyse reprend.
+                vm.rearm()
+                vm.events.collect(nav::onNavEvent)
+            }
+            ScanScreen(state = state, onDecoded = vm::onDecoded, onDismissMessage = vm::clearMessage)
+        }
     }
 }
 
@@ -297,9 +302,4 @@ private fun NavController.onNavEvent(event: NavEvent) = when (event) {
     NavEvent.ToRemote -> navigate(RemoteRoute) { launchSingleTop = true }
     is NavEvent.ToWork -> navigate(WorkRoute(event.id))
     is NavEvent.ToSeason -> navigate(SeasonRoute(event.id))
-}
-
-@Composable
-private fun Placeholder(title: String) {
-    Text(title, style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(16.dp))
 }
