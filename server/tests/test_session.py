@@ -435,3 +435,41 @@ async def test_sheet_requested_during_playback_shown_after_stop(env):
     await env.svc.stop()
     assert (env.tv.state.screen, env.tv.state.work_id, env.tv.state.season_id) == (
         "season", 5, 1)
+
+
+async def test_seek_while_paused_published_immediately(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.clock.t = 5.0
+    emit(env, position=5.0, duration=6000, paused=True)
+    q = env.bus.subscribe()
+    env.clock.t = 5.3
+    emit(env, position=90.0, duration=6000, paused=True)  # saut en pause : plus de time-pos
+    (msg,) = drain(q)
+    assert msg["state"]["position"] == 90.0
+
+
+async def test_last_dropped_position_published_by_trailing_call(env, monkeypatch):
+    monkeypatch.setattr(session_mod, "POSITION_PUBLISH_INTERVAL", 0.1)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=0, duration=6000)
+    q = env.bus.subscribe()
+    env.clock.t = 0.02
+    emit(env, position=300.0, duration=6000)  # deux sauts rapprochés
+    env.clock.t = 0.03
+    emit(env, position=600.0, duration=6000)
+    assert drain(q) == []
+    await asyncio.sleep(0.25)
+    (msg,) = drain(q)  # un seul appel différé, avec la dernière position
+    assert msg["state"]["position"] == 600.0
+
+
+async def test_trailing_publish_cancelled_at_finish(env, monkeypatch):
+    monkeypatch.setattr(session_mod, "POSITION_PUBLISH_INTERVAL", 0.1)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=0, duration=6000)
+    env.clock.t = 0.02
+    emit(env, position=300.0, duration=6000)
+    await env.svc.stop()
+    q = env.bus.subscribe()
+    await asyncio.sleep(0.25)
+    assert drain(q) == []

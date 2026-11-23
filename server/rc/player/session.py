@@ -180,6 +180,7 @@ class PlaybackService:
         self._replacing = False  # arrêt interne avant une nouvelle lecture : télé inchangée
         self._published: PlayerState | None = None  # dernier état publié
         self._published_at = 0.0
+        self._trailing: asyncio.TimerHandle | None = None  # publication différée en attente
         player.on_state = self._on_state
 
     @property
@@ -321,15 +322,34 @@ class PlaybackService:
 
     def _publish_throttled(self) -> None:
         """Tout changement est publié aussitôt, sauf le simple avancement de la position
-        (mpv le signale à chaque image) : au plus une fois par seconde."""
+        (mpv le signale à chaque image) : au plus une fois par seconde. En pause, mpv
+        n'envoie plus de position : un saut est alors publié aussitôt. Une position
+        retenue est toujours publiée en fin d'intervalle (appel différé unique)."""
         last = self._published
-        if last is not None and replace(last, position=0) == replace(self._state, position=0):
-            if (last.position == self._state.position
-                    or self.clock() - self._published_at < POSITION_PUBLISH_INTERVAL):
+        if (last is not None and not self._state.paused
+                and replace(last, position=0) == replace(self._state, position=0)):
+            if last.position == self._state.position:
+                return
+            remaining = POSITION_PUBLISH_INTERVAL - (self.clock() - self._published_at)
+            if remaining > 0:
+                if self._trailing is None:
+                    self._trailing = asyncio.get_running_loop().call_later(
+                        remaining, self._publish_trailing)
                 return
         self._publish()
 
+    def _publish_trailing(self) -> None:
+        self._trailing = None
+        if self._published is None or self._published != self._state:
+            self._publish()
+
+    def _cancel_trailing(self) -> None:
+        if self._trailing is not None:
+            self._trailing.cancel()
+            self._trailing = None
+
     def _finish(self, state: PlayerState, message: str | None) -> None:
+        self._cancel_trailing()
         try:
             self._save(state)
             self.on_catalog(current_revision(self.conn))  # progression visible sans attendre
@@ -382,6 +402,7 @@ class PlaybackService:
             (kind, target_id)).fetchone()
 
     def _publish(self) -> None:
+        self._cancel_trailing()
         self._published, self._published_at = copy.copy(self._state), self.clock()
         self.bus.publish({"type": "player", "state": asdict(self._state),
                           "current": self.current})
