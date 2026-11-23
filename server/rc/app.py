@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +33,7 @@ from rc.events import EventBus
 from rc.player.base import Player
 from rc.player.mpv import MpvPlayer
 from rc.player.session import PlaybackService, TvController
+from rc.tmdb import fetch_missing_posters
 from rc.volumes import (Volume, VolumeUnreadable, build_index, find_catalog_source,
                         list_volumes, locate_files)
 
@@ -205,6 +207,10 @@ async def refresh_once(state: AppState) -> None:
         locate_files(state.conn, state.volumes, state.indexes)
     await asyncio.to_thread(_posters_in_thread, _db_file(state.conn),
                             state.config.data_dir / "assets", state.indexes)
+    if state.config.tmdb_api_key:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
+                                        state.config.tmdb_api_key, client)
     revision = current_revision(state.conn)
     if revision != before:
         state.bus.publish({"type": "catalog", "revision": revision})
