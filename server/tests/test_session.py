@@ -187,7 +187,7 @@ async def test_process_error_saves_and_shows_message(env):
 async def test_ended_returns_to_last_sheet(env):
     env.tv.show("work", 1)
     await env.svc.play(PlayRequest("work", 1, "start"))
-    env.player.on_state(PlayerState(position=0, duration=6000, running=True, ended=True))
+    env.player.on_state(PlayerState(position=5900, duration=6000, running=True, ended=True))
     assert env.tv.state.screen == "work" and env.tv.state.work_id == 1
     assert progress(env.conn)["watched"] == 1
     assert env.svc.current is None
@@ -345,3 +345,69 @@ async def test_resume_rewatch_uses_position_even_if_watched(env):
     assert (row["position"], row["watched"]) == (1500, 1)
     await env.svc.play(PlayRequest("work", 1, "start"))
     assert env.player.starts()[-1]["start_at"] == 0
+
+
+async def test_premature_eof_not_watched(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.on_state(PlayerState(position=2400, duration=6000, running=True, ended=True))
+    row = progress(env.conn)
+    assert (row["watched"], row["position"]) == (0, 2400)
+    assert env.svc.current is None
+
+
+async def test_eof_without_duration_marks_watched(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.on_state(PlayerState(position=2400, running=True, ended=True))
+    row = progress(env.conn)
+    assert (row["watched"], row["position"]) == (1, 0)
+
+
+def drain(q):
+    msgs = []
+    while not q.empty():
+        msgs.append(q.get_nowait())
+    return [m for m in msgs if m["type"] == "player"]
+
+
+async def test_position_only_events_at_most_once_per_second(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.clock.t = 0.0
+    emit(env, position=0, duration=6000)
+    q = env.bus.subscribe()
+    for i in range(1, 31):  # 30 images en 0,9 s
+        env.clock.t = i * 0.03
+        emit(env, position=i * 0.03, duration=6000)
+    assert drain(q) == []
+    env.clock.t = 1.0
+    emit(env, position=1.0, duration=6000)
+    (msg,) = drain(q)
+    assert msg["state"]["position"] == 1.0
+    env.clock.t = 1.5
+    emit(env, position=1.5, duration=6000)
+    assert drain(q) == []
+
+
+@pytest.mark.parametrize("change", [dict(paused=True), dict(volume=50), dict(audio=2),
+                                    dict(subtitle={"kind": "embedded", "index": 1}),
+                                    dict(duration=5000)])
+async def test_non_position_change_published_immediately(env, change):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=0, duration=6000)
+    q = env.bus.subscribe()
+    env.clock.t = 0.1
+    emit(env, **{"position": 0.1, "duration": 6000, **change})
+    (msg,) = drain(q)
+    for k, v in change.items():
+        assert msg["state"][k] == v
+
+
+async def test_failed_start_releases_lock(env):
+    from rc.player.mpv import MpvTimeout
+
+    async def frozen(*a, **k):
+        raise MpvTimeout("mpv ne répond pas")
+
+    env.player.start = frozen
+    with pytest.raises(PlayError):
+        await env.svc.play(PlayRequest("work", 1, "start"))
+    assert not env.svc._lock.locked()

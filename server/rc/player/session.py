@@ -24,6 +24,7 @@ from rc.volumes import resolve_media_path
 log = logging.getLogger(__name__)
 
 SAVE_INTERVAL = 10
+POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
 MSG_INTERRUPTED = "Lecture interrompue : fichier inaccessible"
 
@@ -170,6 +171,8 @@ class PlaybackService:
         self._session: _Session | None = None
         self._lock = asyncio.Lock()
         self._replacing = False  # arrêt interne avant une nouvelle lecture : télé inchangée
+        self._published: PlayerState | None = None  # dernier état publié
+        self._published_at = 0.0
         player.on_state = self._on_state
 
     @property
@@ -307,6 +310,16 @@ class PlaybackService:
             if state.paused != s.paused or self.clock() - s.last_save >= SAVE_INTERVAL:
                 s.paused = state.paused
                 self._save(state)
+        self._publish_throttled()
+
+    def _publish_throttled(self) -> None:
+        """Tout changement est publié aussitôt, sauf le simple avancement de la position
+        (mpv le signale à chaque image) : au plus une fois par seconde."""
+        last = self._published
+        if last is not None and replace(last, position=0) == replace(self._state, position=0):
+            if (last.position == self._state.position
+                    or self.clock() - self._published_at < POSITION_PUBLISH_INTERVAL):
+                return
         self._publish()
 
     def _finish(self, state: PlayerState, message: str | None) -> None:
@@ -327,7 +340,11 @@ class PlaybackService:
         s.last_save = self.clock()
         cur = s.current
         position, watched = state.position, 0
-        if state.ended or (state.duration and position >= WATCHED_RATIO * state.duration):
+        # La durée connue décide seule : une fin de fichier prématurée (fichier tronqué)
+        # ne vaut pas « vu ». Sans durée, la fin de fichier fait foi.
+        done = (position >= WATCHED_RATIO * state.duration if state.duration
+                else state.ended)
+        if done:
             position, watched = 0, 1
         audio = None if s.audio is None else str(s.audio)
         subtitle = None if s.subtitle is None else json.dumps(s.subtitle)
@@ -357,5 +374,6 @@ class PlaybackService:
             (kind, target_id)).fetchone()
 
     def _publish(self) -> None:
+        self._published, self._published_at = copy.copy(self._state), self.clock()
         self.bus.publish({"type": "player", "state": asdict(self._state),
                           "current": self.current})

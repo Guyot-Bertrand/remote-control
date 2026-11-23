@@ -279,6 +279,23 @@ def test_play_volume_absent_409(env):
     assert r.json() == {"error": "not_playable", "volume_label": None}
 
 
+@pytest.mark.parametrize("error", ["timeout", "connection", "gone"])
+def test_player_failure_409(env, error):
+    from rc.player.mpv import MpvTimeout
+
+    env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                       "start": "start"})
+    env.player.command_error = {"timeout": MpvTimeout("mpv ne répond pas"),
+                                "connection": ConnectionError("socket mpv fermé"),
+                                "gone": RuntimeError("aucune lecture en cours")}[error]
+    for path, body in (("pause", {"paused": True}), ("seek", {"seconds": 1, "relative": False}),
+                       ("volume", {"level": 5}), ("audio", {"index": 1}),
+                       ("subtitle", {"kind": "none"})):
+        r = env.client.post(f"/api/player/{path}", json=body)
+        assert r.status_code == 409, path
+        assert r.json() == {"error": "player", "volume_label": None}
+
+
 def test_player_idle_409(env):
     for path, body in (("pause", {"paused": True}), ("seek", {"seconds": 1, "relative": False}),
                        ("volume", {"level": 5}), ("audio", {"index": 1}),

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Annotated, Literal
@@ -20,9 +21,12 @@ from rc.assets import SIZES, asset_path
 from rc.config import Config
 from rc.db import current_revision
 from rc.events import EventBus
+from rc.player.mpv import MpvError
 from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
                                load_tracks, pick_tracks, resolve_version)
 from rc.probe import MediaTracks
+
+log = logging.getLogger(__name__)
 
 CACHE_IMMUTABLE = "public, max-age=31536000, immutable"
 ASSET_SIZES = {"orig", *SIZES}
@@ -226,40 +230,45 @@ def build_router(services: Services) -> APIRouter:
     def idle() -> bool:
         return s.playback.current is None
 
+    async def command(action: Awaitable) -> JSONResponse | dict:
+        """Commande au lecteur : mpv figé, socket fermée ou lecture terminée entre-temps
+        donnent 409 {"error": "player"} plutôt qu'une erreur 500."""
+        try:
+            await action
+        except (MpvError, ConnectionError, RuntimeError):
+            log.warning("commande au lecteur impossible", exc_info=True)
+            return conflict("player")
+        return OK
+
     @router.post("/player/pause")
     async def pause(body: PauseBody):
         if idle():
             return conflict("idle")
-        await s.playback.pause(body.paused)
-        return OK
+        return await command(s.playback.pause(body.paused))
 
     @router.post("/player/seek")
     async def seek(body: SeekBody):
         if idle():
             return conflict("idle")
-        await s.playback.seek(body.seconds, body.relative)
-        return OK
+        return await command(s.playback.seek(body.seconds, body.relative))
 
     @router.post("/player/volume")
     async def volume(body: VolumeBody):
         if idle():
             return conflict("idle")
-        await s.playback.set_volume(body.level)
-        return OK
+        return await command(s.playback.set_volume(body.level))
 
     @router.post("/player/audio")
     async def audio(body: AudioBody):
         if idle():
             return conflict("idle")
-        await s.playback.set_audio(body.index)
-        return OK
+        return await command(s.playback.set_audio(body.index))
 
     @router.post("/player/subtitle")
     async def subtitle(body: SubSelBody):
         if idle():
             return conflict("idle")
-        await s.playback.set_subtitle(body.root.model_dump())
-        return OK
+        return await command(s.playback.set_subtitle(body.root.model_dump()))
 
     @router.post("/player/stop")
     async def stop():

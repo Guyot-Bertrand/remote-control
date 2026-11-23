@@ -16,10 +16,15 @@ from rc.player.base import PlayerState, SubSel
 log = logging.getLogger("rc.player.mpv")
 
 OBSERVED = ("time-pos", "duration", "pause", "volume", "aid", "sid", "eof-reached")
+COMMAND_TIMEOUT = 5  # secondes : au-delà, mpv est considéré comme figé
 
 
 class MpvError(Exception):
     pass
+
+
+class MpvTimeout(MpvError):
+    """mpv n'a pas répondu à une commande dans le délai imparti."""
 
 
 class MpvClient:
@@ -89,7 +94,12 @@ class MpvClient:
         except (ConnectionError, OSError) as e:
             self._pending.pop(rid, None)
             raise ConnectionError(str(e)) from e
-        reply = await fut
+        try:
+            reply = await asyncio.wait_for(fut, COMMAND_TIMEOUT)
+        except asyncio.TimeoutError:
+            raise MpvTimeout(f"mpv ne répond pas à {args[0]!r}") from None
+        finally:
+            self._pending.pop(rid, None)
         if reply.get("error") != "success":
             raise MpvError(reply.get("error"))
         return reply.get("data")
@@ -218,10 +228,14 @@ class MpvPlayer:
 
     def _apply(self, prop: str | None, data: Any) -> None:
         s = self.state
+        # time-pos et duration deviennent indisponibles (null) en fin de fichier :
+        # on garde alors la dernière valeur connue, utile pour décider « vu ».
         if prop == "time-pos":
-            s.position = data if isinstance(data, (int, float)) else 0
+            if isinstance(data, (int, float)) and not isinstance(data, bool):
+                s.position = data
         elif prop == "duration":
-            s.duration = data if isinstance(data, (int, float)) else None
+            if isinstance(data, (int, float)) and not isinstance(data, bool):
+                s.duration = data
         elif prop == "pause":
             s.paused = bool(data)
         elif prop == "volume":

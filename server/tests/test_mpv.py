@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from rc.player.mpv import MpvClient, MpvError, MpvPlayer
+from rc.player import mpv as mpv_mod
+from rc.player.mpv import MpvClient, MpvError, MpvPlayer, MpvTimeout
 from tests.fake_mpv import FakeMpv
 
 FAKE = Path(__file__).parent / "fake_mpv.py"
@@ -57,6 +58,18 @@ async def test_observe_property_change_yields_event(fake, client):
     assert ev == {"event": "property-change", "id": pid, "name": "time-pos", "data": 3.5}
 
 
+async def test_command_times_out_when_mpv_hangs(fake, client, monkeypatch):
+    monkeypatch.setattr(mpv_mod, "COMMAND_TIMEOUT", 0.2)
+    fake.mute.add("hang")
+    async with asyncio.timeout(2):
+        with pytest.raises(MpvTimeout):
+            await client.command("hang")
+    assert issubclass(MpvTimeout, MpvError)
+    assert client._pending == {}
+    fake.props["x"] = 7
+    assert await client.command("get_property", "x") == 7  # le client reste utilisable
+
+
 # -- MpvPlayer contre un mpv factice (sous-processus) ------------------------
 
 
@@ -68,9 +81,10 @@ def make_player(tmp_path, monkeypatch):
     log = tmp_path / "log.jsonl"
     players = []
 
-    def make(script, props=None):
+    def make(script, props=None, mute=()):
         cfg = tmp_path / "cfg.json"
-        cfg.write_text(json.dumps({"script": script, "props": props or {}, "log": str(log)}))
+        cfg.write_text(json.dumps({"script": script, "props": props or {}, "log": str(log),
+                                   "mute": list(mute)}))
         monkeypatch.setenv("FAKE_MPV_CONFIG", str(cfg))
         p = MpvPlayer(str(wrapper), ["--foo"], tmp_path / "run")
         states = []
@@ -124,6 +138,26 @@ async def test_state_updates_position(make_player, tmp_path):
     assert (s.position, s.duration, s.paused, s.running) == (12.5, 100.0, True, True)
     await p.stop()
     assert states[-1].running is False and states[-1].error is None
+
+
+async def test_start_against_frozen_mpv_fails_fast(make_player, tmp_path, monkeypatch):
+    monkeypatch.setattr(mpv_mod, "COMMAND_TIMEOUT", 0.2)
+    p, states, _ = make_player([], mute=["observe_property"])
+    async with asyncio.timeout(5):
+        with pytest.raises(MpvTimeout):
+            await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    assert states[-1].running is False and states[-1].error == "start_failed"
+    assert p._proc is None and p._client is None
+
+
+async def test_unavailable_time_pos_keeps_last_values(make_player, tmp_path):
+    ev = lambda n, d: {"event": {"event": "property-change", "id": 1, "name": n, "data": d}}
+    p, states, _ = make_player([ev("time-pos", 50.0), ev("duration", 100.0),
+                                ev("time-pos", None), ev("duration", None), ev("volume", 80)])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await wait_for(lambda: states and states[-1].volume == 80)
+    assert (states[-1].position, states[-1].duration) == (50.0, 100.0)
+    await p.stop()
 
 
 async def test_process_exit_without_eof_sets_error(make_player, tmp_path):

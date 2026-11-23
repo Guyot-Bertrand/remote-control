@@ -13,6 +13,12 @@ class FakePlayer:
         self.start_gate: asyncio.Event | None = None  # start lent
         self.stop_gate: asyncio.Event | None = None  # stop lent
         self.stop_state: PlayerState | None = None  # état final émis par stop (comme mpv)
+        self.command_error: Exception | None = None  # levée par les commandes (mpv figé)
+
+    def _command(self, *call):
+        self.calls.append(call)
+        if self.command_error is not None:
+            raise self.command_error
 
     async def start(self, path, start_at, audio, subtitle, external_subs):
         self.calls.append(("start", dict(path=path, start_at=start_at, audio=audio,
@@ -23,19 +29,19 @@ class FakePlayer:
             raise OSError("boom")
 
     async def set_pause(self, paused):
-        self.calls.append(("set_pause", paused))
+        self._command("set_pause", paused)
 
     async def seek(self, seconds, relative):
-        self.calls.append(("seek", seconds, relative))
+        self._command("seek", seconds, relative)
 
     async def set_volume(self, level):
-        self.calls.append(("set_volume", level))
+        self._command("set_volume", level)
 
     async def set_audio(self, index):
-        self.calls.append(("set_audio", index))
+        self._command("set_audio", index)
 
     async def set_subtitle(self, sel):
-        self.calls.append(("set_subtitle", sel))
+        self._command("set_subtitle", sel)
 
     async def stop(self):
         self.calls.append(("stop",))

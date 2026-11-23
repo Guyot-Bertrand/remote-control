@@ -3,7 +3,7 @@
 En processus (classe FakeMpv) ou comme exécutable (`python fake_mpv.py --input-ipc-server=SOCK ...`).
 En exécutable, il lit le JSON pointé par FAKE_MPV_CONFIG :
   {"props": {nom: valeur}, "script": [{"event": {...}} | {"sleep": s} | {"exit": true}],
-   "log": "fichier"}
+   "log": "fichier", "mute": [commandes jamais répondues]}
 Le script démarre quand le client observe `eof-reached` (dernière propriété observée).
 Chaque commande reçue est ajoutée au fichier log (une liste JSON par ligne).
 """
@@ -16,10 +16,11 @@ from pathlib import Path
 
 
 class FakeMpv:
-    def __init__(self, socket_path, props=None, fail=(), log=None, script=None):
+    def __init__(self, socket_path, props=None, fail=(), log=None, script=None, mute=()):
         self.socket_path = str(socket_path)
         self.props = props or {}
         self.fail = set(fail)  # noms de commandes qui répondent en erreur
+        self.mute = set(mute)  # noms de commandes jamais répondues (mpv figé)
         self.commands: list[list] = []
         self.log = log
         self.script = script or []
@@ -61,7 +62,9 @@ class FakeMpv:
                 elif cmd[0] == "get_property":
                     reply["data"] = self.props.get(cmd[1])
                 data = json.dumps(reply).encode() + b"\n"
-                if cmd[0] == "get_property" and cmd[1] == "slow":
+                if cmd[0] in self.mute:
+                    pass
+                elif cmd[0] == "get_property" and cmd[1] == "slow":
                     self._tasks.append(asyncio.create_task(self._late(writer, data)))
                 else:
                     writer.write(data)
@@ -93,7 +96,8 @@ class FakeMpv:
 async def _main(argv):
     sock = next(a.split("=", 1)[1] for a in argv if a.startswith("--input-ipc-server="))
     cfg = json.loads(Path(os.environ["FAKE_MPV_CONFIG"]).read_text())
-    fake = FakeMpv(sock, cfg.get("props"), log=cfg.get("log"), script=cfg.get("script"))
+    fake = FakeMpv(sock, cfg.get("props"), log=cfg.get("log"), script=cfg.get("script"),
+                   mute=cfg.get("mute", ()))
     if cfg.get("log"):
         with open(cfg["log"], "a") as f:
             f.write(json.dumps(["argv", *argv]) + "\n")
