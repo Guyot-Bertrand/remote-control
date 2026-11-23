@@ -20,6 +20,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -44,7 +47,29 @@ class RemoteViewModelTest {
         scope.cancel()
     }
 
-    private fun viewModel() = RemoteViewModel(api, RemoteController(api, events, scope)).also { vms += it }
+    /** ViewModel dont l'état est observé (comme par l'écran) dans [on], qui porte aussi le contrôleur. */
+    private fun viewModel(on: CoroutineScope = scope): RemoteViewModel {
+        val vm = RemoteViewModel(api, RemoteController(api, events, on)).also { vms += it }
+        observe(vm, on)
+        return vm
+    }
+
+    private fun observe(vm: RemoteViewModel, on: CoroutineScope): Job = on.launch { vm.state.collect {} }
+
+    /**
+     * Test en temps virtuel : [vt] partage l'ordonnanceur du test (et de Dispatchers.Main). Les ViewModels et
+     * [vt] sont arrêtés même si une assertion échoue, sinon le tic d'une seconde ferait tourner runTest sans fin.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun virtualTest(block: suspend TestScope.(vt: CoroutineScope) -> Unit) = runTest {
+        val vt = CoroutineScope(UnconfinedTestDispatcher(testScheduler) + Job())
+        try {
+            block(vt)
+        } finally {
+            vms.forEach { it.clearAndJoin() }
+            vt.cancel()
+        }
+    }
 
     private suspend fun push(s: PlayerSnapshotDto) {
         events.subscriptionCount.first { it > 0 }
@@ -160,9 +185,9 @@ class RemoteViewModelTest {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun position_interpolated_while_playing() = runTest {
+    @Test fun position_interpolated_while_playing() = virtualTest { vt ->
         api.playerStateResult = ApiResult.Ok(playing)
-        val vm = viewModel()
+        val vm = viewModel(vt)
         advanceTimeBy(1_001)
         assertEquals(613.5, vm.state.value.position, 0.0)
         assertEquals("10:13", vm.state.value.positionLabel)
@@ -170,6 +195,100 @@ class RemoteViewModelTest {
         advanceTimeBy(3_000)
         runCurrent()
         assertEquals(800.0, vm.state.value.position, 0.0)
-        vm.clearAndJoin()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun interpolation_capped_at_duration() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(at(5_939.5))
+        val vm = viewModel(vt)
+        advanceTimeBy(3_001)
+        assertEquals(5_940.0, vm.state.value.position, 0.0)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun no_tick_when_ended_or_stopped() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(playing.copy(state = playing.state.copy(ended = true)))
+        val vm = viewModel(vt)
+        advanceTimeBy(3_001)
+        assertEquals(612.5, vm.state.value.position, 0.0)
+        push(PlayerSnapshotDto(PlayerStateDto(position = 42.0, running = false)))
+        advanceTimeBy(3_001)
+        assertEquals(42.0, vm.state.value.position, 0.0)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun seek_hold_ignores_stale_events_until_timeout() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(at(600.0, paused = true))
+        val vm = viewModel(vt)
+        vm.onSeekDrag(3_000.0)
+        vm.onSeekRelease()
+        push(at(610.0, paused = true)) // événement antérieur à la commande
+        advanceTimeBy(1_000)
+        assertEquals(3_000.0, vm.state.value.position, 0.0)
+        advanceTimeBy(1_001)
+        assertEquals(610.0, vm.state.value.position, 0.0)
+    }
+
+    @Test fun volume_hold_released_within_tolerance() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(playing)
+        val vm = viewModel()
+        vm.onVolumeDrag(55)
+        vm.onVolumeRelease()
+        push(playing.copy(state = playing.state.copy(volume = 70))) // antérieur à la commande
+        assertEquals(55, vm.state.value.volume)
+        push(playing.copy(state = playing.state.copy(volume = 54)))
+        assertEquals(54, vm.state.value.volume)
+    }
+
+    @Test fun tracks_failure_not_retried_per_event() = runBlocking {
+        api.tracksResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = viewModel()
+        push(at(700.0))
+        assertEquals("Serveur injoignable", vm.state.value.message)
+        vm.clearMessage()
+        push(at(701.0))
+        assertEquals(1, api.calls.count { it == "tracks(2)" })
+        assertEquals(null, vm.state.value.message)
+        // Autre fichier, puis retour : nouvel essai.
+        push(playing.copy(current = playing.current!!.copy(mediaFileId = 3)))
+        api.tracksResult = ApiResult.Ok(tracks)
+        push(at(702.0))
+        assertEquals(2, api.calls.count { it == "tracks(2)" })
+        assertEquals(2, vm.state.value.audio.size)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun stops_working_when_screen_leaves() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(playing)
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt)).also { vms += it }
+        val screen = observe(vm, vt)
+        advanceTimeBy(2_001)
+        assertEquals(614.5, vm.state.value.position, 0.0)
+        screen.cancel()
+        advanceTimeBy(5_001)
+        val frozen = vm.state.value.position
+        advanceTimeBy(5_000)
+        assertEquals(frozen, vm.state.value.position, 0.0)
+        assertEquals(0, events.subscriptionCount.value)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun reopening_later_does_not_replay_past_playback() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(playing)
+        val controller = RemoteController(api, events, vt)
+        val first = RemoteViewModel(api, controller).also { vms += it }
+        val screen = observe(first, vt)
+        assertTrue(first.state.value.running)
+        screen.cancel()
+        first.clearAndJoin()
+        advanceTimeBy(5_001)
+        // Plus rien ne joue, et le serveur ne répond plus.
+        api.playerStateResult = ApiResult.Err(ApiError.Unreachable)
+        val second = RemoteViewModel(api, controller).also { vms += it }
+        observe(second, vt)
+        val ui = second.state.value
+        assertFalse(ui.running)
+        assertFalse(ui.finished)
+        assertEquals(null, ui.workId)
     }
 }

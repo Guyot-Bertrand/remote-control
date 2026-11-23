@@ -24,13 +24,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 
 /**
  * Télécommande. [running] : une lecture est en cours (commandes actives). [finished] : la lecture suivie par
@@ -64,20 +65,27 @@ private data class Local(val seek: Double? = null, val volume: Int? = null, val 
 
 private const val TICK_MS = 1_000L
 
+/** Délai maximal pendant lequel une position ou un volume envoyés restent affichés en attendant le serveur. */
+private const val HOLD_MS = 2_000L
+private const val SEEK_TOLERANCE = 2.0
+private const val VOLUME_TOLERANCE = 2
+
 class RemoteViewModel(private val api: RcApi, private val controller: RemoteController) : ViewModel() {
     private val local = MutableStateFlow(Local())
     private val tracks = MutableStateFlow<Map<Long, MediaTracksDto>>(emptyMap())
-    private val requested = mutableSetOf<Long>()
+    private val loading = mutableSetOf<Long>()
+    private var shownMediaFileId: Long? = null
 
     /** Dernière lecture vue par l'écran : garde le lien vers la fiche quand le serveur l'oublie (fin de lecture). */
     private val lastCurrent = MutableStateFlow<CurrentDto?>(null)
 
     /**
-     * Instantanés du serveur, plus une position extrapolée chaque seconde pendant la lecture : le serveur
-     * n'envoie la position qu'au plus une fois par seconde, l'affichage avance sans attendre le prochain événement.
+     * Instantanés du serveur (avec la mémoire de la lecture et le chargement des pistes), plus une position
+     * extrapolée chaque seconde pendant la lecture : le serveur n'envoie la position qu'au plus une fois par
+     * seconde, l'affichage avance sans attendre le prochain événement. Tout s'arrête avec l'abonnement à [state].
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val live: Flow<PlayerSnapshotDto?> = controller.snapshot.transformLatest { s ->
+    private val live: Flow<PlayerSnapshotDto?> = controller.snapshot.onEach(::onSnapshot).transformLatest { s ->
         emit(s)
         val st = s?.state ?: return@transformLatest
         if (!st.running || st.paused || st.ended) return@transformLatest
@@ -92,28 +100,28 @@ class RemoteViewModel(private val api: RcApi, private val controller: RemoteCont
 
     val state: StateFlow<RemoteUi> = combine(live, local, tracks, lastCurrent) { s, l, t, last ->
         toUi(s, l, t, last)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, RemoteUi())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RemoteUi())
 
-    init {
-        viewModelScope.launch {
-            controller.snapshot.collect { s ->
-                val current = s?.current ?: return@collect
-                lastCurrent.value = current
-                loadTracks(current.mediaFileId)
-            }
-        }
+    private fun onSnapshot(s: PlayerSnapshotDto?) {
+        val current = s?.current ?: return
+        lastCurrent.value = current
+        if (current.mediaFileId == shownMediaFileId) return
+        shownMediaFileId = current.mediaFileId
+        loadTracks(current.mediaFileId)
     }
 
-    /** Pistes lues une fois par fichier ; un échec permet un nouvel essai au prochain changement. */
+    /**
+     * Pistes lues une fois par fichier, au changement de fichier seulement : un échec n'est pas relancé
+     * à chaque événement (ni son message réaffiché), mais au prochain changement vers ce fichier.
+     */
     private fun loadTracks(mediaFileId: Long) {
-        if (!requested.add(mediaFileId)) return
+        if (mediaFileId in tracks.value || !loading.add(mediaFileId)) return
         viewModelScope.launch {
-            when (val r = api.tracks(mediaFileId)) {
+            val r = api.tracks(mediaFileId)
+            loading.remove(mediaFileId)
+            when (r) {
                 is ApiResult.Ok -> tracks.update { it + (mediaFileId to r.value) }
-                is ApiResult.Err -> {
-                    requested.remove(mediaFileId)
-                    local.update { it.copy(message = r.error.messageFr()) }
-                }
+                is ApiResult.Err -> local.update { it.copy(message = r.error.messageFr()) }
             }
         }
     }
@@ -132,14 +140,24 @@ class RemoteViewModel(private val api: RcApi, private val controller: RemoteCont
     /** Une seule commande au relâchement ; la position tenue reste affichée jusqu'au prochain état du serveur. */
     fun onSeekRelease() {
         val target = local.value.seek ?: return
-        holdUntilServer({ api.seek(target, relative = false) }, { it.seek == target }, { it.copy(seek = null) })
+        holdUntilServer(
+            send = { api.seek(target, relative = false) },
+            reached = { abs(it.position - target) <= SEEK_TOLERANCE },
+            stillHeld = { it.seek == target },
+            release = { it.copy(seek = null) },
+        )
     }
 
     fun onVolumeDrag(level: Int) = local.update { it.copy(volume = level) }
 
     fun onVolumeRelease() {
         val target = local.value.volume ?: return
-        holdUntilServer({ api.volume(target) }, { it.volume == target }, { it.copy(volume = null) })
+        holdUntilServer(
+            send = { api.volume(target) },
+            reached = { abs(it.volume - target) <= VOLUME_TOLERANCE },
+            stillHeld = { it.volume == target },
+            release = { it.copy(volume = null) },
+        )
     }
 
     fun selectAudio(index: Int?) = command { api.audio(index) }
@@ -160,15 +178,19 @@ class RemoteViewModel(private val api: RcApi, private val controller: RemoteCont
     }
 
     /**
-     * Envoie [send] ; en cas de succès, la valeur tenue reste affichée jusqu'au prochain état du serveur
-     * (au plus 2 s), pour que le curseur ne revienne pas en arrière entre la réponse et l'événement.
-     * [stillHeld] : le doigt n'a pas repris le curseur entre-temps.
+     * Envoie [send] ; en cas de succès, la valeur tenue reste affichée jusqu'à ce que le serveur l'ait atteinte
+     * ([reached], à la tolérance près) ou au plus [HOLD_MS] : le curseur ne revient pas en arrière sur un
+     * événement antérieur à la commande. [stillHeld] : le doigt n'a pas repris le curseur entre-temps.
      */
-    private fun holdUntilServer(send: suspend () -> ApiResult<Unit>, stillHeld: (Local) -> Boolean, release: (Local) -> Local) {
+    private fun holdUntilServer(
+        send: suspend () -> ApiResult<Unit>,
+        reached: (PlayerStateDto) -> Boolean,
+        stillHeld: (Local) -> Boolean,
+        release: (Local) -> Local,
+    ) {
         viewModelScope.launch {
-            val before = controller.snapshot.value
-            if (!fail(send()) && controller.snapshot.value == before) {
-                withTimeoutOrNull(2_000) { controller.snapshot.drop(1).first() }
+            if (!fail(send())) {
+                withTimeoutOrNull(HOLD_MS) { controller.snapshot.first { it != null && reached(it.state) } }
             }
             local.update { if (stillHeld(it)) release(it) else it }
         }

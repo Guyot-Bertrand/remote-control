@@ -313,7 +313,7 @@ private fun RoundButton(
 
 @Composable
 private fun Tracks(state: RemoteUi, onAudio: (Int?) -> Unit, onSubtitle: (SubSel) -> Unit) {
-    val audioLabel = state.audio.firstOrNull { it.index == state.selectedAudio }?.label ?: "—"
+    val audioLabel = state.audio.firstOrNull { it.index == state.selectedAudio }?.label ?: Texts.unknownTrack
     val subtitleLabel = state.subtitles.firstOrNull { it.sel == state.selectedSubtitle }?.label ?: Texts.subtitleNone
     Row(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         TrackChip(

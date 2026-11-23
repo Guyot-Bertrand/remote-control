@@ -104,6 +104,7 @@ object Texts {
     const val playbackEnded = "Lecture terminée"
     const val playbackInterrupted = "Lecture interrompue"
     const val backToSheet = "Retour à la fiche"
+    const val unknownTrack = "—"
 
     // Fiches œuvre et saison
     const val shownOnTv = "Affichée sur la télé"
