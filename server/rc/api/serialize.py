@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import sqlite3
 from dataclasses import asdict
 
@@ -153,3 +154,59 @@ def _highlight(episodes: list[dict]) -> int | None:
     if touched:
         return max(touched, key=lambda e: e["progress"]["updated_at"])["id"]
     return episodes[0]["id"] if episodes else None
+
+
+RECENT_MAX = 8
+
+
+def _tv_summary(w: sqlite3.Row, position: float | None, duration: float | None,
+                watched: bool) -> dict:
+    """Résumé d'œuvre pour l'écran télé, avec la progression de sa dernière lecture."""
+    ratio = None
+    if not watched and position and duration:
+        ratio = min(position / duration, 1.0)
+    return {"id": w["id"], "title_fr": w["title_fr"], "year": w["year"],
+            "poster": w["poster_asset"], "progress_ratio": ratio, "watched": watched}
+
+
+def tv_home(conn: sqlite3.Connection, rng: random.Random | None = None) -> dict:
+    """Veille de la télé : dernières œuvres vues ou entamées, et une affiche à montrer."""
+    rows = conn.execute(
+        "SELECT w.*, p.position AS p_position, p.duration AS p_duration,"
+        " p.watched AS p_watched FROM progress p"
+        " LEFT JOIN episode e ON p.target_kind = 'episode' AND e.id = p.target_id"
+        " LEFT JOIN season s ON s.id = e.season_id"
+        " JOIN work w ON w.id = CASE p.target_kind WHEN 'work' THEN p.target_id"
+        " ELSE s.work_id END"
+        " ORDER BY p.updated_at IS NULL, p.updated_at DESC").fetchall()
+    recent: list[dict] = []
+    seen: set[int] = set()
+    for r in rows:  # une œuvre à épisodes n'apparaît qu'une fois (son épisode le plus récent)
+        if r["id"] in seen:
+            continue
+        seen.add(r["id"])
+        recent.append(_tv_summary(r, r["p_position"], r["p_duration"], bool(r["p_watched"])))
+        if len(recent) == RECENT_MAX:
+            break
+    return {"recent": recent, "showcase": _showcase(conn, rng or random)}
+
+
+def _showcase(conn: sqlite3.Connection, rng: random.Random) -> dict | None:
+    """Une œuvre avec affiche, tirée au hasard, de préférence membre d'une collection."""
+    ids = [r[0] for r in conn.execute(
+        "SELECT id FROM work WHERE poster_asset IS NOT NULL"
+        " AND id IN (SELECT work_id FROM work_collection)")]
+    if not ids:
+        ids = [r[0] for r in conn.execute("SELECT id FROM work WHERE poster_asset IS NOT NULL")]
+    if not ids:
+        return None
+    w = conn.execute("SELECT * FROM work WHERE id = ?", (rng.choice(ids),)).fetchone()
+    p = conn.execute("SELECT * FROM progress WHERE target_kind = 'work' AND target_id = ?",
+                     (w["id"],)).fetchone()
+    d = _tv_summary(w, p and p["position"], p and p["duration"], bool(p and p["watched"]))
+    c = conn.execute("SELECT c.name FROM collection c JOIN work_collection wc"
+                     " ON wc.collection_id = c.id WHERE wc.work_id = ? ORDER BY c.name",
+                     (w["id"],)).fetchone()
+    d.update(title_vo=w["title_vo"], directors=json.loads(w["directors_json"]),
+             duration_min=w["duration_min"], collection_name=c and c["name"])
+    return d

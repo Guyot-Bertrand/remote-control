@@ -204,6 +204,10 @@ def build_router(services: Services) -> APIRouter:
         return {"shown": s.tv.show("season", work_id=r["work_id"], season_id=body.id,
                                    force=body.force)}
 
+    @router.get("/tv/home")
+    async def tv_home():
+        return serialize.tv_home(s.conn)
+
     @router.get("/tv/state")
     async def tv_state():
         return asdict(s.tv.state)

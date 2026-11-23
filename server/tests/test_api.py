@@ -446,3 +446,70 @@ def test_host_policy_unit():
     assert p.allowed({b"host": b"salon.lan:8765"}, check_origin=False)
     assert not p.allowed({}, check_origin=False)  # Host absent
     assert not p.allowed({b"host": b"evil.example"}, check_origin=False)
+
+
+def test_tv_home_empty_db(tmp_path):
+    conn = open_db(tmp_path / "vide.db", check_same_thread=False)
+    bus = EventBus()
+    tv = TvController(bus)
+    config = Config(data_dir=tmp_path / "data", allowed_hosts=["testserver"])
+    playback = PlaybackService(conn, FakePlayer(), tv, bus, dict)
+    app = FastAPI()
+    install_api(app, Services(conn, config, bus, tv, playback, dict))
+    with TestClient(app) as client:
+        assert client.get("/api/tv/home").json() == {"recent": [], "showcase": None}
+    conn.close()
+
+
+def add_progress(conn, kind, target, position, duration, watched, at):
+    conn.execute("INSERT INTO progress (target_kind, target_id, position, duration, watched,"
+                 " updated_at, rev) VALUES (?, ?, ?, ?, ?, ?, 1)",
+                 (kind, target, position, duration, watched, at))
+
+
+def test_tv_home_recent_most_recent_first(env):
+    add_progress(env.conn, "work", 1, 300.0, 600.0, 0, 10.0)
+    add_progress(env.conn, "episode", 1, 0.0, 1500.0, 1, 30.0)  # Back to Life
+    add_progress(env.conn, "episode", 3, 100.0, 1500.0, 0, 5.0)  # même série, plus ancien
+    add_progress(env.conn, "work", 3, 0.0, 6540.0, 1, 20.0)
+    add_progress(env.conn, "work", 999, 10.0, 100.0, 0, 40.0)  # œuvre disparue : ignorée
+    recent = env.client.get("/api/tv/home").json()["recent"]
+    assert [w["id"] for w in recent] == [5, 3, 1]
+    ava = recent[2]
+    assert ava == {"id": 1, "title_fr": "Ava", "year": 2017, "poster": ava["poster"],
+                   "progress_ratio": 0.5, "watched": False}
+    assert len(ava["poster"]) == 16
+    assert recent[0]["poster"] is None
+    assert recent[0]["watched"] is True and recent[0]["progress_ratio"] is None
+    assert recent[1]["watched"] is True and recent[1]["progress_ratio"] is None
+
+
+def test_tv_home_recent_at_most_8(env):
+    for i in range(12):  # œuvres factices : seules les 8 plus récentes
+        env.conn.execute("INSERT INTO work_identity (id, type, key) VALUES (?, 'film', ?)",
+                         (100 + i, f"k{i}"))
+        env.conn.execute(
+            "INSERT INTO work (id, type, key, title_fr, directors_json, genres_json,"
+            " cast_json, tags_json, episodic, content_hash, rev)"
+            " VALUES (?, 'film', ?, ?, '[]', '[]', '[]', '[]', 0, '', 1)",
+            (100 + i, f"k{i}", f"Film {i}"))
+        add_progress(env.conn, "work", 100 + i, 0.0, None, 0, float(i))
+    recent = env.client.get("/api/tv/home").json()["recent"]
+    assert [w["id"] for w in recent] == [111, 110, 109, 108, 107, 106, 105, 104]
+    assert recent[0]["progress_ratio"] is None  # durée inconnue
+
+
+def test_tv_home_showcase(env):
+    show = env.client.get("/api/tv/home").json()["showcase"]
+    assert show == {"id": 1, "title_fr": "Ava", "year": 2017, "poster": show["poster"],
+                    "progress_ratio": None, "watched": False, "title_vo": None,
+                    "directors": ["Léa Mysius"], "duration_min": 99,
+                    "collection_name": "Les 1000 plus grands films de tous les temps [2020]"}
+    # Une œuvre avec affiche hors collection n'est pas préférée.
+    env.conn.execute("UPDATE work SET poster_asset = ? WHERE id = 3", (show["poster"],))
+    assert {env.client.get("/api/tv/home").json()["showcase"]["id"] for _ in range(20)} == {1}
+    env.conn.execute("DELETE FROM work_collection")
+    show = env.client.get("/api/tv/home").json()["showcase"]
+    assert show["id"] in (1, 3) and show["collection_name"] is None
+    env.conn.execute("UPDATE work SET poster_asset = NULL")
+    assert env.client.get("/api/tv/home").json()["showcase"] is None
