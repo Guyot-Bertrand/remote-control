@@ -281,20 +281,41 @@ def _default_zeroconf():
 
 
 async def mdns_announce(port: int, zeroconf_factory: Callable = _default_zeroconf,
-                        addresses: Callable[[], list[bytes]] = local_addresses) -> None:
+                        addresses: Callable[[], list[bytes]] = local_addresses,
+                        interval: float = 60) -> None:
     """Annonce le service tant que la tâche vit ; retire l'annonce à l'annulation.
+    Toutes les `interval` secondes (un tour de rafraîchissement), les adresses locales
+    sont relues : si elles ont changé (Wi-Fi rebranché, DHCP), l'annonce est mise à jour.
     Un échec est journalisé : le serveur continue sans annonce."""
     from zeroconf.asyncio import AsyncServiceInfo
 
     azc = info = None
     try:
+        announced = addresses()
         info = AsyncServiceInfo(SERVICE_TYPE, SERVICE_NAME, port=port,
-                                properties={"api": "1"}, addresses=addresses())
+                                properties={"api": "1"}, addresses=announced)
         azc = zeroconf_factory()
         # zeroconf renvoie une tâche : l'attendre garantit l'envoi complet des annonces.
         await (await azc.async_register_service(info))
         log.info("service mDNS annoncé : %s (port %d)", SERVICE_NAME, port)
-        await asyncio.Event().wait()
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                current = addresses()
+            except Exception as exc:
+                log.warning("adresses locales illisibles, annonce inchangée (%s)", exc)
+                continue
+            if set(current) == set(announced):
+                continue
+            try:
+                info.addresses = current
+                await (await azc.async_update_service(info))
+            except Exception:
+                log.exception("mise à jour de l'annonce mDNS impossible")
+                continue
+            announced = current
+            log.info("annonce mDNS mise à jour : %s",
+                     ", ".join(socket.inet_ntoa(a) for a in current) or "aucune adresse")
     except Exception:
         log.exception("annonce mDNS impossible")
     finally:
@@ -337,7 +358,8 @@ def create_app(config: Config, player: Player | None = None,
     async def lifespan(app: FastAPI):
         tasks = [asyncio.create_task(refresh_loop(state))]
         if config.mdns:
-            tasks.append(asyncio.create_task(mdns_announce(config.port)))
+            tasks.append(asyncio.create_task(
+                mdns_announce(config.port, interval=config.poll_interval)))
         try:
             yield
         finally:

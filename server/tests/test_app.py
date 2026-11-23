@@ -274,6 +274,10 @@ class FakeZeroconf:
     async def async_unregister_service(self, info):
         return asyncio.ensure_future(self._done("unregistered"))
 
+    async def async_update_service(self, info):
+        self.calls.append(("update", list(info.addresses)))
+        return asyncio.ensure_future(self._done("updated"))
+
     async def async_close(self):
         self.calls.append("closed")
 
@@ -403,3 +407,48 @@ async def test_refresh_remembers_unreadable_posters(setup, caplog):
         await refresh_once(state)
     unreadable = [r for r in caplog.records if "affiche illisible" in r.getMessage()]
     assert len(unreadable) == 1
+
+
+async def test_mdns_reannounced_when_addresses_change(caplog):
+    zc = FakeZeroconf()
+    wifi, eth = bytes([192, 168, 1, 23]), bytes([192, 168, 1, 40])
+    current = [wifi]
+    task = asyncio.create_task(mdns_announce(8765, zeroconf_factory=lambda: zc,
+                                             addresses=lambda: list(current),
+                                             interval=0.01))
+    await asyncio.sleep(0.05)
+    assert not any(c[0] == "update" for c in zc.calls if isinstance(c, tuple))
+    current[:] = [eth, wifi]
+    async with asyncio.timeout(2):
+        while "updated" not in zc.calls:
+            await asyncio.sleep(0.01)
+    updates = [c for c in zc.calls if isinstance(c, tuple) and c[0] == "update"]
+    assert updates == [("update", [eth, wifi])]
+    current[:] = [wifi, eth]  # même ensemble, autre ordre : rien à annoncer
+    await asyncio.sleep(0.05)
+    assert len([c for c in zc.calls if isinstance(c, tuple) and c[0] == "update"]) == 1
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert zc.calls[-2:] == ["unregistered", "closed"]
+
+
+async def test_mdns_address_lookup_failure_keeps_announcement(caplog):
+    zc = FakeZeroconf()
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("interfaces illisibles")
+        return [bytes([192, 168, 1, 23 + (calls["n"] > 2)])]
+
+    with caplog.at_level(logging.WARNING, logger="rc.app"):
+        task = asyncio.create_task(mdns_announce(8765, zeroconf_factory=lambda: zc,
+                                                 addresses=flaky, interval=0.01))
+        async with asyncio.timeout(2):
+            while "updated" not in zc.calls:
+                await asyncio.sleep(0.01)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert zc.calls[-2:] == ["unregistered", "closed"]
+    assert any("adresses" in r.getMessage() for r in caplog.records)
