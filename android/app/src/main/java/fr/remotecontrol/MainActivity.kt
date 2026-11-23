@@ -61,6 +61,8 @@ import fr.remotecontrol.ui.preplay.PrePlayScreen
 import fr.remotecontrol.ui.preplay.PrePlayViewModel
 import fr.remotecontrol.ui.preplay.toArgs
 import fr.remotecontrol.ui.preplay.toRoute
+import fr.remotecontrol.ui.remote.RemoteScreen
+import fr.remotecontrol.ui.remote.RemoteViewModel
 import fr.remotecontrol.ui.search.SearchScreen
 import fr.remotecontrol.ui.season.SeasonScreen
 import fr.remotecontrol.ui.season.SeasonViewModel
@@ -254,10 +256,41 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onClose = { nav.popBackStack() },
             )
         }
-        // Écrans des tâches suivantes : titre provisoire.
-        composable<RemoteRoute> { Placeholder(Texts.remote) }
+        composable<RemoteRoute> {
+            val vm = viewModel { RemoteViewModel(c.api, c.remote) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            RemoteScreen(
+                state = state,
+                server = server,
+                onTogglePause = vm::togglePause,
+                onRestart = vm::restart,
+                onSkip = vm::skip,
+                onSeekDrag = vm::onSeekDrag,
+                onSeekRelease = vm::onSeekRelease,
+                onVolumeDrag = vm::onVolumeDrag,
+                onVolumeRelease = vm::onVolumeRelease,
+                onAudio = vm::selectAudio,
+                onSubtitle = vm::selectSubtitle,
+                onStop = vm::stop,
+                onOpenSheet = { nav.openSheet(state.workId, state.seasonId) },
+                onDismissMessage = vm::clearMessage,
+                onBack = { nav.popBackStack() },
+            )
+        }
+        // Écran de la tâche suivante : titre provisoire.
         composable<ScanRoute> { Placeholder(Texts.scan) }
     }
+}
+
+/**
+ * Fin de lecture : retour à la fiche (saison d'un épisode, œuvre sinon). Si elle est déjà sous la
+ * télécommande dans la pile, on y revient ; sinon on l'ouvre à la place de la télécommande.
+ */
+private fun NavController.openSheet(workId: Long?, seasonId: Long?) {
+    val route: Any = seasonId?.let(::SeasonRoute) ?: workId?.let(::WorkRoute) ?: return
+    if (popBackStack(route, inclusive = false)) return
+    navigate(route) { popUpTo<RemoteRoute> { inclusive = true } }
 }
 
 private fun NavController.onNavEvent(event: NavEvent) = when (event) {

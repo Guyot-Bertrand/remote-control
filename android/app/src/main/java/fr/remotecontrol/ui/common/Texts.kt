@@ -94,6 +94,17 @@ object Texts {
     const val nothingPlaying = "Lecture en cours"
     const val playerNotResponding = "Le lecteur ne répond pas."
 
+    // Télécommande
+    const val onTv = "Sur la télé"
+    const val minimize = "Réduire"
+    const val seekPosition = "Position"
+    const val pausedNow = "En pause"
+    const val volumeDown = "Baisser le volume"
+    const val volumeUp = "Monter le volume"
+    const val playbackEnded = "Lecture terminée"
+    const val playbackInterrupted = "Lecture interrompue"
+    const val backToSheet = "Retour à la fiche"
+
     // Fiches œuvre et saison
     const val shownOnTv = "Affichée sur la télé"
     const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
@@ -203,4 +214,10 @@ object Texts {
     fun externalSub(lang: String?) = "${languageName(lang)} (fichier)"
     fun embeddedSub(lang: String?) = "${languageName(lang)} (intégré)"
     fun skipLabel(seconds: Int) = if (seconds < 0) "−${-seconds} s" else "+$seconds s"
+    /** Libellé accessible des boutons de saut : « Reculer de 10 secondes ». */
+    fun skipDescription(seconds: Int) =
+        "${if (seconds < 0) "Reculer" else "Avancer"} de ${kotlin.math.abs(seconds)} secondes"
+    /** Temps restant, précédé d'un signe moins : « −0:26:56 ». */
+    fun remainingClock(seconds: Double) = "−${formatClock(seconds)}"
+    fun volumeLevel(level: Int) = "$volume $level\u00A0%"
 }

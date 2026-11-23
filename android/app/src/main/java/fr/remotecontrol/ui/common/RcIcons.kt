@@ -38,6 +38,13 @@ object RcIcons {
     val Film = icon("Film", rrect(3.5f, 3.5f, 17f, 17f, 2f), "M7.5 3.5v17M16.5 3.5v17M3.5 8h4M3.5 12h4M3.5 16h4M16.5 8h4M16.5 12h4M16.5 16h4")
     val Audio = icon("Audio", "M4 15v-3a8 8 0 0 1 16 0v3", rrect(3f, 14f, 4f, 6f, 1.5f), rrect(17f, 14f, 4f, 6f, 1.5f))
     val Subtitles = icon("Subtitles", rrect(3f, 5f, 18f, 14f, 2f), "M7 12h3M13 12h4M7 15.5h6M15.5 15.5h1.5")
+    val ChevronDown = icon("ChevronDown", "m5 9 7 7 7-7")
+    val Pause = icon("Pause", fill(rrect(6f, 4.5f, 4f, 15f, 1f)), fill(rrect(14f, 4.5f, 4f, 15f, 1f)))
+    val Stop = icon("Stop", fill(rrect(6f, 6f, 12f, 12f, 1.5f)))
+    val Rewind = Resume
+    val Forward = icon("Forward", "M20 12a8 8 0 1 1-2.4-5.7", "M20 4v4.5h-4.5")
+    val VolumeDown = icon("VolumeDown", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5")
+    val VolumeUp = icon("VolumeUp", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5M18.5 9.5v5")
 
     /** Tracé plein (sans trait), comme les triangles « lecture » des maquettes. */
     private fun fill(path: String) = FILL + path
