@@ -3,3 +3,4 @@ docs/data/
 .superpowers/
 server/.venv/
 __pycache__/
+.playwright-mcp/
