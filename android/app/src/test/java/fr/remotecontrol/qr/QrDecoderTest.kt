@@ -27,4 +27,10 @@ class QrDecoderTest {
     }
 
     @Test fun plain_image_is_null() = assertNull(QrDecoder.decode(ByteArray(size * size) { 0x80.toByte() }, size, size))
+
+    /** Tampon plus court que l'image annoncée : ZXing lève une exception d'exécution, l'analyse continue. */
+    @Test fun short_buffer_is_null() = assertNull(QrDecoder.decode(ByteArray(10), size, size))
+
+    /** Pas de ligne plus courte que l'image : refusé par ZXing (IllegalArgumentException), sans plantage. */
+    @Test fun bad_stride_is_null() = assertNull(QrDecoder.decode(ByteArray(size * size), size, size, rowStride = size / 2))
 }

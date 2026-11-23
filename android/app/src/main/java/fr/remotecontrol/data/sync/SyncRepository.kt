@@ -31,7 +31,15 @@ class SyncRepository(
     suspend fun sync(forceFull: Boolean = false): SyncOutcome = mutex.withLock {
         _syncing.value = true
         try {
-            val since = if (forceFull) null else localRevision()
+            // La lecture de la révision locale est dans le même filet que l'écriture : une base en panne
+            // donne un échec de synchronisation, jamais une exception.
+            val since = try {
+                if (forceFull) null else localRevision()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@withLock SyncOutcome.Failed(ApiError.BadResponse)
+            }
             when (val r = api.sync(since)) {
                 is ApiResult.Err -> SyncOutcome.Failed(r.error)
                 is ApiResult.Ok -> {

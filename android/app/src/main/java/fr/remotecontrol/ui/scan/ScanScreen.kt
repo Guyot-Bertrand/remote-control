@@ -88,6 +88,7 @@ import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
 import java.util.concurrent.Executors
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.awaitCancellation
 
 /**
@@ -238,6 +239,8 @@ private fun CameraPreview(
         val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
         val provider = try {
             ProcessCameraProvider.awaitInstance(context)
+        } catch (e: CancellationException) {
+            throw e // l'écran quitte la composition : ce n'est pas une panne de caméra
         } catch (_: Exception) {
             failed()
             return@LaunchedEffect

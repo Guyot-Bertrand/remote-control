@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -95,6 +96,21 @@ class SyncCoordinatorTest {
         events.emit(ServerEvent.Tv(TvStateDto("home")))
         job.cancel()
         assertEquals(listOf("sync(null)", "sync(null)"), api.calls)
+    }
+
+    @Test fun survives_failing_local_revision() = runTest {
+        val logged = mutableListOf<Throwable>()
+        db.openHelper.writableDatabase.execSQL("DROP TABLE meta")
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            SyncCoordinator(repo, events, log = { _, t -> logged += t }).run()
+        }
+        while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        events.emit(hello(3))
+        events.emit(ServerEvent.Catalog(4))
+        events.emit(ServerEvent.Tv(TvStateDto("home")))
+        assertTrue(job.isActive)
+        job.cancel()
+        assertTrue(logged.size >= 2)
     }
 
     @Test fun empty_cache_forces_full() = runTest {

@@ -18,15 +18,18 @@ object QrDecoder {
     )
 
     /** [rowStride] : octets par ligne dans [luma] (≥ [width]) ; la dernière ligne peut ne pas être complétée. */
+    /** Toute erreur de ZXing (y compris d'exécution, sur un tampon incohérent) donne `null` : l'analyse continue. */
     fun decode(luma: ByteArray, width: Int, height: Int, rowStride: Int = width): String? {
-        val source = PlanarYUVLuminanceSource(luma, rowStride, height, 0, 0, width, height, false)
         return try {
+            val source = PlanarYUVLuminanceSource(luma, rowStride, height, 0, 0, width, height, false)
             QRCodeReader().decode(BinaryBitmap(HybridBinarizer(source)), hints).text
         } catch (_: NotFoundException) {
             null
         } catch (_: ChecksumException) {
             null
         } catch (_: FormatException) {
+            null
+        } catch (_: RuntimeException) {
             null
         }
     }

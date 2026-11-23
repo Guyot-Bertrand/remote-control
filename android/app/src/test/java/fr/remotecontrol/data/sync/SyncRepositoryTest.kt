@@ -140,4 +140,11 @@ class SyncRepositoryTest {
         assertEquals(0, dao.workCount())
         assertNull(repo.localRevision())
     }
+
+    @Test fun unreadable_local_revision_reports_failed() = runTest {
+        db.openHelper.writableDatabase.execSQL("DROP TABLE meta")
+        assertEquals(SyncOutcome.Failed(ApiError.BadResponse), repo.sync())
+        assertFalse(repo.syncing.value)
+        assertEquals(emptyList<String>(), api.calls)
+    }
 }
