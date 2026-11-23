@@ -21,6 +21,14 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.net.ServerEvent
+import fr.remotecontrol.net.TvStateDto
+import fr.remotecontrol.player.TvStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +45,8 @@ class SeasonViewModelTest {
     @get:Rule val main = MainDispatcherRule()
     private lateinit var db: AppDatabase
     private val api = FakeRcApi()
+    private val serverEvents = MutableSharedFlow<ServerEvent>()
+    private val tvStatus = TvStatus(serverEvents)
     private val full: SyncDto = RcJson.decodeFromString(Fixtures.text("sync_full.json"))
     private val vms = mutableListOf<SeasonViewModel>()
 
@@ -51,10 +61,28 @@ class SeasonViewModelTest {
     }
 
     private fun viewModel(id: Long) =
-        SeasonViewModel(id, db.catalogDao(), api, PlayLauncher(api)).also { vms += it }
+        SeasonViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus).also { vms += it }
 
     private suspend fun SeasonViewModel.await(predicate: (SeasonUi) -> Boolean = { true }) =
         withTimeout(5_000) { state.filterNotNull().first(predicate) }
+
+    @Test fun tv_label_follows_tv_and_resume_resends_after_drift() = runBlocking {
+        val watcher = launch(Dispatchers.Main) { tvStatus.run() }
+        while (serverEvents.subscriptionCount.value == 0) yield()
+        val vm = viewModel(1)
+        vm.onScreenResumed() // ouverture : déjà envoyée
+        vm.await { it.onTv }
+        serverEvents.emit(ServerEvent.Tv(TvStateDto("home")))
+        vm.await { !it.onTv }
+        serverEvents.emit(ServerEvent.Player(PlayerSnapshotDto()))
+        vm.onScreenResumed()
+        vm.await { it.onTv }
+        assertEquals(2, api.calls.count { it == "tvShow(season,1)" })
+        serverEvents.emit(ServerEvent.Tv(TvStateDto("season", seasonId = 1)))
+        vm.onScreenResumed()
+        assertEquals(2, api.calls.count { it == "tvShow(season,1)" })
+        watcher.cancel()
+    }
 
     @Test fun init_sends_tv_show_season() = runBlocking {
         val vm = viewModel(1)

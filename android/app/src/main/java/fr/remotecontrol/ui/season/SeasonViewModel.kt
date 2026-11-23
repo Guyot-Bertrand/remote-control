@@ -6,19 +6,19 @@ import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.EpisodeRow
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkEntity
-import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.PlayLauncher
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.player.TargetKind
+import fr.remotecontrol.player.TvSheet
+import fr.remotecontrol.player.TvStatus
 import fr.remotecontrol.player.highlightEpisode
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /**
  * [label] : « S01E02 », suivi de « — titre » s'il existe. [status] : « Vu », « Entamé — 5:00 » ou nul.
@@ -66,11 +65,14 @@ private data class Catalog(
 class SeasonViewModel(
     private val seasonId: Long,
     dao: CatalogDao,
-    private val api: RcApi,
+    api: RcApi,
     launcher: PlayLauncher,
+    tvStatus: TvStatus,
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
-    private val onTv = MutableStateFlow(false)
+
+    /** Envoyée à la télé une fois à l'ouverture (hors ligne, l'échec est ignoré), puis suivie en direct. */
+    private val tvSheet = TvSheet(viewModelScope, api, tvStatus, "season", seasonId)
 
     /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
     val events: Flow<NavEvent> = playAction.events
@@ -85,7 +87,7 @@ class SeasonViewModel(
         }
     }
 
-    val state: StateFlow<SeasonUi?> = combine(catalog, playAction.message, onTv, playAction.launching) { c, msg, tv, busy ->
+    val state: StateFlow<SeasonUi?> = combine(catalog, playAction.message, tvSheet.onTv, playAction.launching) { c, msg, tv, busy ->
         c?.let { toUi(it, msg, tv).copy(launching = busy) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -93,14 +95,11 @@ class SeasonViewModel(
     val missing: StateFlow<Boolean> = dao.season(seasonId).map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    init {
-        viewModelScope.launch {
-            val shown = api.tvShow("season", seasonId)
-            onTv.value = shown is ApiResult.Ok && shown.value
-        }
-    }
 
     fun play(episodeId: Long, mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Episode, episodeId), mode)
+
+    /** Retour sur l'écran : renvoie la fiche à la télé si elle montre autre chose et que rien n'est en lecture. */
+    fun onScreenResumed() = tvSheet.onScreenResumed()
 
     fun clearMessage() {
         playAction.message.value = null

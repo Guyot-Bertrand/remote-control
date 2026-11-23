@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -186,7 +187,11 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
-            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher) }
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) }
+            LifecycleResumeEffect(vm) {
+                vm.onScreenResumed()
+                onPauseOrDispose {}
+            }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
@@ -206,7 +211,11 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
-            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher) }
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) }
+            LifecycleResumeEffect(vm) {
+                vm.onScreenResumed()
+                onPauseOrDispose {}
+            }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()

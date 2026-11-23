@@ -17,6 +17,7 @@ import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.rcOkHttpClient
 import fr.remotecontrol.player.PlayLauncher
 import fr.remotecontrol.player.RemoteController
+import fr.remotecontrol.player.TvStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +44,7 @@ class AppContainer(context: Context) {
         eventsClient.events().shareIn(appScope, SharingStarted.WhileSubscribed(5_000))
     val sync: SyncRepository = SyncRepository(db, api)
     val coordinator: SyncCoordinator = SyncCoordinator(sync, events)
+    val tvStatus: TvStatus = TvStatus(events)
     val filter: CatalogFilter = CatalogFilter()
     val playLauncher: PlayLauncher by lazy { PlayLauncher(api) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }
