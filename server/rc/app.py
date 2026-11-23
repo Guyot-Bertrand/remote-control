@@ -194,6 +194,19 @@ async def _refresh_catalog(state: AppState) -> bool:
     return True
 
 
+async def _tmdb_step(state: AppState) -> None:
+    """Étape facultative : jamais bloquante pour la publication du tour."""
+    if not state.config.tmdb_api_key:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
+                                        state.config.tmdb_api_key, client,
+                                        indexes=state.indexes)
+    except Exception:
+        log.exception("secours TMDB en échec, tour poursuivi")
+
+
 async def refresh_once(state: AppState) -> None:
     before = current_revision(state.conn)
     volumes_ok = _list_volumes(state)
@@ -207,10 +220,7 @@ async def refresh_once(state: AppState) -> None:
         locate_files(state.conn, state.volumes, state.indexes)
     await asyncio.to_thread(_posters_in_thread, _db_file(state.conn),
                             state.config.data_dir / "assets", state.indexes)
-    if state.config.tmdb_api_key:
-        async with httpx.AsyncClient(timeout=10) as client:
-            await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
-                                        state.config.tmdb_api_key, client)
+    await _tmdb_step(state)
     revision = current_revision(state.conn)
     if revision != before:
         state.bus.publish({"type": "catalog", "revision": revision})

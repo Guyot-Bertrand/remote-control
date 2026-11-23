@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import shutil
@@ -78,22 +79,40 @@ def _process(data: bytes, assets_dir: Path, tmp_root: Path) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _missing(conn: sqlite3.Connection, row: sqlite3.Row,
+             indexes: dict[str, dict[str, Path]]) -> bool:
+    """Affiche vraiment manquante : aucune référence locale, ou le disque qui devrait
+    la porter est présent et ne l'a pas. Un disque débranché n'est pas « manquant »."""
+    if row["poster_relpath"] is None:
+        return True
+    uuids = {r[0] for r in conn.execute(
+        "SELECT volume_uuid FROM media_file WHERE volume_uuid IS NOT NULL AND "
+        "(work_id = ? OR episode_id IN (SELECT e.id FROM episode e "
+        "JOIN season s ON s.id = e.season_id WHERE s.work_id = ?))", (row["id"], row["id"]))}
+    return any(u in indexes for u in uuids)
+
+
 async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
                                 api_key: str, client: httpx.AsyncClient,
-                                limit: int = 20) -> int:
+                                limit: int = 20,
+                                indexes: dict[str, dict[str, Path]] | None = None) -> int:
     if not api_key:
         return 0
     rows = conn.execute(
-        "SELECT id, imdb_id FROM work WHERE imdb_id IS NOT NULL AND poster_asset IS NULL "
+        "SELECT id, imdb_id, poster_relpath FROM work "
+        "WHERE imdb_id IS NOT NULL AND poster_asset IS NULL "
         "AND NOT EXISTS (SELECT 1 FROM meta WHERE key = 'tmdb_tried:' || work.id) "
-        "ORDER BY id LIMIT ?", (limit,)).fetchall()
+        "ORDER BY id").fetchall()
+    rows = [r for r in rows if _missing(conn, r, indexes or {})][:limit]
     tried: list[int] = []
     done: list[tuple[int, str]] = []
     tmp_root = assets_dir.parent / "tmp"
     try:
         for row in rows:
             imdb_id = (row["imdb_id"] or "").strip()
-            if IMDB_RE.fullmatch(imdb_id):
+            if not IMDB_RE.fullmatch(imdb_id):
+                log.debug("TMDB : imdb_id mal formé pour l'œuvre %d, ignoré", row["id"])
+            else:
                 try:
                     path = await _find_poster_path(client, imdb_id, api_key)
                     if path:
@@ -109,6 +128,8 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
             tried.append(row["id"])
     finally:
         _commit(conn, tried, done)
+        with contextlib.suppress(OSError):
+            tmp_root.rmdir()  # seulement s'il est vide
     return len(done)
 
 

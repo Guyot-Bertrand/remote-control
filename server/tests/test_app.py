@@ -287,3 +287,17 @@ async def test_mdns_shutdown_failures_logged_debug(caplog):
         await asyncio.gather(task, return_exceptions=True)
     debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
     assert any("retrait" in m for m in debug) and any("fermeture" in m for m in debug)
+
+
+async def test_tmdb_failure_does_not_block_publish(setup, monkeypatch):
+    state, disk = setup
+    state.config.tmdb_api_key = "k"
+
+    async def boom(*a, **k):
+        raise RuntimeError("tmdb")
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", boom)
+    events = []
+    state.bus.publish = events.append
+    await import_now(state, disk)
+    assert any(e["type"] == "catalog" for e in events)

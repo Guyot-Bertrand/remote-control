@@ -26,7 +26,7 @@ def jpeg_bytes():
 def conn(tmp_path):
     c = open_db(tmp_path / "rc.db")
     import_catalog(c, parse_catalog(FIXTURE.read_text(encoding="utf-8")), {})
-    c.execute("UPDATE work SET imdb_id = NULL, poster_asset = NULL")
+    c.execute("UPDATE work SET imdb_id = NULL, poster_asset = NULL, poster_relpath = NULL")
     c.execute("UPDATE work SET imdb_id = 'tt0000001' WHERE id = "
               "(SELECT MIN(id) FROM work)")
     yield c
@@ -83,7 +83,7 @@ async def test_fetches_and_sets_asset(conn, tmp_path):
     assert str(image.url) == "https://image.tmdb.org/t/p/w780/abc.jpg"
     assert int(conn.execute("SELECT value FROM meta WHERE key='revision'")
                .fetchone()[0]) == int(rev0) + 1
-    assert not list((tmp_path / "tmp").iterdir())
+    assert not (tmp_path / "tmp").exists()
 
 
 async def test_v4_token_uses_bearer(conn, tmp_path):
@@ -150,3 +150,54 @@ async def test_does_not_touch_text_fields(conn, tmp_path):
     async with client_for(Recorder()) as c:
         await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
     assert [tuple(r) for r in conn.execute(sql)] == before
+
+
+async def test_corrupt_image_marked_tried_and_tmp_cleaned(conn, tmp_path):
+    rec = Recorder(image=b"pas une image")
+    async with client_for(rec) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert len(rec.requests) == 2  # une seule tentative (find + image)
+    assert work(conn)["poster_asset"] is None
+    assert not (tmp_path / "tmp").exists()
+
+
+def with_poster_on_volume(conn, uuid):
+    wid = work(conn)["id"]
+    conn.execute("UPDATE work SET poster_relpath = 'x/absente.jpg' WHERE id = ?", (wid,))
+    conn.execute("INSERT INTO media_file (work_id, quality, relpath, subtitles_json, "
+                 "volume_uuid, present, rev) VALUES (?, 'HD', 'f.mkv', '[]', ?, 1, 1)",
+                 (wid, uuid))
+
+
+async def test_unplugged_disk_is_not_missing(conn, tmp_path):
+    with_poster_on_volume(conn, "U1")
+    rec = Recorder()
+    async with client_for(rec) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c,
+                                           indexes={}) == 0
+    assert rec.requests == []
+
+
+async def test_present_disk_without_poster_is_missing(conn, tmp_path):
+    with_poster_on_volume(conn, "U1")
+    async with client_for(Recorder()) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c,
+                                           indexes={"U1": {}}) == 1
+
+
+async def test_api_key_never_logged_at_info(conn, tmp_path, caplog):
+    from rc.cli import setup_logging
+    setup_logging()
+    caplog.set_level(logging.INFO)
+    async with client_for(Recorder()) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert KEY not in caplog.text
+
+
+def test_redact_filter_masks_secrets():
+    from rc.cli import RedactFilter
+    rec = logging.LogRecord("httpx", logging.INFO, "", 0,
+                            "GET https://x/?api_key=%s&a=1 Bearer eyJabc.d", (KEY,), None)
+    RedactFilter().filter(rec)
+    assert KEY not in rec.msg and "eyJabc" not in rec.msg and "a=1" in rec.msg

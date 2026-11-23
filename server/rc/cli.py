@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -74,6 +75,29 @@ def _doctor(args) -> int:
     return 0
 
 
+_SECRET_RE = re.compile(r"(api_key=)[^&\s\"']+|(Bearer\s+)[A-Za-z0-9._~+/=-]+", re.I)
+
+
+class RedactFilter(logging.Filter):
+    """Masque clés d'API et jetons dans tout message journalisé."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = _SECRET_RE.sub(lambda m: (m.group(1) or m.group(2)) + "***",
+                             record.getMessage())
+        record.msg, record.args = msg, None
+        return True
+
+
+def setup_logging() -> None:
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s : %(message)s")
+    for name in ("httpx", "httpcore"):
+        lg = logging.getLogger(name)
+        lg.setLevel(logging.WARNING)
+        if not any(isinstance(f, RedactFilter) for f in lg.filters):
+            lg.addFilter(RedactFilter())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="rc", description="Serveur Remote-Control")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -91,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--secondes", type=int, default=20, help="durée de lecture (défaut 20)")
     p.set_defaults(func=_doctor)
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s")
+    setup_logging()
     return args.func(args)
 
 
