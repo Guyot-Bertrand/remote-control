@@ -14,6 +14,16 @@ data class WorkSummary(
     val watched: Boolean,
 )
 
+/** En-tête de l'écran de choix pour un épisode : série, saison et numéro. */
+data class EpisodeHeader(
+    val number: Int,
+    val title: String?,
+    val seasonNumber: Int,
+    val workTitle: String,
+    val poster: String?,
+    val year: Int?,
+)
+
 /** Rang (texte libre, souvent numérique) d'une œuvre dans une collection. */
 data class WorkRank(val workId: Long, val rank: String)
 

@@ -103,6 +103,9 @@ data class ProgressDto(
     val duration: Double? = null,
     val watched: Boolean = false,
     @SerialName("updated_at") val updatedAt: Double,
+    /** Dernier choix de pistes pour la cible (arbitrage 7) ; nul si aucun choix explicite. */
+    val audio: Int? = null,
+    val subtitle: SubSel? = null,
 )
 
 @Serializable

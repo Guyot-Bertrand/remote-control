@@ -15,6 +15,9 @@ const val SORT_RECENT = "recent"
 
 @Serializable data class SeasonRoute(val id: Long)
 
+/** Écran de choix de la version et des pistes : [kind] et [start] en valeurs du contrat (`work`, `start`…). */
+@Serializable data class PrePlayRoute(val kind: String, val id: Long, val start: String)
+
 @Serializable data object RemoteRoute
 
 @Serializable data object ScanRoute

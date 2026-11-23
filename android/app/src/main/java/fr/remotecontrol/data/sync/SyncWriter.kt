@@ -45,7 +45,7 @@ class SyncWriter(
             dao.upsertCollections(dto.collections.map { CollectionEntity(it.id, it.name, it.description, it.link) })
             dao.upsertProgress(
                 dto.progress.map {
-                    ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt)
+                    ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt, it.audio, it.subtitle)
                 },
             )
             afterUpserts()

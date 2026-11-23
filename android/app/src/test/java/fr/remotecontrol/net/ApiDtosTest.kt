@@ -62,6 +62,17 @@ class ApiDtosTest {
     }
 
     @Test
+    fun play_request_with_external_subtitle_wire_shape() {
+        val path = "/media/beber/DISK1/Films/A/Ava [2017] [1h45,1920x1038,16x9,FR,sEN].1.fr.srt"
+        val json = RcJson.encodeToString(PlayRequestDto("work", 1, "start", 1, 1, SubSel.External(path)))
+        assertEquals(
+            """{"target_kind":"work","target_id":1,"start":"start","media_file_id":1,"audio":1,""" +
+                """"subtitle":{"kind":"external","path":"$path"}}""",
+            json,
+        )
+    }
+
+    @Test
     fun events_parse() {
         val hello = parseServerEvent(Fixtures.text("ws_hello.json")) as ServerEvent.Hello
         assertEquals(5L, hello.revision)

@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -23,9 +24,18 @@ import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
 
-/** En-tête d'écran des maquettes (64 dp) : retour facultatif, titre facultatif, pastille de connexion. */
+/**
+ * En-tête d'écran des maquettes (64 dp) : retour facultatif (ou fermeture, avec [backIcon] et [backLabel]),
+ * titre facultatif, pastille de connexion.
+ */
 @Composable
-fun ScreenHeader(title: String?, server: ServerState, onBack: (() -> Unit)? = null) {
+fun ScreenHeader(
+    title: String?,
+    server: ServerState,
+    onBack: (() -> Unit)? = null,
+    backIcon: ImageVector = RcIcons.Back,
+    backLabel: String = Texts.back,
+) {
     Row(
         Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -33,7 +43,7 @@ fun ScreenHeader(title: String?, server: ServerState, onBack: (() -> Unit)? = nu
     ) {
         if (onBack != null) {
             IconButton(onClick = onBack) {
-                Icon(RcIcons.Back, contentDescription = Texts.back, tint = RcColors.text)
+                Icon(backIcon, contentDescription = backLabel, tint = RcColors.text)
             }
         }
         if (title != null) {

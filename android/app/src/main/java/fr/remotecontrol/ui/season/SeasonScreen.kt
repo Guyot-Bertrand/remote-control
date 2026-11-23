@@ -69,7 +69,7 @@ private val HEADER_KEYS = listOf("header", "selector", "summary", "message")
 /**
  * Maquette « Fiche saison » : en-tête de la série, sélecteur de saison, puis les épisodes ; l'épisode mis en
  * évidence (carte laiton, « Reprendre » / « Depuis le début ») est amené à l'écran à l'ouverture.
- * [onPrePlay] ouvre la feuille « Version et pistes… » pour l'épisode mis en évidence.
+ * [onPrePlay] ouvre l'écran « Version et pistes… » pour l'épisode mis en évidence.
  */
 @Composable
 fun SeasonScreen(

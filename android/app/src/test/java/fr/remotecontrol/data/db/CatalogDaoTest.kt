@@ -40,7 +40,7 @@ class CatalogDaoTest {
             collections = sync.collections.map { CollectionEntity(it.id, it.name, it.description, it.link) },
             workCollections = sync.workCollections.map { WorkCollectionEntity(it.workId, it.collectionId, it.rank) },
             progress = sync.progress.map {
-                ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt)
+                ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt, it.audio, it.subtitle)
             },
         )
     }

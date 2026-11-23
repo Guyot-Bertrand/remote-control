@@ -100,6 +100,13 @@ interface CatalogDao {
     )
     fun episodesOfSeason(seasonId: Long): Flow<List<EpisodeRow>>
 
+    @Query(
+        "SELECT e.number AS number, e.title AS title, s.number AS seasonNumber, w.titleFr AS workTitle, " +
+            "w.poster AS poster, w.year AS year FROM episode e JOIN season s ON s.id = e.seasonId " +
+            "JOIN work w ON w.id = s.workId WHERE e.id = :id",
+    )
+    fun episodeHeader(id: Long): Flow<EpisodeHeader?>
+
     @Query("SELECT * FROM progress WHERE targetKind = :kind AND targetId = :id")
     fun progress(kind: String, id: Long): Flow<ProgressEntity?>
 

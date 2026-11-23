@@ -20,9 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +42,7 @@ import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.HomeRoute
 import fr.remotecontrol.ui.common.LocalServerBaseUrl
 import fr.remotecontrol.ui.common.NavEvent
+import fr.remotecontrol.ui.common.PrePlayRoute
 import fr.remotecontrol.ui.common.RcBottomBar
 import fr.remotecontrol.ui.common.RemoteRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
@@ -59,8 +57,10 @@ import fr.remotecontrol.ui.common.topNavigation
 import fr.remotecontrol.ui.home.HomeScreen
 import fr.remotecontrol.ui.home.HomeViewModel
 import fr.remotecontrol.ui.preplay.PrePlayArgs
-import fr.remotecontrol.ui.preplay.PrePlaySheet
+import fr.remotecontrol.ui.preplay.PrePlayScreen
 import fr.remotecontrol.ui.preplay.PrePlayViewModel
+import fr.remotecontrol.ui.preplay.toArgs
+import fr.remotecontrol.ui.preplay.toRoute
 import fr.remotecontrol.ui.search.SearchScreen
 import fr.remotecontrol.ui.season.SeasonScreen
 import fr.remotecontrol.ui.season.SeasonViewModel
@@ -188,8 +188,6 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
             val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher) }
-            var prePlay by remember { mutableStateOf<PrePlayArgs?>(null) }
-            prePlay?.let { PrePlayHost(c, nav, it) { prePlay = null } }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
@@ -200,7 +198,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 server = server,
                 onPlayFromStart = vm::playFromStart,
                 onResume = vm::resume,
-                onPrePlay = { prePlay = PrePlayArgs(PlayTarget(TargetKind.Work, id), it) },
+                onPrePlay = { nav.navigate(PrePlayArgs(PlayTarget(TargetKind.Work, id), it).toRoute()) },
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onDismissMessage = vm::clearMessage,
@@ -210,8 +208,6 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
             val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher) }
-            var prePlay by remember { mutableStateOf<PrePlayArgs?>(null) }
-            prePlay?.let { PrePlayHost(c, nav, it) { prePlay = null } }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
@@ -221,42 +217,47 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 missing = missing,
                 server = server,
                 onPlay = vm::play,
-                onPrePlay = { episode, mode -> prePlay = PrePlayArgs(PlayTarget(TargetKind.Episode, episode), mode) },
+                onPrePlay = { episode, mode -> nav.navigate(PrePlayArgs(PlayTarget(TargetKind.Episode, episode), mode).toRoute()) },
                 // Changer de saison remplace la fiche affichée (le retour ramène à la série).
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) { popUpTo<SeasonRoute> { inclusive = true } } },
                 onDismissMessage = vm::clearMessage,
                 onBack = { nav.popBackStack() },
             )
         }
+        composable<PrePlayRoute> { entry ->
+            val args = entry.toRoute<PrePlayRoute>().toArgs()
+            // Un ViewModel par entrée de navigation : les pistes sont relues à chaque ouverture.
+            val vm = viewModel { PrePlayViewModel(args, c.catalogDao, c.api, c.playLauncher) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) {
+                vm.events.collect { event ->
+                    if (event == NavEvent.ToRemote) {
+                        // L'écran de choix quitte la pile : le retour depuis la télécommande ramène à la fiche.
+                        nav.navigate(RemoteRoute) {
+                            popUpTo<PrePlayRoute> { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        nav.onNavEvent(event)
+                    }
+                }
+            }
+            PrePlayScreen(
+                state = state,
+                server = server,
+                onVersion = vm::selectVersion,
+                onAudio = vm::selectAudio,
+                onSubtitle = vm::selectSubtitle,
+                onRetry = vm::retry,
+                onConfirm = vm::confirm,
+                onClose = { nav.popBackStack() },
+            )
+        }
         // Écrans des tâches suivantes : titre provisoire.
         composable<RemoteRoute> { Placeholder(Texts.remote) }
         composable<ScanRoute> { Placeholder(Texts.scan) }
     }
-}
-
-/**
- * Feuille « Version et pistes… », affichée par-dessus la fiche (même destination de navigation) ;
- * un lancement réussi la ferme et mène à la télécommande.
- */
-@Composable
-private fun PrePlayHost(c: AppContainer, nav: NavController, args: PrePlayArgs, onDismiss: () -> Unit) {
-    val key = "preplay-${args.target.kind.wire}-${args.target.id}-${args.start.wire}"
-    val vm = viewModel(key = key) { PrePlayViewModel(args, c.catalogDao, c.api, c.playLauncher) }
-    val state by vm.state.collectAsStateWithLifecycle()
-    LaunchedEffect(vm) {
-        vm.events.collect {
-            onDismiss()
-            nav.onNavEvent(it)
-        }
-    }
-    PrePlaySheet(
-        state = state,
-        onVersion = vm::selectVersion,
-        onAudio = vm::selectAudio,
-        onSubtitle = vm::selectSubtitle,
-        onConfirm = vm::confirm,
-        onDismiss = onDismiss,
-    )
 }
 
 private fun NavController.onNavEvent(event: NavEvent) = when (event) {

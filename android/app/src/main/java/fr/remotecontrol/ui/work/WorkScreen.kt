@@ -63,7 +63,7 @@ private const val LONG_TITLE = 24
  * Maquettes « Fiche œuvre », « Fiche — non numérisé » et « Fiche — disque non branché » : affiche et
  * identité, boutons de lecture (ou encart d'indisponibilité), synopsis, casting, saisons, collections,
  * versions et mention « Affichée sur la télé ».
- * [onPrePlay] ouvre la feuille « Version et pistes… » (reprise si l'œuvre est entamée, sinon depuis le début).
+ * [onPrePlay] ouvre l'écran « Version et pistes… » (reprise si l'œuvre est entamée, sinon depuis le début).
  */
 @Composable
 fun WorkScreen(

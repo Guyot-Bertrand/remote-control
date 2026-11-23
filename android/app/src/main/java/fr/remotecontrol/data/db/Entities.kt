@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import fr.remotecontrol.net.SubSel
 
 @Entity(
     tableName = "work",
@@ -93,6 +94,9 @@ data class ProgressEntity(
     val duration: Double?,
     val watched: Boolean,
     val updatedAt: Double,
+    /** Dernières pistes choisies pour la cible (badge « Dernier choix » de l'écran de choix). */
+    val audio: Int? = null,
+    val subtitle: SubSel? = null,
 )
 
 @Entity(tableName = "meta")

@@ -39,7 +39,13 @@ class FakeRcApi : RcApi {
         return syncResponses.removeFirstOrNull() ?: ApiResult.Err(ApiError.Unreachable)
     }
 
-    override suspend fun tracks(mediaFileId: Long) = tracksResult.also { calls += "tracks($mediaFileId)" }
+    /** Réponse de tracks() par fichier ; à défaut, [tracksResult]. */
+    val tracksByFile = mutableMapOf<Long, ApiResult<MediaTracksDto>>()
+
+    override suspend fun tracks(mediaFileId: Long): ApiResult<MediaTracksDto> {
+        calls += "tracks($mediaFileId)"
+        return tracksByFile[mediaFileId] ?: tracksResult
+    }
     override suspend fun tvShow(screen: String, id: Long?) = tvShowResult.also { calls += "tvShow($screen,$id)" }
     /** When set, play() records its call, then waits for this gate before answering. */
     var playGate: CompletableDeferred<Unit>? = null
