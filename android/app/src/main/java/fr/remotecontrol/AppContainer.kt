@@ -15,6 +15,7 @@ import fr.remotecontrol.net.EventsClient
 import fr.remotecontrol.net.OkHttpRcApi
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.rcOkHttpClient
+import fr.remotecontrol.player.PlayLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,4 +43,5 @@ class AppContainer(context: Context) {
     val sync: SyncRepository = SyncRepository(db, api)
     val coordinator: SyncCoordinator = SyncCoordinator(sync, events)
     val filter: CatalogFilter = CatalogFilter()
+    val playLauncher: PlayLauncher by lazy { PlayLauncher(api) }
 }

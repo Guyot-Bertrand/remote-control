@@ -29,22 +29,37 @@ object RcIcons {
     val Check = icon("Check", "m5 12.5 4.5 4.5L19 7.5")
     val Sort = icon("Sort", "M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5")
     val Clear = icon("Clear", "M6 6l12 12M18 6 6 18")
+    val Play = icon("Play", fill("M7 4.5v15l12.5-7.5z"))
+    val Resume = icon("Resume", "M4 12a8 8 0 1 0 2.4-5.7", "M4 4v4.5h4.5")
+    val FromStart = icon("FromStart", "M6 5v14", fill("M18.5 5.5v13L9.5 12z"))
+    val Tv = icon("Tv", rrect(3f, 4.5f, 18f, 12.5f, 2f), "M8.5 20.5h7")
+    val Disk = icon("Disk", rrect(3f, 7f, 18f, 10f, 2f), fill(circle(7.5f, 12f, 1f)), "M11 12h6")
+    val Disc = icon("Disc", circle(12f, 12f, 8.5f), circle(12f, 12f, 2.5f))
+
+    /** Tracé plein (sans trait), comme les triangles « lecture » des maquettes. */
+    private fun fill(path: String) = FILL + path
+
+    private const val FILL = "fill:"
 
     private fun circle(cx: Float, cy: Float, r: Float) =
         "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0"
 
     /** Carré de 7 au rayon 1,5, comme le pictogramme « Parcourir ». */
-    private fun rect(x: Float, y: Float, s: Float = 7f, r: Float = 1.5f) =
-        "M${x + r} ${y}h${s - 2 * r}a$r $r 0 0 1 $r ${r}v${s - 2 * r}a$r $r 0 0 1 ${-r} ${r}" +
-            "h${-(s - 2 * r)}a$r $r 0 0 1 ${-r} ${-r}v${-(s - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
+    private fun rect(x: Float, y: Float, s: Float = 7f, r: Float = 1.5f) = rrect(x, y, s, s, r)
+
+    /** Rectangle de [w]×[h] aux coins de rayon [r]. */
+    private fun rrect(x: Float, y: Float, w: Float, h: Float, r: Float) =
+        "M${x + r} ${y}h${w - 2 * r}a$r $r 0 0 1 $r ${r}v${h - 2 * r}a$r $r 0 0 1 ${-r} ${r}" +
+            "h${-(w - 2 * r)}a$r $r 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
 
     private fun icon(name: String, vararg paths: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
             paths.forEach {
+                val filled = it.startsWith(FILL)
                 addPath(
-                    pathData = addPathNodes(it),
-                    fill = null,
-                    stroke = SolidColor(Color.Black),
+                    pathData = addPathNodes(it.removePrefix(FILL)),
+                    fill = if (filled) SolidColor(Color.Black) else null,
+                    stroke = if (filled) null else SolidColor(Color.Black),
                     strokeLineWidth = 2f,
                     strokeLineCap = StrokeCap.Round,
                     strokeLineJoin = StrokeJoin.Round,

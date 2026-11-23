@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,7 @@ import fr.remotecontrol.ui.browse.BrowseViewModel
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.HomeRoute
 import fr.remotecontrol.ui.common.LocalServerBaseUrl
+import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.RcBottomBar
 import fr.remotecontrol.ui.common.RemoteRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
@@ -52,11 +54,15 @@ import fr.remotecontrol.ui.common.topNavigation
 import fr.remotecontrol.ui.home.HomeScreen
 import fr.remotecontrol.ui.home.HomeViewModel
 import fr.remotecontrol.ui.search.SearchScreen
+import fr.remotecontrol.ui.season.SeasonScreen
+import fr.remotecontrol.ui.season.SeasonViewModel
 import fr.remotecontrol.ui.search.SearchViewModel
 import fr.remotecontrol.ui.settings.SettingsScreen
 import fr.remotecontrol.ui.settings.SettingsViewModel
 import fr.remotecontrol.ui.theme.RcColors
 import fr.remotecontrol.ui.theme.RcTheme
+import fr.remotecontrol.ui.work.WorkScreen
+import fr.remotecontrol.ui.work.WorkViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -171,12 +177,51 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onOpen = { nav.navigate(WorkRoute(it.id)) },
             )
         }
+        composable<WorkRoute> { entry ->
+            val id = entry.toRoute<WorkRoute>().id
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) { vm.events.collect(nav::onNavEvent) }
+            WorkScreen(
+                state = state,
+                server = server,
+                onPlayFromStart = vm::playFromStart,
+                onResume = vm::resume,
+                onPrePlay = {},
+                onOpenSeason = { nav.navigate(SeasonRoute(it)) },
+                onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
+                onDismissMessage = vm::clearMessage,
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable<SeasonRoute> { entry ->
+            val id = entry.toRoute<SeasonRoute>().id
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher) }
+            val state by vm.state.collectAsStateWithLifecycle()
+            val server by c.locator.state.collectAsStateWithLifecycle()
+            LaunchedEffect(vm) { vm.events.collect(nav::onNavEvent) }
+            SeasonScreen(
+                state = state,
+                server = server,
+                onPlay = vm::play,
+                onPrePlay = { _, _ -> },
+                // Changer de saison remplace la fiche affichée (le retour ramène à la série).
+                onOpenSeason = { nav.navigate(SeasonRoute(it)) { popUpTo<SeasonRoute> { inclusive = true } } },
+                onDismissMessage = vm::clearMessage,
+                onBack = { nav.popBackStack() },
+            )
+        }
         // Écrans des tâches suivantes : titre provisoire.
-        composable<WorkRoute> { Placeholder(Texts.work) }
-        composable<SeasonRoute> { Placeholder(Texts.season) }
         composable<RemoteRoute> { Placeholder(Texts.remote) }
         composable<ScanRoute> { Placeholder(Texts.scan) }
     }
+}
+
+private fun NavController.onNavEvent(event: NavEvent) = when (event) {
+    NavEvent.ToRemote -> navigate(RemoteRoute)
+    is NavEvent.ToWork -> navigate(WorkRoute(event.id))
+    is NavEvent.ToSeason -> navigate(SeasonRoute(event.id))
 }
 
 @Composable

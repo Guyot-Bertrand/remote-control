@@ -24,6 +24,7 @@ fun ApiError.messageFr(): String = when (this) {
         "not_playable" -> Texts.notPlayable
         "not_found" -> Texts.notFound
         "idle" -> Texts.idle
+        "player" -> Texts.playerNotResponding
         else -> Texts.httpError(409)
     }
     is ApiError.Http -> Texts.httpError(status)

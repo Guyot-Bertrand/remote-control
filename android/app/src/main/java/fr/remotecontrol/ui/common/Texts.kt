@@ -86,6 +86,17 @@ object Texts {
     const val invalidAddress = "Adresse invalide"
     const val addressUnreachable = "Serveur injoignable à cette adresse"
     const val nothingPlaying = "Lecture en cours"
+    const val playerNotResponding = "Le lecteur ne répond pas."
+
+    // Fiches œuvre et saison
+    const val shownOnTv = "Affichée sur la télé"
+    const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
+    const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
+    const val retry = "Réessayer"
+    const val dismiss = "Fermer"
+    const val inProgress = "En cours"
+    const val showMore = "Afficher plus"
+    const val showLess = "Afficher moins"
 
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"
@@ -94,6 +105,15 @@ object Texts {
     fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"
     fun collectionCounts(count: Int, playable: Int) = "${workCount(count)} · $playable ${if (playable > 1) "lisibles" else "lisible"}"
     fun remaining(minutes: Int) = "reste ${formatDuration(minutes)}"
+    /** « 2017 · 1 h 39 » : éléments connus, séparés par un point médian. */
+    fun details(vararg parts: String?) = parts.filterNotNull().joinToString(" · ")
+    fun genres(list: List<String>) = list.joinToString(", ") { g -> g.replaceFirstChar { it.titlecase(Locale.FRENCH) } }
+    /** Libellé accessible d'un bouton d'épisode : « Reprendre S01E02 ». */
+    fun episodeAction(action: String, episode: String) = "$action $episode"
+    fun alsoKnownAs(title: String) = "Aussi : $title"
+    fun seasonCount(count: Int) = if (count == 1) "1 saison" else "$count saisons"
+    fun episodesSummary(count: Int, watched: Int) =
+        "${if (count == 1) "1 épisode" else "$count épisodes"} · $watched ${if (watched > 1) "vus" else "vu"}"
     fun synced(count: Int) = "Catalogue synchronisé ($count œuvres)"
 
     // Fonctions de libellé
@@ -156,6 +176,10 @@ object Texts {
 
     fun episodeCode(season: Int, number: Int): String =
         if (season == 0) "Épisode $number" else "S%02dE%02d".format(Locale.ROOT, season, number)
+
+    /** « S01E02 », suivi de « — titre » si l'épisode a un titre. */
+    fun episodeLabel(season: Int, number: Int, title: String?): String =
+        episodeCode(season, number).let { code -> title?.let { "$code — $it" } ?: code }
 
     fun episodeTitle(work: String, season: Int, number: Int): String =
         if (season == 0) "$work — épisode $number" else "$work — ${episodeCode(season, number)}"
