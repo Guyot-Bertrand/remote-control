@@ -8,6 +8,8 @@ import logging
 import os
 import sqlite3
 import stat
+import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from PIL import Image
@@ -26,6 +28,21 @@ ALLOWED_FORMATS = ["JPEG", "PNG", "WEBP"]
 
 def asset_path(assets_dir: Path, hash: str, size: str) -> Path:
     return assets_dir / hash / f"{size}.jpg"
+
+
+def _write_atomic(dest: Path, write: Callable[[Path], None]) -> None:
+    """Écrit dans un fichier temporaire du même dossier puis le renomme : un lecteur ne
+    voit jamais une vignette à moitié écrite, et une écriture interrompue ne laisse rien."""
+    fd, name = tempfile.mkstemp(dir=dest.parent, prefix=f".{dest.stem}-", suffix=".part")
+    os.close(fd)
+    tmp = Path(name)
+    try:
+        write(tmp)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, dest)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def process_image(src: Path, assets_dir: Path) -> str:
@@ -53,20 +70,30 @@ def process_image(src: Path, assets_dir: Path) -> str:
         rgb = im.convert("RGB")
     (assets_dir / h).mkdir(parents=True, exist_ok=True)
     if is_jpeg:
-        asset_path(assets_dir, h, "orig").write_bytes(data)
+        _write_atomic(asset_path(assets_dir, h, "orig"), lambda p: p.write_bytes(data))
     else:
-        rgb.save(asset_path(assets_dir, h, "orig"), "JPEG", quality=QUALITY)
+        _write_atomic(asset_path(assets_dir, h, "orig"),
+                      lambda p: rgb.save(p, "JPEG", quality=QUALITY))
     for name, width in SIZES.items():
         img = rgb
         if rgb.width > width:
             img = rgb.resize((width, max(1, round(rgb.height * width / rgb.width))),
                              Image.LANCZOS)
-        img.save(asset_path(assets_dir, h, name), "JPEG", quality=QUALITY)
+        _write_atomic(asset_path(assets_dir, h, name),
+                      lambda p, img=img: img.save(p, "JPEG", quality=QUALITY))
     return h
 
 
+Failure = tuple[str, int, int]  # (chemin relatif, taille, mtime en ns) d'une affiche illisible
+
+
 def ingest_posters(conn: sqlite3.Connection, assets_dir: Path,
-                   indexes: dict[str, dict[str, Path]]) -> int:
+                   indexes: dict[str, dict[str, Path]],
+                   failed: set[Failure] | None = None) -> int:
+    """Ingère les affiches locales manquantes. `failed` mémorise les échecs d'un tour à
+    l'autre : une affiche illisible n'est relue qu'une fois le fichier modifié."""
+    if failed is None:
+        failed = set()
     rows = conn.execute(
         "SELECT id, poster_relpath FROM work "
         "WHERE poster_relpath IS NOT NULL AND poster_asset IS NULL").fetchall()
@@ -77,9 +104,18 @@ def ingest_posters(conn: sqlite3.Connection, assets_dir: Path,
         if src is None:
             continue
         try:
+            st = src.stat()
+            sig: Failure | None = (row["poster_relpath"], st.st_size, st.st_mtime_ns)
+        except OSError:
+            sig = None
+        if sig in failed:
+            continue
+        try:
             done.append((row["id"], row["poster_relpath"], process_image(src, assets_dir)))
         except Exception as exc:  # image illisible : on passe à la suivante
             log.warning("affiche illisible, ignorée : %s (%s)", src, exc)
+            if sig is not None:
+                failed.add(sig)
     if not done:
         return 0
     conn.execute("BEGIN IMMEDIATE")

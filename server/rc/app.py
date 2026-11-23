@@ -62,6 +62,7 @@ class AppState:
     last_seen: Stat | None = None  # observation du catalogue au tour précédent
     refused: Stat | None = None  # dernière version refusée (avertie une seule fois)
     published_revision: int | None = None  # dernière révision annoncée aux clients
+    poster_failures: set = field(default_factory=set)  # affiches illisibles (inchangées)
     playback: PlaybackService | None = None
 
 
@@ -141,13 +142,13 @@ def import_file(conn: sqlite3.Connection, config: Config, src: Path,
 
 
 def _posters_in_thread(db_file: str, assets_dir: Path,
-                       indexes: dict[str, dict[str, Path]]) -> int:
+                       indexes: dict[str, dict[str, Path]], failed: set) -> int:
     # Connexion propre au thread : sqlite3 interdit le partage de connexion entre threads.
     conn = sqlite3.connect(db_file, isolation_level=None, timeout=5)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     try:
-        return ingest_posters(conn, assets_dir, indexes)
+        return ingest_posters(conn, assets_dir, indexes, failed)
     finally:
         conn.close()
 
@@ -247,7 +248,8 @@ async def refresh_once(state: AppState) -> None:
     if volumes_ok:
         locate_files(state.conn, state.volumes, state.indexes)
     await asyncio.to_thread(_posters_in_thread, _db_file(state.conn),
-                            state.config.data_dir / "assets", state.indexes)
+                            state.config.data_dir / "assets", state.indexes,
+                            state.poster_failures)
     await _tmdb_step(state)
     # Toute révision non encore annoncée : import, affiches, mais aussi progressions
     # enregistrées pendant la lecture ou import fait par `rc import` dans un autre processus.

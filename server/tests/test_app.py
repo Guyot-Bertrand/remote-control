@@ -390,3 +390,16 @@ def test_cli_import_logs_parse_warnings(setup, tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger="rc.app"):
         app_mod.import_file(state.conn, state.config, src)
     assert any(f"{expected} avertissement" in r.getMessage() for r in caplog.records)
+
+
+async def test_refresh_remembers_unreadable_posters(setup, caplog):
+    state, disk = setup
+    for p in disk.rglob("*"):
+        if p.is_file() and "Ava" in str(p) and p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+            p.write_bytes(b"not an image")
+    with caplog.at_level(logging.WARNING, logger="rc.assets"):
+        await import_now(state, disk)
+        await refresh_once(state)
+        await refresh_once(state)
+    unreadable = [r for r in caplog.records if "affiche illisible" in r.getMessage()]
+    assert len(unreadable) == 1

@@ -135,3 +135,68 @@ def test_disallowed_format_skipped(conn, tmp_path, caplog):
         ingest_posters(conn, tmp_path / "assets", indexes)
     assert ava(conn)["poster_asset"] is None
     assert any(r.name == "rc.assets" for r in caplog.records)
+
+
+def ava_posters(disk):
+    return [p for p in disk.rglob("*") if p.is_file() and "Ava" in str(p)
+            and p.suffix.lower() in (".jpg", ".jpeg", ".png")]
+
+
+def test_unreadable_poster_not_reread_until_changed(conn, tmp_path, monkeypatch):
+    indexes, disk = setup(conn, tmp_path)
+    (poster,) = ava_posters(disk)
+    poster.write_bytes(b"not an image")
+    calls = []
+    real = process_image
+
+    def spy(src, assets_dir):
+        calls.append(src)
+        return real(src, assets_dir)
+
+    monkeypatch.setattr("rc.assets.process_image", spy)
+    failed: set = set()
+    ingest_posters(conn, tmp_path / "assets", indexes, failed)
+    ingest_posters(conn, tmp_path / "assets", indexes, failed)
+    assert calls.count(poster) == 1
+    assert ava(conn)["poster_asset"] is None
+    make_image(poster, (100, 150))  # fichier corrigé : taille et date changent
+    ingest_posters(conn, tmp_path / "assets", indexes, failed)
+    assert calls.count(poster) == 2
+    assert ava(conn)["poster_asset"] is not None
+
+
+def test_asset_files_written_atomically(tmp_path, monkeypatch):
+    import os
+
+    replaced = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        assert Path(src).parent == Path(dst).parent  # même dossier : renommage atomique
+        replaced.append(Path(dst).name)
+        real_replace(src, dst)
+
+    monkeypatch.setattr("rc.assets.os.replace", spy)
+    src = make_image(tmp_path / "p.png", (1000, 1500), fmt="PNG")
+    h = process_image(src, tmp_path / "assets")
+    assert sorted(replaced) == ["orig.jpg", "thumb.jpg", "tv.jpg"]
+    assert sorted(p.name for p in (tmp_path / "assets" / h).iterdir()) == [
+        "orig.jpg", "thumb.jpg", "tv.jpg"]
+
+
+def test_interrupted_write_leaves_no_partial_asset(tmp_path, monkeypatch):
+    src = make_image(tmp_path / "p.jpg", (1000, 1500))
+    real_save = Image.Image.save
+
+    def broken(self, fp, *a, **k):
+        if "tv" in str(fp):
+            Path(fp).write_bytes(b"partiel")
+            raise OSError("disque plein")
+        return real_save(self, fp, *a, **k)
+
+    monkeypatch.setattr(Image.Image, "save", broken)
+    with pytest.raises(OSError):
+        process_image(src, tmp_path / "assets")
+    (d,) = (tmp_path / "assets").iterdir()
+    assert "tv.jpg" not in [p.name for p in d.iterdir()]
+    assert all(not p.name.startswith(".") and "tmp" not in p.name for p in d.iterdir())
