@@ -2,6 +2,7 @@ package fr.remotecontrol.ui.home
 
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.ResumeRow
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.discovery.ServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
@@ -52,7 +53,24 @@ class HomeViewModelTest {
         val vm = viewModel()
         val ui = vm.await { it.resume.size == 2 }
         assertEquals(listOf("Back to Life — S01E02", "Ava"), ui.resume.map { it.title })
-        assertEquals("Reprendre à 00:05", ui.resume[0].label)
+        assertEquals("reste 19 min", ui.resume[0].label)
+        assertEquals("reste 1 h 29", ui.resume[1].label)
+    }
+
+    @Test fun resume_label_falls_back_without_duration() {
+        val row = ResumeRow("work", 1, 1, null, "Ava", null, null, null, 300.0, null, 0.0)
+        assertEquals("Reprendre à 00:05", toResumeItem(row).label)
+        assertEquals(0f, toResumeItem(row).progress)
+    }
+
+    @Test fun collections_show_total_and_playable() = runBlocking {
+        SyncWriter(db).apply(full)
+        val vm = viewModel()
+        vm.setPlayableOnly(false)
+        val ui = vm.await { !it.playableOnly && it.collections.size == 2 }
+        val alien = ui.collections.single { it.id == 2L }
+        assertEquals(1, alien.count)
+        assertEquals(0, alien.playableCount)
     }
 
     @Test fun recent_respects_filter() = runBlocking {

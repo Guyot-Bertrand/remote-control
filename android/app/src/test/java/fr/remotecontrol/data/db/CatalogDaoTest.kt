@@ -138,6 +138,17 @@ class CatalogDaoTest {
         assertEquals(2, dao.collections(false).first().size)
     }
 
+    @Test fun collections_count_total_and_playable() = runTest {
+        db.seed(works = emptyList(), workCollections = listOf(WorkCollectionEntity(4, 1, null)))
+        val c = dao.collections(true).first().single()
+        assertEquals(1L, c.id)
+        assertEquals(2, c.count)
+        assertEquals(1, c.playableCount)
+        val alien = dao.collections(false).first().single { it.id == 2L }
+        assertEquals(1, alien.count)
+        assertEquals(0, alien.playableCount)
+    }
+
     @Test fun media_files_with_volume_label() = runTest {
         val row = dao.mediaFilesOfWork(4).first().single()
         assertEquals("Théâtre", row.volumeLabel)

@@ -1,6 +1,7 @@
 package fr.remotecontrol.ui.common
 
 import java.util.Locale
+import kotlin.math.roundToInt
 
 val WORK_TYPES = listOf("film", "serie", "doc", "theatre", "tele", "spectacle")
 
@@ -19,3 +20,7 @@ fun formatHhMm(seconds: Double): String {
     val total = seconds.coerceAtLeast(0.0).toLong()
     return "%02d:%02d".format(Locale.ROOT, total / 3600, (total % 3600) / 60)
 }
+
+/** Minutes restantes, arrondies (0 si la position dépasse la durée). */
+fun remainingMinutes(position: Double, duration: Double): Int =
+    ((duration - position).coerceAtLeast(0.0) / 60.0).roundToInt()

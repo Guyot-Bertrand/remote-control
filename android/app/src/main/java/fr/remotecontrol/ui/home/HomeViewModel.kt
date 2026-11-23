@@ -10,6 +10,7 @@ import fr.remotecontrol.data.db.WorkSummary
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.ui.common.Texts
+import fr.remotecontrol.ui.common.remainingMinutes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,8 +34,12 @@ fun toResumeItem(row: ResumeRow): ResumeItem {
         row.titleFr
     }
     val duration = row.duration
-    val progress = if (duration == null || duration <= 0.0) 0f else (row.position / duration).toFloat().coerceIn(0f, 1f)
-    return ResumeItem(row.workId, row.seasonId, title, row.poster, progress, Texts.resumeAt(row.position))
+    if (duration == null || duration <= 0.0) {
+        return ResumeItem(row.workId, row.seasonId, title, row.poster, 0f, Texts.resumeAt(row.position))
+    }
+    val progress = (row.position / duration).toFloat().coerceIn(0f, 1f)
+    val label = Texts.remaining(remainingMinutes(row.position, duration))
+    return ResumeItem(row.workId, row.seasonId, title, row.poster, progress, label)
 }
 
 data class HomeUi(

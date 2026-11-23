@@ -65,6 +65,7 @@ object Texts {
     const val subtitleNone = "Aucun"
     const val playableOnly = "Œuvres lisibles"
     const val wholeCatalogue = "Tout le catalogue"
+    const val seeAll = "Tout voir"
     const val catalogEmpty = "Catalogue vide : recherche du serveur…"
     const val qrUnknown = "QR-code non reconnu"
     const val qrNotInCatalog = "Œuvre introuvable dans le catalogue"
@@ -78,6 +79,8 @@ object Texts {
     fun resumeAt(seconds: Double) = "Reprendre à ${formatHhMm(seconds)}"
     fun started(seconds: Double) = "Entamé — ${formatClock(seconds)}"
     fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"
+    fun collectionCounts(count: Int, playable: Int) = "${workCount(count)} · $playable ${if (playable > 1) "lisibles" else "lisible"}"
+    fun remaining(minutes: Int) = "reste ${formatDuration(minutes)}"
     fun synced(count: Int) = "Catalogue synchronisé ($count œuvres)"
 
     // Fonctions de libellé

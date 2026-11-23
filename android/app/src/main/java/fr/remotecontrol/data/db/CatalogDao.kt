@@ -22,10 +22,12 @@ interface CatalogDao {
     fun recentWorks(playableOnly: Boolean, limit: Int): Flow<List<WorkSummary>>
 
     @Query(
-        "SELECT c.id AS id, c.name AS name, COUNT(w.id) AS count FROM collection c " +
+        "SELECT c.id AS id, c.name AS name, COUNT(w.id) AS count, " +
+            "COALESCE(SUM(w.playable), 0) AS playableCount FROM collection c " +
             "JOIN work_collection wc ON wc.collectionId = c.id " +
-            "JOIN work w ON w.id = wc.workId AND (:playableOnly = 0 OR w.playable = 1) " +
-            "GROUP BY c.id HAVING COUNT(w.id) > 0 ORDER BY c.name",
+            "JOIN work w ON w.id = wc.workId " +
+            "GROUP BY c.id HAVING (CASE WHEN :playableOnly THEN SUM(w.playable) ELSE COUNT(w.id) END) > 0 " +
+            "ORDER BY c.name",
     )
     fun collections(playableOnly: Boolean): Flow<List<CollectionSummary>>
 

@@ -26,6 +26,20 @@ class FormatTest {
     }
 
     @Test
+    fun remaining_minutes() {
+        assertEquals(27, remainingMinutes(5940.0 - 1620.0, 5940.0))
+        assertEquals(19, remainingMinutes(300.0, 1440.0))
+        assertEquals(1, remainingMinutes(1410.0, 1440.0)) // 30 s → arrondi à 1 min
+        assertEquals(0, remainingMinutes(1500.0, 1440.0))
+    }
+
+    @Test
+    fun remaining_label() {
+        assertEquals("reste 27 min", Texts.remaining(27))
+        assertEquals("reste 1 h 05", Texts.remaining(65))
+    }
+
+    @Test
     fun texts() {
         assertEquals("Reprendre à 01:12", Texts.resumeAt(4320.0))
         assertEquals("Disque « DISK1 » non branché", Texts.volumeAbsent("DISK1"))

@@ -10,7 +10,8 @@ data class WorkSummary(
     val episodic: Boolean,
 )
 
-data class CollectionSummary(val id: Long, val name: String, val count: Int)
+/** [count] : toutes les œuvres de la collection ; [playableCount] : celles qui sont lisibles. */
+data class CollectionSummary(val id: Long, val name: String, val count: Int, val playableCount: Int)
 
 data class ResumeRow(
     val targetKind: String,

@@ -4,7 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
 
-@Serializable data class BrowseRoute(val type: String? = null, val collectionId: Long? = null)
+/** Tri « récemment ajoutés » de [BrowseRoute.sort] (honoré par l'écran de parcours, Task 9). */
+const val SORT_RECENT = "recent"
+
+@Serializable data class BrowseRoute(val type: String? = null, val collectionId: Long? = null, val sort: String? = null)
 
 @Serializable data object SearchRoute
 

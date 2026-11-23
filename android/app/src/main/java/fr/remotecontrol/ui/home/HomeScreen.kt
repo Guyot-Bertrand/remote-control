@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,9 +42,8 @@ import androidx.compose.ui.unit.dp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.ui.common.ConnectionChip
 import fr.remotecontrol.ui.common.PosterThumb
-import fr.remotecontrol.ui.common.RcBottomBar
+import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.Texts
-import fr.remotecontrol.ui.common.TopDestination
 import fr.remotecontrol.ui.common.WORK_TYPES
 import fr.remotecontrol.ui.theme.RcColors
 
@@ -54,8 +55,7 @@ fun HomeScreen(
     onOpenSeason: (Long) -> Unit,
     onOpenType: (String) -> Unit,
     onOpenCollection: (Long) -> Unit,
-    onSearch: () -> Unit,
-    onScan: () -> Unit,
+    onSeeAllRecent: () -> Unit,
     onRemote: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -86,7 +86,7 @@ fun HomeScreen(
                 item { Spacer(Modifier.height(16.dp)) }
             }
             if (state.recent.isNotEmpty()) {
-                item { SectionTitle(Texts.sectionRecent) }
+                item { SectionTitle(Texts.sectionRecent, Texts.seeAll, onSeeAllRecent) }
                 item {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -123,21 +123,10 @@ fun HomeScreen(
                 item { Spacer(Modifier.height(12.dp)) }
                 item { SectionTitle(Texts.sectionCollections) }
                 items(state.collections, key = { it.id }) { c ->
-                    CollectionRow(c.name, Texts.workCount(c.count)) { onOpenCollection(c.id) }
+                    CollectionRow(c.name, Texts.collectionCounts(c.count, c.playableCount)) { onOpenCollection(c.id) }
                 }
             }
         }
-        RcBottomBar(
-            selected = TopDestination.Home,
-            onSelect = { d ->
-                when (d) {
-                    TopDestination.Home -> Unit
-                    TopDestination.Browse -> onOpenType(WORK_TYPES.first())
-                    TopDestination.Search -> onSearch()
-                    TopDestination.Scan -> onScan()
-                }
-            },
-        )
     }
 }
 
@@ -162,8 +151,8 @@ private fun HomeHeader(server: ServerState, onSettings: () -> Unit) {
             )
         }
         ConnectionChip(server)
-        TextButton(onClick = onSettings) {
-            Text(Texts.settings, style = MaterialTheme.typography.labelLarge, color = RcColors.text)
+        IconButton(onClick = onSettings) {
+            Icon(RcIcons.Settings, contentDescription = Texts.settings, tint = RcColors.text)
         }
     }
 }
@@ -229,9 +218,17 @@ private fun RcFilterChip(label: String, selected: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Box(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
-        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) {
+    Row(
+        Modifier.fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        if (action != null) {
+            TextButton(onClick = onAction) {
+                Text(action, style = MaterialTheme.typography.titleSmall, color = RcColors.accentStrong)
+            }
+        }
     }
 }
 
@@ -288,15 +285,12 @@ private fun CollectionRow(name: String, subtitle: String, onClick: () -> Unit) {
             Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(RcColors.surface2),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                name.take(1).uppercase(),
-                style = MaterialTheme.typography.titleLarge,
-                color = RcColors.accent,
-            )
+            Icon(RcIcons.Collection, contentDescription = null, tint = RcColors.accent, modifier = Modifier.size(22.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(subtitle, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = RcColors.text2)
         }
+        Icon(RcIcons.ChevronRight, contentDescription = null, tint = RcColors.text3, modifier = Modifier.size(20.dp))
     }
 }

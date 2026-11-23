@@ -5,16 +5,30 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import fr.remotecontrol.R
 
-// Fraunces statique n'a pas de graisse 500 : le demi-gras la remplace.
+// Fraunces variable (graisse exacte des maquettes) ; l'italique reste statique.
+// Axes fixés : opsz 24 (taille des titres téléphone), SOFT 0, WONK 0 ; la police vaut wght 900 par défaut.
+private fun frauncesWeight(weight: Int) = Font(
+    R.font.fraunces_variable,
+    FontWeight(weight),
+    variationSettings = FontVariation.Settings(
+        FontVariation.weight(weight),
+        FontVariation.Setting("opsz", 24f),
+        FontVariation.Setting("SOFT", 0f),
+        FontVariation.Setting("WONK", 0f),
+    ),
+)
+
 val Fraunces = FontFamily(
-    Font(R.font.fraunces_regular, FontWeight.Normal),
-    Font(R.font.fraunces_semibold, FontWeight.Medium),
-    Font(R.font.fraunces_semibold, FontWeight.SemiBold),
+    frauncesWeight(300),
+    frauncesWeight(400),
+    frauncesWeight(500),
+    frauncesWeight(600),
     Font(R.font.fraunces_italic, FontWeight.Normal, FontStyle.Italic),
 )
 
