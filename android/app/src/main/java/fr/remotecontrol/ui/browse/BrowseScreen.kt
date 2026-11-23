@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,7 +95,8 @@ private fun TypeContent(
         ) {
             Icon(RcIcons.Sort, contentDescription = null, tint = RcColors.text2, modifier = Modifier.size(18.dp))
             Text(
-                Texts.browseSummary(state.type, state.works.size, state.recent),
+                // Le compte n'apparaît qu'une fois la liste chargée pour ce choix.
+                if (state.loaded) Texts.browseSummary(state.type, state.works.size, state.recent) else Texts.sortLabel(state.recent),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
                 color = RcColors.text2,
                 maxLines = 1,
@@ -106,9 +109,14 @@ private fun TypeContent(
         EmptyMessage()
         return
     }
+    // Nouveau choix (type, tri, filtre) : la grille repart du haut ; au retour d'une fiche, la position est gardée.
+    val gridState = rememberSaveable(state.type, state.recent, state.playableOnly, saver = LazyGridState.Saver) {
+        LazyGridState()
+    }
     // Clés stables (id) : la grille tient les ~3 600 films sans recomposer les cellules au défilement.
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 104.dp),
+        state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
@@ -160,11 +168,16 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun GridCell(work: WorkSummary, onOpen: (WorkSummary) -> Unit) {
-    Column(Modifier.clickable { onOpen(work) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        Modifier.clickable(onClickLabel = Texts.openWork, role = Role.Button) { onOpen(work) },
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         PosterThumb(
             hash = work.poster,
             title = work.titleFr,
             year = work.year,
+            progress = work.progress?.toFloat(),
+            watched = work.watched,
             unavailableLabel = if (work.playable) null else Texts.notAvailable,
             modifier = Modifier.fillMaxWidth(),
         )

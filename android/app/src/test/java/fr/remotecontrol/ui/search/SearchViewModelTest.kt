@@ -78,7 +78,9 @@ class SearchViewModelTest {
         vm.setPlayableOnly(false)
         vm.onQuery("prenom")
         advanceTimeBy(200)
-        assertEquals(listOf(3L, 4L), vm.await { it.results.size == 2 }.ids())
+        val both = vm.await { it.results.size == 2 }
+        assertEquals(listOf(3L, 4L), both.ids())
+        assertEquals(listOf("Alexandre de La Patellière", "Matthieu Delaporte"), both.results[0].directors)
         vm.setPlayableOnly(true)
         assertEquals(listOf(3L), vm.await { it.playableOnly && it.results.size == 1 }.ids())
     }

@@ -48,6 +48,7 @@ object Texts {
     const val noResults = "Aucun résultat"
     const val searchHelp = "Titres, titres originaux et alternatifs, réalisation, casting — sans tenir compte des accents."
     const val clear = "Effacer"
+    const val openWork = "Ouvrir la fiche"
 
     // Barre de navigation
     const val navHome = "Accueil"
@@ -136,7 +137,8 @@ object Texts {
     fun browseSummary(type: String?, count: Int, recent: Boolean) = "${countOfType(type, count)} · ${sortLabel(recent)}"
     fun collectionSummary(count: Int, playable: Int, ranked: Boolean) =
         if (ranked) "${collectionCounts(count, playable)} · $byRank" else collectionCounts(count, playable)
-    fun workLine(year: Int?, type: String) = listOfNotNull(year?.toString(), typeSingular(type)).joinToString(" · ")
+    fun workLine(year: Int?, type: String, directors: List<String>) =
+        listOfNotNull(year?.toString(), typeSingular(type), directors.joinToString(", ").ifEmpty { null }).joinToString(" · ")
 
     fun languageName(code: String?): String = when (code) {
         null -> "Langue inconnue"

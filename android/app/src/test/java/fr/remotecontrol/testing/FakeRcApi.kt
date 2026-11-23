@@ -9,6 +9,7 @@ import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.net.SyncDto
+import kotlinx.coroutines.CompletableDeferred
 
 /** Scriptable [RcApi]; every call is recorded in [calls] (e.g. `"sync(null)"`, `"tvShow(work,1)"`). */
 class FakeRcApi : RcApi {
@@ -29,8 +30,12 @@ class FakeRcApi : RcApi {
 
     override suspend fun info() = infoResult.also { calls += "info()" }
 
+    /** When set, sync() records its call, then waits for this gate before answering. */
+    var syncGate: CompletableDeferred<Unit>? = null
+
     override suspend fun sync(since: Long?): ApiResult<SyncDto> {
         calls += "sync($since)"
+        syncGate?.await()
         return syncResponses.removeFirstOrNull() ?: ApiResult.Err(ApiError.Unreachable)
     }
 

@@ -84,4 +84,11 @@ class FormatTest {
         assertEquals("0\u00A0pièce de théâtre", Texts.countOfType("theatre", 0))
         assertEquals("3\u00A0œuvres", Texts.countOfType(null, 3))
     }
+
+    @Test
+    fun work_line_with_directors() {
+        assertEquals("2017 · Film · Léa Mysius", Texts.workLine(2017, "film", listOf("Léa Mysius")))
+        assertEquals("Série · A, B", Texts.workLine(null, "serie", listOf("A", "B")))
+        assertEquals("2012 · Théâtre", Texts.workLine(2012, "theatre", emptyList()))
+    }
 }

@@ -4,7 +4,13 @@ import androidx.room.Dao
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
-private const val SUMMARY = "work.id, work.type, work.titleFr, work.year, work.poster, work.playable, work.episodic"
+// Progression propre à l'œuvre (pas aux épisodes) : ratio si entamée et non vue, et drapeau « vu ».
+private const val WORK_PROGRESS = "FROM progress p WHERE p.targetKind = 'work' AND p.targetId = work.id"
+private const val SUMMARY = "work.id, work.type, work.titleFr, work.year, work.poster, work.playable, work.episodic, " +
+    "work.directors, " +
+    "(SELECT MIN(p.position / p.duration, 1.0) $WORK_PROGRESS " +
+    "AND p.watched = 0 AND p.position > 0 AND p.duration > 0) AS progress, " +
+    "COALESCE((SELECT p.watched $WORK_PROGRESS), 0) AS watched"
 
 @Dao
 interface CatalogDao {

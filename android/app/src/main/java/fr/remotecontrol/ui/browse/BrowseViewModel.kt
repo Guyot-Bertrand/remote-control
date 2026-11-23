@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -38,6 +39,8 @@ data class BrowseUi(
 
 private data class Selection(val type: String?, val recent: Boolean)
 
+private data class Answer(val selection: Selection, val playableOnly: Boolean, val works: List<WorkSummary>)
+
 private fun typeTitle(type: String?) = type?.let(Texts::typeLabel) ?: Texts.allWorks
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -58,20 +61,27 @@ class BrowseViewModel(
     val state: StateFlow<BrowseUi> = (if (collectionId != null) collectionState(collectionId) else typeState())
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
 
-    private fun typeState(): Flow<BrowseUi> =
-        combine(filter.playableOnly, selection, ::Pair).flatMapLatest { (playable, sel) ->
+    /**
+     * Le type, le tri et le filtre choisis passent tout de suite dans l'état ; la liste n'y entre que lorsqu'elle
+     * répond à ce choix-là (sinon vide, [BrowseUi.loaded] faux) : jamais les films sous la puce « Théâtre ».
+     */
+    private fun typeState(): Flow<BrowseUi> {
+        val answers = combine(filter.playableOnly, selection, ::Pair).flatMapLatest { (playable, sel) ->
             val works = if (sel.type == null) dao.allWorks(playable) else dao.worksByType(sel.type, playable)
-            works.map { list ->
-                BrowseUi(
-                    title = typeTitle(sel.type),
-                    works = if (sel.recent) list.sortedByDescending { it.id } else list,
-                    playableOnly = playable,
-                    type = sel.type,
-                    recent = sel.recent,
-                    loaded = true,
-                )
-            }
+            works.map<List<WorkSummary>, Answer?> { list -> Answer(sel, playable, if (sel.recent) list.sortedByDescending { it.id } else list) }
+        }.onStart { emit(null) }
+        return combine(selection, filter.playableOnly, answers) { sel, playable, answer ->
+            val current = answer != null && answer.selection == sel && answer.playableOnly == playable
+            BrowseUi(
+                title = typeTitle(sel.type),
+                works = if (current) answer.works else emptyList(),
+                playableOnly = playable,
+                type = sel.type,
+                recent = sel.recent,
+                loaded = current,
+            )
         }
+    }
 
     private fun collectionState(id: Long): Flow<BrowseUi> {
         // Le nom et les compteurs viennent de collections(false) : la collection reste connue même filtrée à vide.

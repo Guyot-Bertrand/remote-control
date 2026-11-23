@@ -8,6 +8,10 @@ data class WorkSummary(
     val poster: String?,
     val playable: Boolean,
     val episodic: Boolean,
+    val directors: List<String>,
+    /** Position / durée quand l'œuvre est entamée et non vue ; nulle sinon. */
+    val progress: Double?,
+    val watched: Boolean,
 )
 
 /** Rang (texte libre, souvent numérique) d'une œuvre dans une collection. */

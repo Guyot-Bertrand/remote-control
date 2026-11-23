@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +31,8 @@ import fr.remotecontrol.ui.theme.Fraunces
 import fr.remotecontrol.ui.theme.RcColors
 
 /**
- * Liste d'œuvres des maquettes « Collection » et « Recherche » : vignette, titre, « année · type »,
+ * Liste d'œuvres des maquettes « Collection » et « Recherche » : vignette (entamée, vue), titre,
+ * « année · type · réalisation »,
  * et « Non lisible » à droite (ligne estompée) quand l'œuvre n'a aucun fichier présent.
  * Avec [ranks] (collection), le rang s'affiche en laiton devant la vignette.
  * [header] ajoute des éléments défilant avec la liste, avant les œuvres.
@@ -58,7 +60,7 @@ private fun WorkRow(work: WorkSummary, rank: String?, onOpen: (WorkSummary) -> U
         Modifier
             .fillMaxWidth()
             .height(if (rank != null) 76.dp else 80.dp)
-            .clickable { onOpen(work) }
+            .clickable(onClickLabel = Texts.openWork, role = Role.Button) { onOpen(work) }
             .padding(horizontal = 16.dp)
             .alpha(if (work.playable) 1f else 0.6f),
         verticalAlignment = Alignment.CenterVertically,
@@ -78,12 +80,14 @@ private fun WorkRow(work: WorkSummary, rank: String?, onOpen: (WorkSummary) -> U
             hash = work.poster,
             title = work.titleFr,
             year = work.year,
+            progress = work.progress?.toFloat(),
+            watched = work.watched,
             modifier = Modifier.width(if (rank != null) 40.dp else 44.dp),
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(work.titleFr, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                Texts.workLine(work.year, work.type),
+                Texts.workLine(work.year, work.type, work.directors),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
                 color = RcColors.text2,
                 maxLines = 1,

@@ -2,6 +2,7 @@ package fr.remotecontrol.ui.browse
 
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.ProgressEntity
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.SyncDto
@@ -11,7 +12,9 @@ import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -102,5 +105,43 @@ class BrowseViewModelTest {
         val ui = vm.await { it.type == "theatre" && it.works.size == 1 }
         assertEquals("Théâtre", ui.title)
         assertEquals(listOf(4L), ui.ids())
+    }
+
+    @Test fun works_carry_progress_and_watched() = runBlocking {
+        db.syncDao().upsertProgress(listOf(ProgressEntity("work", 3, null, 7000.0, 7000.0, true, 1.0)))
+        val vm = viewModel(BrowseRoute(type = "film"))
+        val ui = vm.await { it.works.size == 2 && it.works.any { w -> w.watched } }
+        val ava = ui.works.single { it.id == 1L }
+        assertEquals(600.0 / 5940.0, ava.progress!!, 1e-6)
+        assertEquals(false, ava.watched)
+        val prenom = ui.works.single { it.id == 3L }
+        assertEquals(null, prenom.progress) // vu : pastille, pas de barre
+        assertEquals(true, prenom.watched)
+        assertEquals(listOf("Léa Mysius"), ava.directors)
+    }
+
+    @Test fun selection_visible_before_works_load() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 3 }
+        val seen = mutableListOf<BrowseUi>()
+        val job = launch(Dispatchers.Unconfined) { vm.state.collect { seen += it } }
+        vm.setType("theatre")
+        vm.await { it.type == "theatre" && it.loaded }
+        job.cancel()
+        val theatre = seen.filter { it.type == "theatre" }
+        // Le filtre choisi s'affiche tout de suite, sans jamais montrer les films sous « Théâtre ».
+        assertTrue(theatre.all { ui -> ui.works.all { it.type == "theatre" } })
+        assertTrue(theatre.filter { !it.loaded }.all { it.works.isEmpty() })
+        assertEquals(listOf(4L), theatre.last().ids())
+    }
+
+    @Test fun progress_change_updates_live() = runBlocking {
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 2 }
+        db.syncDao().upsertProgress(listOf(ProgressEntity("work", 3, null, 7000.0, 7000.0, true, 1.0)))
+        // Room doit invalider la requête via la sous-requête sur `progress`.
+        vm.await { ui -> ui.works.any { it.id == 3L && it.watched } }
+        Unit
     }
 }

@@ -10,6 +10,7 @@ import fr.remotecontrol.net.TvStateDto
 import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.testDb
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -50,6 +51,7 @@ class SyncCoordinatorTest {
     private suspend fun kotlinx.coroutines.test.TestScope.emit(e: ServerEvent, response: SyncDto? = null) {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
         events.subscriptionCount.let { while (it.value == 0) kotlinx.coroutines.yield() }
+        events.emit(ServerEvent.Tv(TvStateDto("home"))) // barrier: the start-up sync is over
         api.calls.clear()
         response?.let { api.syncResponses.addLast(ApiResult.Ok(it)) }
         events.emit(e)
@@ -105,6 +107,7 @@ class SyncCoordinatorTest {
         api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = 4, full = false)))
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
         while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        events.emit(ServerEvent.Tv(TvStateDto("home"))) // barrier: the start-up sync is over
         job.cancel()
         assertEquals(listOf("sync(3)"), api.calls)
         assertEquals(4L, repo.localRevision())
@@ -113,7 +116,38 @@ class SyncCoordinatorTest {
     @Test fun startup_no_sync_without_local() = runTest {
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
         while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        events.emit(ServerEvent.Tv(TvStateDto("home"))) // barrier: the start-up sync is over
         job.cancel()
         assertEquals(emptyList<String>(), api.calls)
+    }
+
+    @Test fun startup_sync_then_hello_at_new_revision_syncs_once() = runTest {
+        seedLocal(3)
+        api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = 4, full = false)))
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
+        while (events.subscriptionCount.value == 0) kotlinx.coroutines.yield()
+        events.emit(hello(4))
+        events.emit(ServerEvent.Tv(TvStateDto("home")))
+        job.cancel()
+        assertEquals(listOf("sync(3)"), api.calls)
+    }
+
+    @Test fun event_during_startup_sync_is_not_lost() = runTest {
+        seedLocal(3)
+        val gate = CompletableDeferred<Unit>()
+        api.syncGate = gate
+        api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = 4, full = false)))
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { SyncCoordinator(repo, events).run() }
+        while ("sync(3)" !in api.calls) kotlinx.coroutines.yield() // start-up sync en cours, bloquée
+        val sender = launch(UnconfinedTestDispatcher(testScheduler)) {
+            events.emit(hello(5))
+            events.emit(ServerEvent.Tv(TvStateDto("home")))
+        }
+        api.syncGate = null
+        api.syncResponses.addLast(ApiResult.Ok(full.copy(revision = 5, full = false)))
+        gate.complete(Unit)
+        sender.join()
+        job.cancel()
+        assertEquals(listOf("sync(3)", "sync(4)"), api.calls)
     }
 }
