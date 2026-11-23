@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -16,31 +17,38 @@ from rc.config import Config
 from rc.player.mpv import MpvClient
 from rc.volumes import VolumeUnreadable, build_index, list_volumes
 
+PROBE_TIMEOUT = 15  # s par fichier
+SURVEY_BUDGET = 600  # s pour toute l'enquête
 MAX_SURVEY = 300  # fichiers sondés au plus, répartis sur toute la collection
 UNREADABLE = "illisible"
 _VA_LINE = re.compile(r"^\s*VAProfile(\w+)\s*:\s*VAEntrypointVLD\b", re.M)
-_VA_MAP = (
-    ("MPEG2", "mpeg2"), ("H264", "h264"), ("HEVCMain10", "hevc10"),
-    ("HEVCMain", "hevc"), ("VP9", "vp9"), ("AV1", "av1"),
-)
-VIDEO_EXT = {".mkv", ".mp4", ".avi", ".m4v", ".mov", ".ts", ".m2ts", ".mpg", ".mpeg", ".wmv", ".webm", ".iso"}
+_VA_MAP = {
+    "H264Main": "h264", "H264High": "h264", "H264ConstrainedBaseline": "h264",
+    "HEVCMain": "hevc", "HEVCMain10": "hevc10",
+    "VP9Profile0": "vp9", "VP9Profile2": "vp9_10", "AV1Profile0": "av1",
+    "MPEG2Main": "mpeg2", "MPEG2Simple": "mpeg2",
+    "VC1Simple": "vc1", "VC1Main": "vc1", "VC1Advanced": "vc1",
+    "VP8Version0_3": "vp8",
+    "MPEG4Simple": "mpeg4", "MPEG4AdvancedSimple": "mpeg4", "MPEG4Main": "mpeg4",
+}
+KNOWN = set(_VA_MAP.values())  # clés dont le matériel peut être vérifié
 _CODECS = {"mpeg2video": "mpeg2"}
 
 
 def parse_vainfo(text: str) -> set[str]:
-    found: set[str] = set()
-    for name in _VA_LINE.findall(text):
-        for prefix, key in _VA_MAP:
-            if name.startswith(prefix):
-                found.add(key)
-                break
-    return found
+    return {_VA_MAP[n] for n in _VA_LINE.findall(text) if n in _VA_MAP}
 
 
 def codec_key(video_codec: str, profile: str | None) -> str:
     codec = _CODECS.get(video_codec, video_codec)
-    if codec == "hevc" and profile and "10" in profile:
+    if codec == "hevc" and profile not in (None, "Main", "Main 10"):
+        return f"hevc ({profile})"
+    if codec == "hevc" and profile == "Main 10":
         return "hevc10"
+    if codec == "vp9" and profile not in (None, "Profile 0", "Profile 2"):
+        return f"vp9 ({profile})"
+    if codec == "vp9" and profile == "Profile 2":
+        return "vp9_10"
     return codec
 
 
@@ -49,7 +57,7 @@ def _probe_key(path: Path, runner) -> str:
         proc = runner(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
              "-show_entries", "stream=codec_name,profile", "-of", "json", str(path)],
-            capture_output=True, text=True, check=True, timeout=30,
+            capture_output=True, text=True, check=True, timeout=PROBE_TIMEOUT,
         )
         stream = (json.loads(proc.stdout).get("streams") or [None])[0]
         if not stream or not stream.get("codec_name"):
@@ -65,14 +73,18 @@ def _spread(paths: list[Path], limit: int) -> list[Path]:
     return [paths[i * len(paths) // limit] for i in range(limit)]
 
 
-def _survey(media_paths: list[Path], runner) -> tuple[Counter[str], dict[str, Path]]:
+def _survey(media_paths: list[Path], runner, budget: float = SURVEY_BUDGET,
+            clock=time.monotonic) -> tuple[Counter[str], dict[str, Path], bool]:
     counts: Counter[str] = Counter()
     examples: dict[str, Path] = {}
+    start = clock()
     for path in _spread(sorted(media_paths), MAX_SURVEY):
+        if clock() - start > budget:
+            return counts, examples, True
         key = _probe_key(path, runner)
         counts[key] += 1
         examples.setdefault(key, path)
-    return counts, examples
+    return counts, examples, False
 
 
 def survey(media_paths: list[Path], runner=subprocess.run) -> Counter[str]:
@@ -85,7 +97,7 @@ async def _play_sample(path: Path, mpv_path: str, extra_args: list[str],
     with tempfile.TemporaryDirectory(prefix="rc-doctor-") as tmp:
         sock = Path(tmp) / "mpv.sock"
         proc = await asyncio.create_subprocess_exec(
-            mpv_path, "--no-terminal", "--idle=no", "--hwdec=auto-safe", "--fs",
+            mpv_path, "--no-terminal", "--idle=no", "--hwdec=auto-safe", "--fs", "--keep-open=yes",
             "--volume=0", f"--input-ipc-server={sock}", *extra_args, str(path),
         )
         client = MpvClient(sock)
@@ -135,37 +147,47 @@ def run_doctor(config: Config, samples: int = 3, play_seconds: int = 20, *,
     lines = ["Diagnostic du décodage vidéo", ""]
 
     # 1. profils matériels
-    hw: set[str] = set()
+    hw: set[str] | None = None
     try:
         proc = runner(["vainfo"], capture_output=True, text=True, timeout=30)
-        hw = parse_vainfo((proc.stdout or "") + "\n" + (proc.stderr or ""))
-        if hw:
+        found = parse_vainfo((proc.stdout or "") + "\n" + (proc.stderr or ""))
+        if found:
+            hw = found
             lines.append("Profils décodables par le matériel : " + ", ".join(sorted(hw)))
         else:
-            lines.append("vainfo ne signale aucun profil de décodage matériel.")
+            lines.append("vainfo ne signale aucun profil de décodage matériel exploitable.")
     except (OSError, subprocess.SubprocessError):
-        lines.append("vainfo introuvable ou en échec : décodage matériel non vérifiable.")
+        lines.append("vainfo introuvable ou en échec.")
 
     # 2. collection
     notes: list[str] = []
     if media_paths is None:
         media_paths, notes = _collect_paths(config)
     lines += notes
-    counts, examples = _survey(media_paths, runner)
+    counts, examples, cut = _survey(media_paths, runner)
     lines += ["", f"Collection : {len(media_paths)} fichier(s) présent(s)."]
     sampled = sum(counts.values())
     if sampled < len(media_paths):
         lines.append(f"Échantillon sondé : {sampled} fichiers répartis sur toute la collection "
                      f"(limite de {MAX_SURVEY}, pour rester rapide).")
+    if cut:
+        lines.append(f"Enquête interrompue après {SURVEY_BUDGET // 60} min : résultats partiels.")
     for key, n in counts.most_common():
         label = "non sondable (ffprobe a échoué)" if key == UNREADABLE else key
         lines.append(f"  {label} : {n}")
-    bad = sum(n for k, n in counts.items() if k != UNREADABLE and k not in hw)
-    if bad:
-        lines.append(f"{bad} fichier{'s' if bad > 1 else ''} sans décodage matériel possible "
-                     "(décodage logiciel, lecture potentiellement saccadée).")
+    if hw is None:
+        lines.append("Décodage matériel non vérifiable (vainfo indisponible).")
     else:
-        lines.append("Aucun fichier sondé sans décodage matériel possible.")
+        bad = sum(n for k, n in counts.items() if k in KNOWN and k not in hw)
+        unk = sum(n for k, n in counts.items() if k != UNREADABLE and k not in KNOWN)
+        if bad:
+            lines.append(f"{bad} fichier{'s' if bad > 1 else ''} sans décodage matériel possible "
+                         "(décodage logiciel, lecture potentiellement saccadée).")
+        else:
+            lines.append("Aucun fichier sondé sans décodage matériel possible.")
+        if unk:
+            lines.append(f"{unk} fichier{'s' if unk > 1 else ''} non vérifié{'s' if unk > 1 else ''} "
+                         "(codec ou profil que vainfo ne permet pas d'évaluer).")
 
     # 3. lecture d'échantillons
     lines.append("")
@@ -173,6 +195,7 @@ def run_doctor(config: Config, samples: int = 3, play_seconds: int = 20, *,
     if mpv is None:
         lines.append("mpv introuvable : test de lecture ignoré")
     else:
+        lines.append("Attention : le test de lecture ouvre mpv en plein écran sur la télé.")
         picks = [(k, examples[k]) for k, _ in counts.most_common() if k != UNREADABLE][:samples]
         if not picks:
             lines.append("Aucun fichier lisible à tester.")
