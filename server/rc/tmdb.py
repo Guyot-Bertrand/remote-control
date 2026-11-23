@@ -112,19 +112,34 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
             imdb_id = (row["imdb_id"] or "").strip()
             if not IMDB_RE.fullmatch(imdb_id):
                 log.debug("TMDB : imdb_id mal formé pour l'œuvre %d, ignoré", row["id"])
-            else:
-                try:
-                    path = await _find_poster_path(client, imdb_id, api_key)
-                    if path:
-                        data = await _download(client, path)
-                        h = await asyncio.to_thread(_process, data, assets_dir, tmp_root)
-                        done.append((row["id"], h))
-                except RateLimited:
-                    log.warning("TMDB : limite atteinte, passage interrompu")
+                tried.append(row["id"])
+                continue
+            # Seule une issue définitive (aucune correspondance, 404, image illisible)
+            # marque l'œuvre ; un incident passager laisse un nouvel essai possible.
+            try:
+                path = await _find_poster_path(client, imdb_id, api_key)
+                if path:
+                    data = await _download(client, path)
+                    h = await asyncio.to_thread(_process, data, assets_dir, tmp_root)
+                    done.append((row["id"], h))
+            except RateLimited:
+                log.warning("TMDB : limite atteinte, passage interrompu")
+                break
+            except httpx.TransportError as exc:
+                log.warning("TMDB : réseau indisponible (%s), passage interrompu",
+                            type(exc).__name__)
+                break
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                if status in (401, 403):
+                    log.warning("TMDB : clé refusée (HTTP %d), passage interrompu", status)
                     break
-                except Exception as exc:  # réseau, HTTP, image : une seule tentative
-                    log.warning("TMDB : affiche indisponible pour %s (%s)",
-                                imdb_id, type(exc).__name__)
+                log.warning("TMDB : affiche indisponible pour %s (HTTP %d)", imdb_id, status)
+                if status != 404:
+                    continue  # erreur passagère du service : nouvel essai plus tard
+            except Exception as exc:  # réponse ou image illisible : une seule tentative
+                log.warning("TMDB : affiche indisponible pour %s (%s)",
+                            imdb_id, type(exc).__name__)
             tried.append(row["id"])
     finally:
         _commit(conn, tried, done)

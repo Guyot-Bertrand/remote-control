@@ -104,14 +104,75 @@ async def test_never_retries_same_work(conn, tmp_path):
     assert work(conn)["poster_asset"] is None
 
 
-async def test_http_error_logged_without_key_and_marked(conn, tmp_path, caplog):
-    rec = Recorder(status=500)
+def tried(conn) -> int:
+    return conn.execute("SELECT COUNT(*) FROM meta WHERE key LIKE 'tmdb_tried:%'"
+                        ).fetchone()[0]
+
+
+def second_work(conn):
+    conn.execute("UPDATE work SET imdb_id = 'tt0000002' WHERE id = "
+                 "(SELECT MAX(id) FROM work)")
+
+
+async def test_not_found_is_definitive_and_marked(conn, tmp_path, caplog):
+    rec = Recorder(status=404)
     with caplog.at_level(logging.WARNING):
         async with client_for(rec) as c:
             assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
             await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
     assert len(rec.requests) == 1
+    assert tried(conn) == 1
+    assert KEY not in caplog.text
+
+
+async def test_server_error_not_marked(conn, tmp_path, caplog):
+    rec = Recorder(status=500)
+    with caplog.at_level(logging.WARNING):
+        async with client_for(rec) as c:
+            assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+            await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert len(rec.requests) == 2  # nouvel essai au tour suivant
+    assert tried(conn) == 0
     assert caplog.records and KEY not in caplog.text
+
+
+@pytest.mark.parametrize("status", [401, 403])
+async def test_refused_key_stops_without_marking(conn, tmp_path, status, caplog):
+    second_work(conn)
+    rec = Recorder(status=status)
+    with caplog.at_level(logging.WARNING):
+        async with client_for(rec) as c:
+            assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+    assert len(rec.requests) == 1  # tour interrompu
+    assert tried(conn) == 0
+    assert KEY not in caplog.text
+
+
+async def test_network_error_stops_without_marking(conn, tmp_path):
+    second_work(conn)
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        raise httpx.ConnectError("pas de réseau", request=request)
+
+    async with client_for(handler) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+    assert len(requests) == 1
+    assert tried(conn) == 0
+
+
+async def test_image_download_network_error_not_marked(conn, tmp_path):
+    rec = Recorder()
+
+    def handler(request):
+        if request.url.host == "image.tmdb.org":
+            raise httpx.ReadTimeout("lent", request=request)
+        return rec(request)
+
+    async with client_for(handler) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+    assert tried(conn) == 0
 
 
 async def test_rate_limit_stops_without_marking(conn, tmp_path):
