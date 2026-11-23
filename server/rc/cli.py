@@ -68,7 +68,9 @@ def _fake_tree(args) -> int:
 
 
 def _doctor(args) -> int:
-    print("Diagnostic disponible à la tâche 13")
+    from rc.doctor import run_doctor
+
+    print(run_doctor(load_config(), samples=args.echantillons, play_seconds=args.secondes))
     return 0
 
 
@@ -84,7 +86,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("catalogue", type=Path)
     p.add_argument("dossier", type=Path)
     p.set_defaults(func=_fake_tree)
-    sub.add_parser("doctor", help="diagnostic de l'installation").set_defaults(func=_doctor)
+    p = sub.add_parser("doctor", help="diagnostic du décodage vidéo")
+    p.add_argument("--echantillons", type=int, default=3, help="fichiers lus (défaut 3)")
+    p.add_argument("--secondes", type=int, default=20, help="durée de lecture (défaut 20)")
+    p.set_defaults(func=_doctor)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s")
     return args.func(args)
