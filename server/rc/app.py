@@ -60,6 +60,15 @@ class AppState:
     last_full_index: float | None = None  # horloge du dernier index complet
     last_seen: Stat | None = None  # observation du catalogue au tour précédent
     refused: Stat | None = None  # dernière version refusée (avertie une seule fois)
+    published_revision: int | None = None  # dernière révision annoncée aux clients
+    playback: PlaybackService | None = None
+
+
+def publish_catalog(state: AppState, revision: int) -> None:
+    """Annonce une révision une seule fois (rafraîchissement ou fin de lecture)."""
+    if revision != state.published_revision:
+        state.published_revision = revision
+        state.bus.publish({"type": "catalog", "revision": revision})
 
 
 def _stat(path: Path) -> Stat | None:
@@ -208,7 +217,6 @@ async def _tmdb_step(state: AppState) -> None:
 
 
 async def refresh_once(state: AppState) -> None:
-    before = current_revision(state.conn)
     volumes_ok = _list_volumes(state)
     if volumes_ok:
         due = (state.last_full_index is None or state.clock() - state.last_full_index
@@ -221,9 +229,9 @@ async def refresh_once(state: AppState) -> None:
     await asyncio.to_thread(_posters_in_thread, _db_file(state.conn),
                             state.config.data_dir / "assets", state.indexes)
     await _tmdb_step(state)
-    revision = current_revision(state.conn)
-    if revision != before:
-        state.bus.publish({"type": "catalog", "revision": revision})
+    # Toute révision non encore annoncée : import, affiches, mais aussi progressions
+    # enregistrées pendant la lecture ou import fait par `rc import` dans un autre processus.
+    publish_catalog(state, current_revision(state.conn))
 
 
 async def refresh_loop(state: AppState) -> None:
@@ -296,9 +304,11 @@ def create_app(config: Config, player: Player | None = None,
     tv = TvController(bus)
     if player is None:
         player = MpvPlayer(config.mpv_path, config.mpv_extra_args, _runtime_dir(config))
-    state = AppState(config, conn, bus, runner)
+    state = AppState(config, conn, bus, runner, published_revision=current_revision(conn))
     indexes_getter = lambda: state.indexes  # noqa: E731
-    playback = PlaybackService(conn, player, tv, bus, indexes_getter)
+    playback = PlaybackService(conn, player, tv, bus, indexes_getter,
+                               on_catalog=lambda rev: publish_catalog(state, rev))
+    state.playback = playback
     services = Services(conn, config, bus, tv, playback, indexes_getter)
 
     @asynccontextmanager

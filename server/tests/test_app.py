@@ -11,7 +11,8 @@ from rc import app as app_mod
 from rc.app import create_app, mdns_announce, refresh_once
 from rc.catalog.parser import parse_catalog
 from rc.config import Config
-from rc.db import current_revision
+from rc.db import current_revision, next_revision, open_db
+from rc.player.session import PlayRequest
 from rc.fake_tree import make_fake_tree
 
 from fake_player import FakePlayer
@@ -97,6 +98,58 @@ async def test_refresh_publishes_catalog_event(setup):
     assert catalog[-1] == {"type": "catalog", "revision": current_revision(state.conn)}
     await refresh_once(state)  # rien de neuf : pas d'événement
     assert queue.empty()
+
+
+def catalog_events(queue) -> list[dict]:
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    return [e for e in events if e["type"] == "catalog"]
+
+
+async def test_revision_change_between_rounds_is_published(setup):
+    state, disk = setup
+    await import_now(state, disk)
+    queue = state.bus.subscribe()
+    state.conn.execute("BEGIN IMMEDIATE")
+    rev = next_revision(state.conn)  # une progression enregistrée pendant la lecture
+    state.conn.execute("COMMIT")
+    await refresh_once(state)
+    assert catalog_events(queue) == [{"type": "catalog", "revision": rev}]
+    await refresh_once(state)
+    assert catalog_events(queue) == []
+
+
+async def test_external_import_is_published(setup):
+    state, disk = setup
+    await import_now(state, disk)
+    queue = state.bus.subscribe()
+    edited = disk / "medias.txt"  # catalogue modifié puis `rc import` sans argument
+    put_catalog(disk, FIXTURE.read_text(encoding="utf-8").replace(
+        "MP ; Ava, 13 ans", "MP ; Ava, treize ans"), 1_700_000_900)
+    other = open_db(Path(app_mod._db_file(state.conn)))  # `rc import` dans un autre processus
+    try:
+        assert app_mod.import_file(other, state.config, edited).updated == 1
+    finally:
+        other.close()
+    await refresh_once(state)
+    assert catalog_events(queue) == [{"type": "catalog",
+                                      "revision": current_revision(state.conn)}]
+    await refresh_once(state)  # copie à jour : pas de réimport ni de doublon
+    assert catalog_events(queue) == []
+
+
+async def test_playback_end_publishes_catalog(setup):
+    state, disk = setup
+    await import_now(state, disk)
+    playback = state.playback
+    queue = state.bus.subscribe()
+    await playback.play(PlayRequest("work", 1, "start"))
+    await playback.stop()
+    rev = current_revision(state.conn)
+    assert catalog_events(queue) == [{"type": "catalog", "revision": rev}]
+    await refresh_once(state)  # déjà publiée : pas de doublon
+    assert catalog_events(queue) == []
 
 
 async def test_refresh_survives_findmnt_failure(tmp_path, caplog):

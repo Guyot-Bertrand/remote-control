@@ -411,3 +411,17 @@ async def test_failed_start_releases_lock(env):
     with pytest.raises(PlayError):
         await env.svc.play(PlayRequest("work", 1, "start"))
     assert not env.svc._lock.locked()
+
+
+async def test_finish_publishes_catalog_after_save(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    q = env.bus.subscribe()
+    env.clock.t = 3
+    emit(env, position=300, duration=6000)
+    await env.svc.stop()
+    msgs = []
+    while not q.empty():
+        msgs.append(q.get_nowait())
+    catalog = [m for m in msgs if m["type"] == "catalog"]
+    assert catalog == [{"type": "catalog", "revision": current_revision(env.conn)}]
+    assert progress(env.conn)["rev"] == current_revision(env.conn)

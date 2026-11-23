@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 from rc.catalog.paths import QUALITY_ORDER
-from rc.db import next_revision
+from rc.db import current_revision, next_revision
 from rc.events import EventBus
 from rc.player.base import Player, PlayerState, SubSel
 from rc.probe import MediaTracks, cached_tracks, default_selection, find_external_subs
@@ -164,9 +164,13 @@ class _Session:
 class PlaybackService:
     def __init__(self, conn: sqlite3.Connection, player: Player, tv: TvController,
                  bus: EventBus, indexes_getter: Callable[[], dict],
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic,
+                 on_catalog: Callable[[int], None] | None = None) -> None:
         self.conn, self.player, self.tv, self.bus = conn, player, tv, bus
         self.indexes_getter, self.clock = indexes_getter, clock
+        # Annonce d'une nouvelle révision (progression enregistrée) ; par défaut sur le bus.
+        self.on_catalog = on_catalog or (
+            lambda rev: bus.publish({"type": "catalog", "revision": rev}))
         self._state = PlayerState()
         self._session: _Session | None = None
         self._lock = asyncio.Lock()
@@ -325,6 +329,7 @@ class PlaybackService:
     def _finish(self, state: PlayerState, message: str | None) -> None:
         try:
             self._save(state)
+            self.on_catalog(current_revision(self.conn))  # progression visible sans attendre
         except Exception:
             log.exception("enregistrement de la progression impossible")
         finally:
