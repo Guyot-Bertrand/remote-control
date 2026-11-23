@@ -37,6 +37,8 @@ import kotlin.math.abs
  * Télécommande. [running] : une lecture est en cours (commandes actives). [finished] : la lecture suivie par
  * l'écran s'est terminée ([interrupted] si sur une erreur du lecteur) ; [finishedTitle], [workId] et [seasonId]
  * restent alors connus pour revenir à la fiche (saison si [seasonId] n'est pas nul, œuvre sinon).
+ * [loading] : l'état du lecteur n'est pas encore connu (ouverture, retour après plus de 5 s) ; ce n'est
+ * jamais une fin de lecture.
  */
 data class RemoteUi(
     val running: Boolean = false,
@@ -58,6 +60,7 @@ data class RemoteUi(
     val finished: Boolean = false,
     val interrupted: Boolean = false,
     val finishedTitle: String? = null,
+    val loading: Boolean = false,
 )
 
 /** Saisie en cours : position ou volume tenus par le doigt (ou envoyés et pas encore confirmés). */
@@ -204,9 +207,14 @@ private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, 
     val position = l.seek ?: st.position
     val media = current?.let { t[it.mediaFileId] }
     val shown = current ?: last
+    val loading = s == null
     return RemoteUi(
         running = running,
-        title = if (running) current?.title ?: Texts.nothingPlaying else Texts.idle,
+        title = when {
+            running -> current?.title ?: Texts.nothingPlaying
+            loading -> last?.title ?: Texts.idle
+            else -> Texts.idle
+        },
         position = position,
         duration = st.duration,
         positionLabel = formatClock(position),
@@ -221,8 +229,9 @@ private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, 
         message = l.message,
         workId = shown?.workId,
         seasonId = shown?.seasonId,
-        finished = !running && last != null,
-        interrupted = !running && st.error != null,
-        finishedTitle = if (!running) last?.title else null,
+        finished = !loading && !running && last != null,
+        interrupted = !loading && !running && st.error != null,
+        finishedTitle = if (!loading && !running) last?.title else null,
+        loading = loading,
     )
 }

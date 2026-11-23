@@ -291,4 +291,26 @@ class RemoteViewModelTest {
         assertFalse(ui.finished)
         assertEquals(null, ui.workId)
     }
+
+    /** Retour après plus de 5 s : tant que le serveur n'a rien redit, l'écran charge, il n'annonce pas la fin. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun unknown_state_on_return_is_loading_not_finished() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(playing)
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt)).also { vms += it }
+        val screen = observe(vm, vt)
+        assertTrue(vm.state.value.running)
+        assertFalse(vm.state.value.loading)
+        screen.cancel()
+        advanceTimeBy(10_001)
+        api.playerStateResult = ApiResult.Err(ApiError.Unreachable)
+        observe(vm, vt)
+        val ui = vm.state.value
+        assertTrue(ui.loading)
+        assertFalse(ui.finished)
+        assertFalse(ui.interrupted)
+        // Le serveur répond ensuite : plus rien ne joue, c'est alors la fin de lecture.
+        push(PlayerSnapshotDto(PlayerStateDto(running = false), current = null))
+        assertFalse(vm.state.value.loading)
+        assertTrue(vm.state.value.finished)
+    }
 }
