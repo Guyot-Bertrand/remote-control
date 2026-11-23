@@ -2,6 +2,8 @@ package fr.remotecontrol.net
 
 import fr.remotecontrol.testing.Fixtures
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -54,6 +56,24 @@ class OkHttpRcApiTest {
         assertEquals("/api/sync", req.url.encodedPath)
         assertNull(req.url.queryParameter("since"))
         assertEquals(5, (r as ApiResult.Ok).value.works.size)
+    }
+
+    /** Le JSON est décodé sur le répartiteur de décodage, jamais dans le contexte de l'appelant (thread principal). */
+    @Test
+    fun decode_runs_on_decode_dispatcher() = runTest {
+        val threads = mutableListOf<String>()
+        val decoding = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                Dispatchers.Default.dispatch(context) {
+                    threads += Thread.currentThread().name
+                    block.run()
+                }
+            }
+        }
+        val offMain = OkHttpRcApi(rcOkHttpClient(), { server.url("/") }, decodeDispatcher = decoding)
+        server.enqueue(ok(Fixtures.text("sync_full.json")))
+        assertEquals(5, (offMain.sync(null) as ApiResult.Ok).value.works.size)
+        assertTrue(threads.isNotEmpty())
     }
 
     @Test

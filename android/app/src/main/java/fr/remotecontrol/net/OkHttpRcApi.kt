@@ -4,7 +4,10 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -31,6 +34,8 @@ class OkHttpRcApi(
     private val client: OkHttpClient,
     private val baseUrl: () -> HttpUrl?,
     private val json: Json = RcJson,
+    /** Le décodage (jusqu'au catalogue complet) ne se fait jamais dans le contexte de l'appelant. */
+    private val decodeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : RcApi, ServerProbe {
 
     private val jsonType = "application/json; charset=utf-8".toMediaType()
@@ -115,13 +120,15 @@ class OkHttpRcApi(
         }
         return when {
             code == 409 -> {
-                val err = runCatching { json.decodeFromString(ErrorDto.serializer(), text) }.getOrNull()
+                val err = withContext(decodeDispatcher) {
+                    runCatching { json.decodeFromString(ErrorDto.serializer(), text) }.getOrNull()
+                }
                 if (err != null) ApiResult.Err(ApiError.Server(err.error, err.volumeLabel))
                 else ApiResult.Err(ApiError.Http(409))
             }
             code !in 200..299 -> ApiResult.Err(ApiError.Http(code))
             else -> try {
-                ApiResult.Ok(decode(text))
+                ApiResult.Ok(withContext(decodeDispatcher) { decode(text) })
             } catch (_: SerializationException) {
                 ApiResult.Err(ApiError.BadResponse)
             } catch (_: IllegalArgumentException) {
