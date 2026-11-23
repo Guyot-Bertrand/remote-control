@@ -253,10 +253,14 @@ async def mdns_announce(port: int, zeroconf_factory: Callable = _default_zerocon
         log.exception("annonce mDNS impossible")
     finally:
         if azc is not None:
-            with contextlib.suppress(Exception):
+            try:
                 await (await azc.async_unregister_service(info))
-            with contextlib.suppress(Exception):
+            except Exception:
+                log.debug("retrait de l'annonce mDNS impossible", exc_info=True)
+            try:
                 await azc.async_close()
+            except Exception:
+                log.debug("fermeture de zeroconf impossible", exc_info=True)
 
 
 def _runtime_dir(config: Config) -> Path:

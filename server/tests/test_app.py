@@ -114,7 +114,8 @@ async def test_refresh_survives_findmnt_failure(tmp_path, caplog):
 
 def test_tv_static_served(tmp_path):
     config = Config(data_dir=tmp_path / "data", scan_roots=[tmp_path / "vide"],
-                    dev_dir_volumes=True, mdns=False, poll_interval=3600)
+                    dev_dir_volumes=True, mdns=False, poll_interval=3600,
+                    allowed_hosts=["testserver"])
     app = create_app(config, player=FakePlayer())
     with TestClient(app) as client:
         r = client.get("/tv/")
@@ -257,3 +258,32 @@ def test_local_addresses_skip_bridges(monkeypatch):
         adapter("docker0", "172.17.0.1"), adapter("br-4d8f", "172.23.0.1"),
         adapter("veth12", "10.0.0.2"), adapter("virbr0", "192.168.122.1")])
     assert app_mod.local_addresses() == [bytes([192, 168, 1, 23])]
+
+
+def test_tv_refused_for_unknown_host(tmp_path):
+    config = Config(data_dir=tmp_path / "data", scan_roots=[tmp_path / "vide"],
+                    dev_dir_volumes=True, mdns=False, poll_interval=3600)
+    app = create_app(config, player=FakePlayer())
+    with TestClient(app, base_url="http://192.168.1.23:8765") as client:
+        assert client.get("/tv/").status_code == 200
+        r = client.get("/tv/", headers={"Host": "evil.example:8765"})
+        assert r.status_code == 403
+
+
+async def test_mdns_shutdown_failures_logged_debug(caplog):
+    class Broken(FakeZeroconf):
+        async def async_unregister_service(self, info):
+            raise OSError("socket fermée")
+
+        async def async_close(self):
+            raise OSError("déjà fermé")
+
+    task = asyncio.create_task(mdns_announce(8765, zeroconf_factory=Broken,
+                                             addresses=lambda: []))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    with caplog.at_level(logging.DEBUG, logger="rc.app"):
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("retrait" in m for m in debug) and any("fermeture" in m for m in debug)

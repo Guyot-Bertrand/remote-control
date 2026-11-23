@@ -18,9 +18,9 @@ GZIP_MIN_SIZE = 1000
 def install_api(app: FastAPI, services: Services) -> None:
     """Monte les routeurs, la compression gzip (réponses de 1 000 octets ou plus) et les
     erreurs de validation au format de l'API (422 {"error": "invalid", ...}), et le refus
-    des requêtes inter-origines (403 / WebSocket 1008)."""
+    des hôtes non autorisés et des requêtes inter-origines (403 / WebSocket 1008)."""
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MIN_SIZE)
-    app.add_middleware(OriginCheckMiddleware)
+    app.add_middleware(OriginCheckMiddleware, allowed_hosts=services.config.allowed_hosts)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(build_router(services))
     app.include_router(build_ws_router(services))

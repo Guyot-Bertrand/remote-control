@@ -1,3 +1,4 @@
+import socket
 import subprocess
 import logging
 import threading
@@ -38,7 +39,7 @@ def tracks():
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     monkeypatch.setattr(session_mod, "cached_tracks", lambda conn, mid, path: tracks())
-    config = Config(data_dir=tmp_path / "data")
+    config = Config(data_dir=tmp_path / "data", allowed_hosts=["testserver"])
     conn = open_db(tmp_path / "rc.db", check_same_thread=False)
     text = FIXTURE.read_text(encoding="utf-8")
     result = parse_catalog(text)
@@ -396,3 +397,52 @@ def test_ws_same_origin_allowed(env):
     with env.client.websocket_connect("/api/events",
                                       headers={"Origin": "http://testserver"}) as ws:
         assert ws.receive_json()["type"] == "hello"
+
+
+EVIL = "evil.example:8765"
+
+
+def test_rebinding_host_refused(env):
+    h = {"Host": EVIL, "Origin": f"http://{EVIL}"}
+    r = env.client.get("/api/sync", headers={"Host": EVIL})
+    assert (r.status_code, r.json()) == (403, FORBIDDEN)
+    r = env.client.post("/api/play", headers=h,
+                        json={"target_kind": "work", "target_id": 1, "start": "start"})
+    assert (r.status_code, r.json()) == (403, FORBIDDEN)
+    assert env.player.starts() == []
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with env.client.websocket_connect("/api/events", headers=h) as ws:
+            ws.receive_json()
+    assert exc.value.code == 1008
+
+
+@pytest.mark.parametrize("host", ["192.168.1.23:8765", "[::1]:8765", "localhost:8765",
+                                  f"{socket.gethostname()}.local:8765",
+                                  socket.gethostname(), "testserver"])
+def test_allowed_hosts_pass(env, host):
+    assert env.client.get("/api/info", headers={"Host": host}).status_code == 200
+    r = env.client.post("/api/tv/show", json={"screen": "home"},
+                        headers={"Host": host, "Origin": f"http://{host}"})
+    assert r.status_code == 200
+    with env.client.websocket_connect("/api/events", headers={"Host": host}) as ws:
+        assert ws.receive_json()["type"] == "hello"
+
+
+def test_origin_host_must_be_allowed(env):
+    # Origin identique à Host, mais Host est déjà refusé ; et une Origin d'un autre hôte
+    # autorisé reste refusée (même hôte exigé).
+    r = env.client.post("/api/tv/show", json={"screen": "home"},
+                        headers={"Host": "localhost:8765", "Origin": "http://127.0.0.1:8765"})
+    assert r.status_code == 403
+
+
+def test_host_policy_unit():
+    from rc.api.origin import HostPolicy, host_name
+
+    assert host_name("[::1]:8765") == "::1"
+    assert host_name("Box.Local:80") == "box.local"
+    assert host_name("fe80::1") == "fe80::1"
+    p = HostPolicy(["salon.lan"])
+    assert p.allowed({b"host": b"salon.lan:8765"}, check_origin=False)
+    assert not p.allowed({}, check_origin=False)  # Host absent
+    assert not p.allowed({b"host": b"evil.example"}, check_origin=False)

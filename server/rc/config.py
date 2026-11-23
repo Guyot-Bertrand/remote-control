@@ -21,6 +21,8 @@ def _default_scan_roots() -> list[Path]:
 class Config:
     data_dir: Path = field(default_factory=_default_data_dir)
     bind_host: str = "0.0.0.0"
+    # Noms d'hôte acceptés en plus des IP, de localhost et du nom de la machine.
+    allowed_hosts: list[str] = field(default_factory=list)
     port: int = 8765
     scan_roots: list[Path] = field(default_factory=_default_scan_roots)
     catalog_path: Path | None = None
