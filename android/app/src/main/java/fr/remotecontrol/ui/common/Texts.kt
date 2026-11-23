@@ -34,6 +34,19 @@ object Texts {
     const val stop = "Arrêter"
     const val directors = "Réalisation"
     const val cast = "Avec"
+    const val work = "Fiche de l'œuvre"
+    const val season = "Saison"
+
+    // Barre de navigation
+    const val navHome = "Accueil"
+    const val navBrowse = "Parcourir"
+    const val navSearch = "Recherche"
+    const val navScan = "Scanner"
+
+    // Pastille de connexion
+    const val chipConnected = "PC connecté"
+    const val chipSearching = "Recherche…"
+    const val chipOffline = "Hors ligne"
 
     // Messages
     const val serverUnreachable = "Serveur injoignable"
@@ -64,6 +77,7 @@ object Texts {
     fun httpError(status: Int) = "Erreur du serveur ($status)"
     fun resumeAt(seconds: Double) = "Reprendre à ${formatHhMm(seconds)}"
     fun started(seconds: Double) = "Entamé — ${formatClock(seconds)}"
+    fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"
     fun synced(count: Int) = "Catalogue synchronisé ($count œuvres)"
 
     // Fonctions de libellé
