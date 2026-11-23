@@ -4,6 +4,8 @@ import android.content.Context
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.KeyValueStore
 import fr.remotecontrol.data.MetaKeyValueStore
+import fr.remotecontrol.data.SharedPreferencesKeyValueStore
+import fr.remotecontrol.data.migrateServerAddress
 import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.buildDatabase
@@ -33,7 +35,11 @@ class AppContainer(context: Context) {
     val okHttp: OkHttpClient = rcOkHttpClient()
     val db: AppDatabase = buildDatabase(appContext)
     val catalogDao: CatalogDao = db.catalogDao()
-    val store: KeyValueStore = MetaKeyValueStore(db.metaDao())
+    val store: KeyValueStore =
+        SharedPreferencesKeyValueStore(appContext.getSharedPreferences("rc-settings", Context.MODE_PRIVATE))
+
+    /** Une fois au démarrage : l'adresse mémorisée par les premières versions (dans le cache Room) passe aux préférences. */
+    suspend fun migrateSettings() = migrateServerAddress(from = MetaKeyValueStore(db.metaDao()), to = store)
 
     // api et locator dépendent l'un de l'autre : tous deux paresseux.
     val locator: ServerLocator by lazy { ServerLocator(store, api, NsdServerDiscovery(appContext)) }

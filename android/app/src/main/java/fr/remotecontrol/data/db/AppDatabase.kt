@@ -12,7 +12,7 @@ import androidx.room.TypeConverters
         VolumeEntity::class, CollectionEntity::class, WorkCollectionEntity::class,
         ProgressEntity::class, MetaEntity::class, WorkFtsEntity::class,
     ],
-    version = 2,
+    version = 1,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -22,7 +22,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun metaDao(): MetaDao
 }
 
-fun buildDatabase(context: Context): AppDatabase =
-    Room.databaseBuilder(context, AppDatabase::class.java, "rc-cache.db")
+const val DATABASE_NAME = "rc-cache.db"
+
+/**
+ * La base n'est qu'un cache du catalogue (l'adresse du serveur est dans les préférences) : tout changement de
+ * schéma, montée comme descente de version, l'efface, et la synchronisation suivante la remplit à nouveau.
+ */
+fun buildDatabase(context: Context, name: String = DATABASE_NAME): AppDatabase =
+    Room.databaseBuilder(context, AppDatabase::class.java, name)
         .fallbackToDestructiveMigration(dropAllTables = true)
+        .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
         .build()

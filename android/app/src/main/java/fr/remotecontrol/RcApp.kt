@@ -24,6 +24,7 @@ class RcApp : Application(), SingletonImageLoader.Factory {
         // serveur est revérifié à chaque retour, recherché toutes les 20 s s'il manque, et
         // revérifié quand le WebSocket échoue.
         ProcessLifecycleOwner.get().lifecycleScope.launch {
+            container.migrateSettings()
             ProcessLifecycleOwner.get().repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { container.coordinator.run() }
                 launch { container.tvStatus.run() }

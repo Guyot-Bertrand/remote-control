@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "cd41a13e3c412c14936ab969f59c2aea",
+    "identityHash": "f8bc9e58984518b45c892fd6ccf735a6",
     "entities": [
       {
         "tableName": "work",
@@ -415,7 +415,7 @@
       },
       {
         "tableName": "progress",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`targetKind` TEXT NOT NULL, `targetId` INTEGER NOT NULL, `mediaFileId` INTEGER, `position` REAL NOT NULL, `duration` REAL, `watched` INTEGER NOT NULL, `updatedAt` REAL NOT NULL, PRIMARY KEY(`targetKind`, `targetId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`targetKind` TEXT NOT NULL, `targetId` INTEGER NOT NULL, `mediaFileId` INTEGER, `position` REAL NOT NULL, `duration` REAL, `watched` INTEGER NOT NULL, `updatedAt` REAL NOT NULL, `audio` INTEGER, `subtitle` TEXT, PRIMARY KEY(`targetKind`, `targetId`))",
         "fields": [
           {
             "fieldPath": "targetKind",
@@ -456,6 +456,16 @@
             "columnName": "updatedAt",
             "affinity": "REAL",
             "notNull": true
+          },
+          {
+            "fieldPath": "audio",
+            "columnName": "audio",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "subtitle",
+            "columnName": "subtitle",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -523,7 +533,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cd41a13e3c412c14936ab969f59c2aea')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f8bc9e58984518b45c892fd6ccf735a6')"
     ]
   }
 }
