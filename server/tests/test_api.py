@@ -190,6 +190,47 @@ def test_asset_immutable_header(env):
     assert env.client.get("/api/assets/..%2F..%2Fetc/tv.jpg").status_code == 404
 
 
+def test_assets_not_gzipped_but_json_is(env):
+    from rc.assets import asset_path
+
+    poster = "0123456789abcdef"
+    for size in ("thumb", "tv", "orig"):
+        path = asset_path(env.config.data_dir / "assets", poster, size)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\xff\xd8" + b"\0" * 5000)  # compressible : seule l'exclusion joue
+    for size in ("thumb", "tv", "orig"):
+        r = env.client.get(f"/api/assets/{poster}/{size}.jpg",
+                           headers={"Accept-Encoding": "gzip"})
+        assert r.status_code == 200
+        assert int(r.headers["content-length"]) == 5002
+        assert "content-encoding" not in r.headers
+    r = env.client.get("/api/sync", headers={"Accept-Encoding": "gzip"})
+    assert r.headers.get("content-encoding") == "gzip"
+
+
+def test_selective_gzip_excludes_asset_paths_whatever_the_type():
+    from fastapi.responses import PlainTextResponse
+
+    from rc.api import GZIP_MIN_SIZE, SelectiveGZipMiddleware
+
+    app = FastAPI()
+    app.add_middleware(SelectiveGZipMiddleware, minimum_size=GZIP_MIN_SIZE)
+    body = "x" * 5000
+
+    @app.get("/api/assets/{name}")
+    async def asset(name: str):
+        return PlainTextResponse(body)
+
+    @app.get("/api/other")
+    async def other():
+        return PlainTextResponse(body)
+
+    with TestClient(app) as client:
+        h = {"Accept-Encoding": "gzip"}
+        assert "content-encoding" not in client.get("/api/assets/a", headers=h).headers
+        assert client.get("/api/other", headers=h).headers["content-encoding"] == "gzip"
+
+
 def test_tracks_default_and_last_choice(env):
     ava = media_id(env.conn, "%1920x1038%")
     t = env.client.get(f"/api/media/{ava}/tracks").json()

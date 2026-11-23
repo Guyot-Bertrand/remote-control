@@ -425,3 +425,13 @@ async def test_finish_publishes_catalog_after_save(env):
     catalog = [m for m in msgs if m["type"] == "catalog"]
     assert catalog == [{"type": "catalog", "revision": current_revision(env.conn)}]
     assert progress(env.conn)["rev"] == current_revision(env.conn)
+
+
+async def test_sheet_requested_during_playback_shown_after_stop(env):
+    env.tv.show("work", 1)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    assert env.tv.show("season", 5, 1) is False
+    assert env.tv.state.screen == "playing"
+    await env.svc.stop()
+    assert (env.tv.state.screen, env.tv.state.work_id, env.tv.state.season_id) == (
+        "season", 5, 1)

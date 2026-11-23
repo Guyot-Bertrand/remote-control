@@ -47,11 +47,14 @@ class TvController:
 
     def show(self, screen: Screen, work_id: int | None = None,
              season_id: int | None = None, force: bool = False) -> bool:
+        """Pendant la lecture (sans `force`), la fiche demandée n'est pas affichée mais
+        retenue : elle apparaîtra à la fin de la lecture."""
+        wanted = TvState(screen, work_id, season_id)
+        if screen in ("home", "work", "season"):
+            self._last_sheet = wanted
         if self.state.screen == "playing" and not force:
             return False
-        self._set(TvState(screen, work_id, season_id))
-        if screen in ("home", "work", "season"):
-            self._last_sheet = self.state
+        self._set(wanted)
         return True
 
     def set_playing(self, work_id: int | None) -> None:

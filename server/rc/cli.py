@@ -17,16 +17,22 @@ def _serve(args) -> int:
     import uvicorn
 
     from rc.app import create_app
+    from rc.db import DatabaseTooNew
 
     config = load_config()
-    uvicorn.run(create_app(config), host=config.bind_host, port=config.port)
+    try:
+        app = create_app(config)
+    except DatabaseTooNew as exc:
+        print(f"Démarrage impossible : {exc}", file=sys.stderr)
+        return 1
+    uvicorn.run(app, host=config.bind_host, port=config.port)
     return 0
 
 
 def _import(args) -> int:
     from rc.app import import_file
     from rc.catalog.importer import ImportRefused
-    from rc.db import open_db
+    from rc.db import DatabaseTooNew, open_db
     from rc.volumes import find_catalog_source, list_volumes
 
     config = load_config()
@@ -42,7 +48,11 @@ def _import(args) -> int:
         print("Catalogue introuvable : aucun medias.txt sur les disques.", file=sys.stderr)
         return 1
     config.data_dir.mkdir(parents=True, exist_ok=True)
-    conn = open_db(config.data_dir / "rc.db")
+    try:
+        conn = open_db(config.data_dir / "rc.db")
+    except DatabaseTooNew as exc:
+        print(f"Import impossible : {exc}", file=sys.stderr)
+        return 1
     try:
         report = import_file(conn, config, Path(src), force=args.force)
     except ImportRefused as exc:

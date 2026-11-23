@@ -452,3 +452,31 @@ async def test_mdns_address_lookup_failure_keeps_announcement(caplog):
         await asyncio.gather(task, return_exceptions=True)
     assert zc.calls[-2:] == ["unregistered", "closed"]
     assert any("adresses" in r.getMessage() for r in caplog.records)
+
+
+async def test_deleted_db_restored_from_catalog_copy(setup):
+    state, disk = setup
+    await import_now(state, disk)
+    count = works(state)
+    state.conn.close()
+    for suffix in ("", "-wal", "-shm"):
+        Path(str(state.config.data_dir / "rc.db") + suffix).unlink(missing_ok=True)
+    app = create_app(state.config, player=FakePlayer())
+    restored = app.state.rc
+    try:
+        assert works(restored) == count
+        await refresh_once(restored)
+        await refresh_once(restored)
+        assert works(restored) == count
+    finally:
+        restored.conn.close()
+    state.conn = open_db(state.config.data_dir / "rc.db")  # refermée par la fixture
+
+
+def test_existing_db_not_reimported_from_copy(setup, monkeypatch):
+    state, disk = setup
+    called = []
+    monkeypatch.setattr(app_mod, "import_catalog", lambda *a, **k: called.append(1))
+    app = create_app(state.config, player=FakePlayer())  # base vide, pas de copie
+    app.state.rc.conn.close()
+    assert called == []

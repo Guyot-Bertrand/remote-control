@@ -141,6 +141,27 @@ def import_file(conn: sqlite3.Connection, config: Config, src: Path,
     return _run_import(conn, config, tmp, _parse_copy(tmp), force)
 
 
+def restore_from_copy(conn: sqlite3.Connection, config: Config) -> None:
+    """Base vide (rc.db supprimée) mais copie du catalogue présente : la copie servant de
+    référence au rafraîchissement, le catalogue ne serait jamais réimporté. On l'importe
+    donc une fois au démarrage."""
+    copy = catalog_copy(config)
+    if not copy.is_file():
+        return
+    if conn.execute("SELECT EXISTS (SELECT 1 FROM work)").fetchone()[0]:
+        return
+    try:
+        result = parse_catalog(copy.read_text(encoding="utf-8"))
+        _log_warnings(result)
+        aliases_file = config.data_dir / "aliases.txt"
+        aliases = load_aliases(aliases_file) if aliases_file.is_file() else {}
+        report = import_catalog(conn, result, aliases)
+    except Exception as exc:
+        log.warning("base vide : réimport de la copie du catalogue impossible (%s)", exc)
+        return
+    log.info("base vide : catalogue réimporté depuis %s (%d œuvres)", copy, report.added)
+
+
 def _posters_in_thread(db_file: str, assets_dir: Path,
                        indexes: dict[str, dict[str, Path]], failed: set) -> int:
     # Connexion propre au thread : sqlite3 interdit le partage de connexion entre threads.
@@ -343,6 +364,7 @@ def create_app(config: Config, player: Player | None = None,
     # boucle d'événements (uvicorn, TestClient). La connexion n'est utilisée que dans ce
     # dernier ; les threads auxiliaires ouvrent leur propre connexion.
     conn = open_db(config.data_dir / "rc.db", check_same_thread=False)
+    restore_from_copy(conn, config)
     bus = EventBus()
     tv = TvController(bus)
     if player is None:
