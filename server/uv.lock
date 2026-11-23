@@ -643,6 +643,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "ifaddr" },
     { name = "pillow" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "zeroconf" },
@@ -658,6 +659,7 @@ dev = [
 requires-dist = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "ifaddr" },
     { name = "pillow" },
     { name = "uvicorn", extras = ["standard"] },
     { name = "zeroconf" },

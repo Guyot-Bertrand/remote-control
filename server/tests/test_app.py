@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import shutil
@@ -6,13 +7,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from rc.app import create_app, refresh_once
+from rc import app as app_mod
+from rc.app import create_app, mdns_announce, refresh_once
 from rc.catalog.parser import parse_catalog
 from rc.config import Config
 from rc.db import current_revision
 from rc.fake_tree import make_fake_tree
 
-from test_session import FakePlayer
+from fake_player import FakePlayer
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
 
@@ -119,3 +121,139 @@ def test_tv_static_served(tmp_path):
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/html")
         assert client.get("/api/info").json()["name"] == "Remote-Control"
+    with pytest.raises(Exception):  # connexion fermée à l'arrêt
+        app.state.rc.conn.execute("SELECT 1")
+
+
+class Clock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+def deep_key(name: str) -> str:
+    return f"films/{name}"
+
+
+async def test_full_reindex_every_interval(setup):
+    state, disk = setup
+    state.clock = clock = Clock()
+    (disk / "films").mkdir()
+    await refresh_once(state)
+    (disk / "films" / "nouveau.mkv").touch()  # la racine du disque ne change pas
+    clock.t += 599
+    await refresh_once(state)
+    assert deep_key("nouveau.mkv") not in state.indexes["DISK1"]
+    clock.t += 1
+    await refresh_once(state)
+    assert deep_key("nouveau.mkv") in state.indexes["DISK1"]
+
+
+async def test_reindex_after_import(setup, tmp_path):
+    state, disk = setup
+    state.clock = Clock()
+    src = tmp_path / "ailleurs" / "medias.txt"
+    src.parent.mkdir()
+    state.config.catalog_path = src
+    (disk / "films").mkdir()
+    await refresh_once(state)
+    (disk / "films" / "nouveau.mkv").touch()
+    shutil.copy2(FIXTURE, src)
+    await refresh_once(state)
+    assert deep_key("nouveau.mkv") not in state.indexes["DISK1"]
+    await refresh_once(state)  # import : réindexation complète dans le même tour
+    assert works(state) > 0
+    assert deep_key("nouveau.mkv") in state.indexes["DISK1"]
+
+
+async def test_undecodable_catalog_refused_once(setup, caplog):
+    state, disk = setup
+    await import_now(state, disk)
+    before = works(state)
+    f = disk / "medias.txt"
+    f.write_bytes(b"MN ; \xff\xfe illisible\n")
+    os.utime(f, (1_700_000_900, 1_700_000_900))
+    with caplog.at_level(logging.WARNING, logger="rc.app"):
+        for _ in range(4):
+            await refresh_once(state)
+    warnings = [r for r in caplog.records if "illisible" in r.getMessage()]
+    assert len(warnings) == 1
+    assert works(state) == before
+    assert not (state.config.data_dir / "catalog" / "medias.tmp").exists()
+    copy = state.config.data_dir / "catalog" / "medias.txt"
+    assert copy.read_text(encoding="utf-8") == FIXTURE.read_text(encoding="utf-8")
+
+
+async def test_catalog_changed_during_copy_skipped(setup, monkeypatch):
+    state, disk = setup
+    real_copy = app_mod._copy
+
+    def racing_copy(src, tmp):
+        real_copy(src, tmp)
+        return (0, 0)  # la copie ne correspond plus à l'observation stable
+
+    monkeypatch.setattr(app_mod, "_copy", racing_copy)
+    shutil.copy2(FIXTURE, disk / "medias.txt")
+    await refresh_once(state)
+    await refresh_once(state)
+    assert works(state) == 0
+    assert not (state.config.data_dir / "catalog" / "medias.tmp").exists()
+    monkeypatch.setattr(app_mod, "_copy", real_copy)
+    await refresh_once(state)  # pas marqué comme refusé : nouvel essai
+    assert works(state) > 0
+
+
+class FakeZeroconf:
+    def __init__(self):
+        self.calls = []
+
+    async def _done(self, name):
+        await asyncio.sleep(0)
+        self.calls.append(name)
+
+    async def async_register_service(self, info):
+        self.calls.append(("register", info.type, info.name, info.port, info.properties))
+        return asyncio.ensure_future(self._done("registered"))
+
+    async def async_unregister_service(self, info):
+        return asyncio.ensure_future(self._done("unregistered"))
+
+    async def async_close(self):
+        self.calls.append("closed")
+
+
+async def test_mdns_register_and_unregister_awaited():
+    zc = FakeZeroconf()
+    task = asyncio.create_task(mdns_announce(8765, zeroconf_factory=lambda: zc,
+                                             addresses=lambda: [bytes([192, 168, 1, 23])]))
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert zc.calls == [("register", "_rc._tcp.local.", "Remote-Control._rc._tcp.local.",
+                         8765, {b"api": b"1"}), "registered"]
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert zc.calls[2:] == ["unregistered", "closed"]
+
+
+async def test_mdns_failure_logged(caplog):
+    def broken():
+        raise OSError("pas de réseau")
+
+    with caplog.at_level(logging.ERROR, logger="rc.app"):
+        await mdns_announce(8765, zeroconf_factory=broken, addresses=lambda: [])
+    assert any("mDNS" in r.getMessage() for r in caplog.records)
+
+
+def test_local_addresses_skip_bridges(monkeypatch):
+    import ifaddr
+
+    def adapter(name, *ips):
+        return ifaddr.Adapter(name, name, [ifaddr.IP(ip, 24, name) for ip in ips])
+
+    monkeypatch.setattr(ifaddr, "get_adapters", lambda: [
+        adapter("lo", "127.0.0.1"), adapter("wlp0s20f3", "192.168.1.23", ("fe80::1", 0, 3)),
+        adapter("docker0", "172.17.0.1"), adapter("br-4d8f", "172.23.0.1"),
+        adapter("veth12", "10.0.0.2"), adapter("virbr0", "192.168.122.1")])
+    assert app_mod.local_addresses() == [bytes([192, 168, 1, 23])]

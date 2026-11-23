@@ -21,7 +21,7 @@ from rc.probe import MediaTracks, Track, cached_tracks
 from rc.volumes import Volume, build_index, locate_files
 
 from test_probe import fake_runner
-from test_session import FakePlayer
+from fake_player import FakePlayer
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
 AVA_SYNOPSIS = "MP ; Ava, 13 ans, est en vacances au bord de l'océan..."
@@ -359,3 +359,40 @@ def test_ws_unexpected_error_is_logged_and_closes(env, caplog, monkeypatch):
     assert exc.value.code == 1011
     assert any(r.exc_info and "état illisible" in str(r.exc_info[1]) for r in caplog.records)
     assert env.playback.bus.subscriber_count == 0
+
+
+FORBIDDEN = {"error": "forbidden", "volume_label": None}
+
+
+def test_post_foreign_origin_refused(env):
+    r = env.client.post("/api/tv/show", json={"screen": "home"},
+                        headers={"Origin": "http://malveillant.example"})
+    assert r.status_code == 403
+    assert r.json() == FORBIDDEN
+    r = env.client.post("/api/tv/show", json={"screen": "home"}, headers={"Origin": "null"})
+    assert r.status_code == 403
+
+
+def test_post_same_origin_or_none_allowed(env):
+    # TestClient envoie Host: testserver ; la page /tv a donc l'origine http://testserver.
+    r = env.client.post("/api/tv/show", json={"screen": "home"},
+                        headers={"Origin": "http://testserver"})
+    assert r.status_code == 200
+    assert env.client.post("/api/tv/show", json={"screen": "home"}).status_code == 200
+    # Lecture seule : pas de vérification.
+    r = env.client.get("/api/info", headers={"Origin": "http://malveillant.example"})
+    assert r.status_code == 200
+
+
+def test_ws_foreign_origin_refused(env):
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with env.client.websocket_connect(
+                "/api/events", headers={"Origin": "http://malveillant.example"}) as ws:
+            ws.receive_json()
+    assert exc.value.code == 1008
+
+
+def test_ws_same_origin_allowed(env):
+    with env.client.websocket_connect("/api/events",
+                                      headers={"Origin": "http://testserver"}) as ws:
+        assert ws.receive_json()["type"] == "hello"

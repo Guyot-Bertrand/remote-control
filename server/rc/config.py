@@ -20,6 +20,7 @@ def _default_scan_roots() -> list[Path]:
 @dataclass
 class Config:
     data_dir: Path = field(default_factory=_default_data_dir)
+    bind_host: str = "0.0.0.0"
     port: int = 8765
     scan_roots: list[Path] = field(default_factory=_default_scan_roots)
     catalog_path: Path | None = None
@@ -27,6 +28,7 @@ class Config:
     mpv_extra_args: list[str] = field(default_factory=list)
     tmdb_api_key: str = ""
     poll_interval: float = 30.0
+    index_refresh_interval: float = 600.0  # réindexation complète des disques (s)
     # Développement : chaque sous-dossier de scan_roots est un disque (UUID = nom).
     dev_dir_volumes: bool = False
     mdns: bool = True

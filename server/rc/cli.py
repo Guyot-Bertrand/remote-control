@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import subprocess
 import sys
 from pathlib import Path
 
@@ -16,7 +18,7 @@ def _serve(args) -> int:
     from rc.app import create_app
 
     config = load_config()
-    uvicorn.run(create_app(config), host="0.0.0.0", port=config.port)
+    uvicorn.run(create_app(config), host=config.bind_host, port=config.port)
     return 0
 
 
@@ -29,7 +31,11 @@ def _import(args) -> int:
     config = load_config()
     src = args.chemin
     if src is None:
-        volumes = list_volumes(config.scan_roots, dev_dir_volumes=config.dev_dir_volumes)
+        try:
+            volumes = list_volumes(config.scan_roots, dev_dir_volumes=config.dev_dir_volumes)
+        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+            print(f"Impossible de lister les disques : {exc}", file=sys.stderr)
+            return 1
         src = find_catalog_source(volumes, config.catalog_path)
     if src is None or not Path(src).is_file():
         print("Catalogue introuvable : aucun medias.txt sur les disques.", file=sys.stderr)
@@ -40,6 +46,9 @@ def _import(args) -> int:
         report = import_file(conn, config, Path(src), force=args.force)
     except ImportRefused as exc:
         print(f"Import refusé : {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:  # dont UnicodeDecodeError
+        print(f"Catalogue illisible : {exc}", file=sys.stderr)
         return 1
     finally:
         conn.close()

@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]",
     "pillow",
     "zeroconf",
+    "ifaddr",
     "httpx",
 ]
 
