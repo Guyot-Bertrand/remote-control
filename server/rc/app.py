@@ -44,6 +44,7 @@ SERVICE_NAME = "Remote-Control._rc._tcp.local."
 DEFAULT_TV_UI = Path(rc.__file__).resolve().parents[2] / "tv-ui"
 
 Stat = tuple[int, int]  # (taille, mtime en ns)
+LOGGED_DETAILS = 20  # avertissements et orphelins détaillés dans le journal
 SKIPPED_INTERFACES = ("lo", "docker", "br-", "veth", "virbr")
 
 
@@ -98,9 +99,27 @@ def _parse_copy(tmp: Path) -> ParseResult:
         raise
 
 
+def _log_warnings(result: ParseResult) -> None:
+    if not result.warnings:
+        return
+    log.warning("catalogue : %d avertissement(s) d'analyse", len(result.warnings))
+    for w in result.warnings[:LOGGED_DETAILS]:
+        log.warning("catalogue : %s", w)
+
+
+def _log_orphans(report: ImportReport) -> None:
+    for type_, key in report.removed[:LOGGED_DETAILS]:
+        log.warning("identifiant orphelin — ajouter un alias ? %s ; %s", type_, key)
+    if len(report.removed) > LOGGED_DETAILS:
+        log.warning("… et %d autre(s) identifiant(s) orphelin(s)",
+                    len(report.removed) - LOGGED_DETAILS)
+
+
 def _run_import(conn: sqlite3.Connection, config: Config, tmp: Path, result: ParseResult,
                 force: bool) -> ImportReport:
-    """Importe ; en cas de succès seulement, la copie temporaire remplace l'ancienne."""
+    """Importe ; en cas de succès seulement, la copie temporaire remplace l'ancienne.
+    Commun au rafraîchissement et à `rc import` : avertissements et orphelins journalisés."""
+    _log_warnings(result)
     aliases_file = config.data_dir / "aliases.txt"
     aliases = load_aliases(aliases_file) if aliases_file.is_file() else {}
     try:
@@ -109,6 +128,7 @@ def _run_import(conn: sqlite3.Connection, config: Config, tmp: Path, result: Par
         tmp.unlink(missing_ok=True)
         raise
     os.replace(tmp, catalog_copy(config))  # copie atomique
+    _log_orphans(report)
     return report
 
 

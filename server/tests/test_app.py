@@ -354,3 +354,39 @@ async def test_tmdb_failure_does_not_block_publish(setup, monkeypatch):
     state.bus.publish = events.append
     await import_now(state, disk)
     assert any(e["type"] == "catalog" for e in events)
+
+
+BAD_LINES = "".join(f"ZZ ; bizarre {i}\n" for i in range(25))
+
+
+async def test_refresh_logs_parse_warnings_and_orphans(setup, caplog):
+    state, disk = setup
+    await import_now(state, disk)
+    text = FIXTURE.read_text(encoding="utf-8")
+    start = text.index("MN ; film ; Ava [2017]")
+    end = text.index("MN ;", start + 1)
+    put_catalog(disk, text[:start] + text[end:] + BAD_LINES, 1_700_000_700)
+    with caplog.at_level(logging.INFO, logger="rc.app"):
+        caplog.clear()
+        await refresh_once(state)
+        await refresh_once(state)
+    messages = [r.getMessage() for r in caplog.records if r.name == "rc.app"]
+    expected = len(parse_catalog(text[:start] + text[end:] + BAD_LINES).warnings)
+    assert expected > 20
+    summary = [m for m in messages if "avertissement" in m]
+    assert summary and f"{expected} avertissement" in summary[0]
+    details = [m for m in messages if "code inconnu ZZ" in m]
+    assert len(details) == 20
+    orphans = [m for m in messages if "identifiant orphelin" in m]
+    assert orphans == ["identifiant orphelin — ajouter un alias ? film ; Ava [2017]"]
+
+
+def test_cli_import_logs_parse_warnings(setup, tmp_path, caplog):
+    state, _ = setup
+    src = tmp_path / "medias.txt"
+    text = FIXTURE.read_text(encoding="utf-8") + BAD_LINES
+    src.write_text(text, encoding="utf-8")
+    expected = len(parse_catalog(text).warnings)
+    with caplog.at_level(logging.WARNING, logger="rc.app"):
+        app_mod.import_file(state.conn, state.config, src)
+    assert any(f"{expected} avertissement" in r.getMessage() for r in caplog.records)

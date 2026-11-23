@@ -213,3 +213,31 @@ def test_removed_season_tombstoned(conn):
     assert ("episode", ep) in kinds
     assert sum(k == "media_file" for k, _ in kinds) == 1
     assert list(season_ids(conn, btl_id)) == [1]
+
+
+def test_report_lists_removed_identities(conn):
+    import_catalog(conn, parse(), {})
+    result = parse()
+    result.works = [w for w in result.works if w.key != "Ava [2017]"]
+    report = import_catalog(conn, result, {})
+    assert report.removed == [("film", "Ava [2017]")]
+    assert import_catalog(conn, parse(), {}).removed == []
+
+
+def test_identities_read_inside_immediate_transaction(conn):
+    statements = []
+    conn.set_trace_callback(statements.append)
+    import_catalog(conn, parse(), {})
+    conn.set_trace_callback(None)
+    begin = statements.index("BEGIN IMMEDIATE")
+    reads = [i for i, st in enumerate(statements) if "FROM work_identity" in st]
+    assert reads and begin < reads[0]
+
+
+def test_refused_import_leaves_no_open_transaction(conn):
+    import_catalog(conn, parse(), {})
+    result = parse()
+    result.works = []
+    with pytest.raises(ImportRefused):
+        import_catalog(conn, result, {})
+    assert not conn.in_transaction

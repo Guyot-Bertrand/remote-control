@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from rc.catalog.model import ParsedWork, ParseResult, VideoFile
@@ -23,6 +23,7 @@ class ImportReport:
     updated: int
     deleted: int
     revision: int
+    removed: list[tuple[str, str]] = field(default_factory=list)  # (type, clé) disparus
 
 
 def load_aliases(path: Path) -> dict[str, str]:
@@ -265,6 +266,20 @@ def _sync_collections(conn, result: ParseResult, rev: int) -> tuple[dict[str, in
 
 def import_catalog(conn: sqlite3.Connection, result: ParseResult,
                    aliases: dict[str, str], force: bool = False) -> ImportReport:
+    # Verrou d'écriture pris avant toute lecture : les identités et le contenu lus
+    # ne peuvent pas changer d'ici au COMMIT.
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        report = _import_locked(conn, result, aliases, force)
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    return report
+
+
+def _import_locked(conn: sqlite3.Connection, result: ParseResult,
+                   aliases: dict[str, str], force: bool) -> ImportReport:
     identities = {(r["type"], r["key"]): r["id"]
                   for r in conn.execute("SELECT id, type, key FROM work_identity")}
     sources: dict[str, list[str]] = {}
@@ -284,8 +299,8 @@ def import_catalog(conn: sqlite3.Connection, result: ParseResult,
         seen.add(marker)
         resolved.append((id_, w))
 
-    existing = {r["id"]: r["content_hash"]
-                for r in conn.execute("SELECT id, content_hash FROM work")}
+    existing = {r["id"]: (r["content_hash"], r["type"], r["key"])
+                for r in conn.execute("SELECT id, content_hash, type, key FROM work")}
     kept = {id_ for id_, _ in resolved if id_ is not None}
     removed = [i for i in existing if i not in kept]
     if not result.works and existing:
@@ -296,33 +311,28 @@ def import_catalog(conn: sqlite3.Connection, result: ParseResult,
     revision = current_revision(conn)
     rev = revision + 1
     added = updated = 0
-    conn.execute("BEGIN")
-    try:
-        collection_ids, changed = _sync_collections(conn, result, rev)
-        for id_, w in resolved:
-            p = _payload(w)
-            content_hash = hashlib.sha256(_dumps(p).encode("utf-8")).hexdigest()
-            if id_ is None:
-                id_ = _identity(conn, "work_identity", ("type", "key"), (w.type, w.key))
-            if id_ not in existing:
-                added += 1
-            elif existing[id_] != content_hash:
-                updated += 1
-            else:
-                continue
-            _write_work(conn, id_, p, content_hash, collection_ids, rev)
-        for work_id in removed:
-            for (sid,) in conn.execute(
-                    "SELECT id FROM season WHERE work_id = ?", (work_id,)).fetchall():
-                _remove_season(conn, sid, rev)
-                _bury(conn, "season", [sid], rev)
-            _bury_files(conn, "work_id = ?", (work_id,), rev)
-            _bury(conn, "work", [work_id], rev)
-            conn.execute("DELETE FROM work WHERE id = ?", (work_id,))
-        if changed or added or updated or removed:
-            revision = next_revision(conn)
-        conn.execute("COMMIT")
-    except BaseException:
-        conn.execute("ROLLBACK")
-        raise
-    return ImportReport(added, updated, len(removed), revision)
+    collection_ids, changed = _sync_collections(conn, result, rev)
+    for id_, w in resolved:
+        p = _payload(w)
+        content_hash = hashlib.sha256(_dumps(p).encode("utf-8")).hexdigest()
+        if id_ is None:
+            id_ = _identity(conn, "work_identity", ("type", "key"), (w.type, w.key))
+        if id_ not in existing:
+            added += 1
+        elif existing[id_][0] != content_hash:
+            updated += 1
+        else:
+            continue
+        _write_work(conn, id_, p, content_hash, collection_ids, rev)
+    for work_id in removed:
+        for (sid,) in conn.execute(
+                "SELECT id FROM season WHERE work_id = ?", (work_id,)).fetchall():
+            _remove_season(conn, sid, rev)
+            _bury(conn, "season", [sid], rev)
+        _bury_files(conn, "work_id = ?", (work_id,), rev)
+        _bury(conn, "work", [work_id], rev)
+        conn.execute("DELETE FROM work WHERE id = ?", (work_id,))
+    if changed or added or updated or removed:
+        revision = next_revision(conn)
+    return ImportReport(added, updated, len(removed), revision,
+                        [existing[i][1:] for i in removed])
