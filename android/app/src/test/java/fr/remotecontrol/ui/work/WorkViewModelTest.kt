@@ -12,13 +12,14 @@ import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
+import fr.remotecontrol.testing.collectNow
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.NavEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,28 +111,81 @@ class WorkViewModelTest {
     @Test fun play_success_navigates_to_remote() = runBlocking {
         val vm = viewModel(1)
         vm.await()
+        val nav = collectNow(vm.events)
         vm.playFromStart()
-        assertEquals(NavEvent.ToRemote, withTimeout(5_000) { vm.events.first() })
+        assertEquals(listOf(NavEvent.ToRemote), nav.items)
         assertTrue(api.calls.contains("play(${PlayRequestDto("work", 1, "start")})"))
+        nav.stop()
     }
 
     @Test fun resume_sends_resume_without_tracks() = runBlocking {
         val vm = viewModel(1)
         vm.await()
+        val nav = collectNow(vm.events)
         vm.resume()
-        assertEquals(NavEvent.ToRemote, withTimeout(5_000) { vm.events.first() })
+        assertEquals(listOf(NavEvent.ToRemote), nav.items)
         assertTrue(api.calls.contains("play(${PlayRequestDto("work", 1, "resume")})"))
+        nav.stop()
+    }
+
+    @Test fun double_tap_launches_once() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        api.playGate = gate
+        val vm = viewModel(1)
+        vm.await()
+        val nav = collectNow(vm.events)
+        vm.playFromStart()
+        vm.playFromStart()
+        vm.resume()
+        assertTrue(vm.await { it.launching }.launching)
+        assertEquals(1, api.calls.count { it.startsWith("play(") })
+        gate.complete(Unit)
+        assertFalse(vm.await { !it.launching }.launching)
+        assertEquals(listOf(NavEvent.ToRemote), nav.items)
+        nav.stop()
+    }
+
+    @Test fun nav_event_without_listener_is_not_replayed() = runBlocking {
+        val vm = viewModel(1)
+        vm.await()
+        vm.playFromStart() // l'écran n'écoute pas (parti ailleurs) : l'événement est perdu
+        val nav = collectNow(vm.events)
+        assertEquals(emptyList<NavEvent>(), nav.items)
+        assertEquals(1, api.calls.count { it.startsWith("play(") })
+        nav.stop()
     }
 
     @Test fun play_error_shows_message() = runBlocking {
         api.playResult = ApiResult.Err(ApiError.Server("volume_absent", "DISK1"))
         val vm = viewModel(1)
         vm.await()
+        val nav = collectNow(vm.events)
         vm.playFromStart()
         assertEquals("Disque « DISK1 » non branché", vm.await { it.message != null }.message)
-        assertNull(withTimeoutOrNull(200) { vm.events.first() })
+        assertEquals(emptyList<NavEvent>(), nav.items)
         vm.clearMessage()
         assertNull(vm.await { it.message == null }.message)
+        nav.stop()
+    }
+
+    @Test fun new_launch_clears_previous_message() = runBlocking {
+        api.playResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = viewModel(1)
+        vm.await()
+        vm.playFromStart()
+        vm.await { it.message != null }
+        val gate = CompletableDeferred<Unit>()
+        api.playGate = gate
+        vm.playFromStart()
+        assertNull(vm.await { it.launching }.message)
+        gate.complete(Unit)
+        assertFalse(vm.await { !it.launching }.launching)
+    }
+
+    @Test fun unknown_work_is_missing() = runBlocking {
+        val vm = viewModel(99)
+        assertTrue(withTimeout(5_000) { vm.missing.first { it } })
+        assertNull(vm.state.value)
     }
 
     @Test fun series_lists_seasons_no_play() = runBlocking {

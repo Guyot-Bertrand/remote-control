@@ -12,7 +12,6 @@ import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.Availability
 import fr.remotecontrol.player.PlayLauncher
-import fr.remotecontrol.player.PlayOutcome
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.player.TargetKind
@@ -20,15 +19,15 @@ import fr.remotecontrol.player.availabilityOf
 import fr.remotecontrol.player.label
 import fr.remotecontrol.player.sortVersions
 import fr.remotecontrol.ui.common.NavEvent
+import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.formatDuration
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,6 +37,7 @@ data class VersionUi(val mediaFileId: Long, val label: String, val present: Bool
  * [canPlay] : œuvre non épisodique dont au moins un fichier est présent.
  * [resumeProgress] : avancement de la reprise (barre du bouton « Reprendre »), nul sans reprise.
  * [onTv] : la télé affiche cette fiche (faux hors ligne ou pendant une lecture).
+ * [launching] : une demande de lecture est en cours (boutons désactivés).
  */
 data class WorkUi(
     val work: WorkEntity,
@@ -53,6 +53,7 @@ data class WorkUi(
     val availability: Availability? = null,
     val resumeProgress: Float? = null,
     val onTv: Boolean = false,
+    val launching: Boolean = false,
 )
 
 private data class Catalog(
@@ -67,12 +68,13 @@ class WorkViewModel(
     private val workId: Long,
     dao: CatalogDao,
     private val api: RcApi,
-    private val launcher: PlayLauncher,
+    launcher: PlayLauncher,
 ) : ViewModel() {
-    private val message = MutableStateFlow<String?>(null)
+    private val playAction = PlayAction(viewModelScope, launcher)
     private val onTv = MutableStateFlow(false)
-    private val navEvents = Channel<NavEvent>(Channel.BUFFERED)
-    val events: Flow<NavEvent> = navEvents.receiveAsFlow()
+
+    /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
+    val events: Flow<NavEvent> = playAction.events
 
     private val catalog: Flow<Catalog> = combine(
         dao.work(workId),
@@ -83,8 +85,13 @@ class WorkViewModel(
         ::Catalog,
     )
 
-    val state: StateFlow<WorkUi?> = combine(catalog, message, onTv) { c, msg, tv -> c.work?.let { toUi(c, it, msg, tv) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val state: StateFlow<WorkUi?> = combine(catalog, playAction.message, onTv, playAction.launching) { c, msg, tv, busy ->
+        c.work?.let { toUi(c, it, msg, tv).copy(launching = busy) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** La base a répondu sans cette œuvre (supprimée, ou QR-code périmé). */
+    val missing: StateFlow<Boolean> = catalog.map { it.work == null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         // Une seule fois par ouverture de fiche ; hors ligne, l'échec est ignoré (la navigation reste possible).
@@ -99,17 +106,10 @@ class WorkViewModel(
     fun resume() = launch(StartMode.Resume)
 
     fun clearMessage() {
-        message.value = null
+        playAction.message.value = null
     }
 
-    private fun launch(mode: StartMode) {
-        viewModelScope.launch {
-            when (val outcome = launcher.launch(PlayTarget(TargetKind.Work, workId), mode)) {
-                PlayOutcome.Started -> navEvents.send(NavEvent.ToRemote)
-                is PlayOutcome.Failed -> message.value = outcome.message
-            }
-        }
-    }
+    private fun launch(mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Work, workId), mode)
 
     private fun toUi(c: Catalog, work: WorkEntity, msg: String?, tv: Boolean): WorkUi {
         // Une œuvre épisodique n'a pas de fichier propre : sa disponibilité se lit épisode par épisode.

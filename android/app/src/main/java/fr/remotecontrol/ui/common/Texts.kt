@@ -93,6 +93,8 @@ object Texts {
     const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
     const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
     const val retry = "Réessayer"
+    const val workNotFound = "Œuvre introuvable."
+    const val seasonNotFound = "Saison introuvable."
     const val dismiss = "Fermer"
     const val inProgress = "En cours"
     const val showMore = "Afficher plus"
@@ -110,6 +112,8 @@ object Texts {
     fun genres(list: List<String>) = list.joinToString(", ") { g -> g.replaceFirstChar { it.titlecase(Locale.FRENCH) } }
     /** Libellé accessible d'un bouton d'épisode : « Reprendre S01E02 ». */
     fun episodeAction(action: String, episode: String) = "$action $episode"
+    fun directorsDescription(names: List<String>) = "$directors : ${names.joinToString(", ")}"
+    fun versionDescription(label: String, absent: String) = "$label, $absent"
     fun alsoKnownAs(title: String) = "Aussi : $title"
     fun seasonCount(count: Int) = if (count == 1) "1 saison" else "$count saisons"
     fun episodesSummary(count: Int, watched: Int) =

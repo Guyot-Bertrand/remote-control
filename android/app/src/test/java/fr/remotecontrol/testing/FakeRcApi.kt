@@ -41,7 +41,14 @@ class FakeRcApi : RcApi {
 
     override suspend fun tracks(mediaFileId: Long) = tracksResult.also { calls += "tracks($mediaFileId)" }
     override suspend fun tvShow(screen: String, id: Long?) = tvShowResult.also { calls += "tvShow($screen,$id)" }
-    override suspend fun play(request: PlayRequestDto) = playResult.also { calls += "play($request)" }
+    /** When set, play() records its call, then waits for this gate before answering. */
+    var playGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun play(request: PlayRequestDto): ApiResult<Unit> {
+        calls += "play($request)"
+        playGate?.await()
+        return playResult
+    }
     override suspend fun pause(paused: Boolean) = pauseResult.also { calls += "pause($paused)" }
     override suspend fun seek(seconds: Double, relative: Boolean) =
         seekResult.also { calls += "seek($seconds,$relative)" }

@@ -50,6 +50,7 @@ import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.ui.common.MessageBanner
+import fr.remotecontrol.ui.common.NotFound
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
@@ -61,8 +62,8 @@ import fr.remotecontrol.ui.theme.Fraunces
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
 
-/** Éléments placés avant les épisodes dans la liste (en-tête, sélecteur, résumé, message). */
-private const val HEADER_ITEMS = 4
+/** Clés des éléments placés avant les épisodes ; l'index d'un épisode s'en déduit. */
+private val HEADER_KEYS = listOf("header", "selector", "summary", "message")
 
 /**
  * Maquette « Fiche saison » : en-tête de la série, sélecteur de saison, puis les épisodes ; l'épisode mis en
@@ -72,6 +73,7 @@ private const val HEADER_ITEMS = 4
 @Composable
 fun SeasonScreen(
     state: SeasonUi?,
+    missing: Boolean,
     server: ServerState,
     onPlay: (Long, StartMode) -> Unit,
     onPrePlay: (Long, StartMode) -> Unit,
@@ -81,26 +83,34 @@ fun SeasonScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(title = null, server = server, onBack = onBack)
-        if (state == null) return@Column
+        if (state == null) {
+            if (missing) NotFound(Texts.seasonNotFound)
+            return@Column
+        }
         val list = rememberLazyListState()
         var scrolled by rememberSaveable(state.season.id) { mutableStateOf(false) }
         val highlight = state.episodes.indexOfFirst { it.highlighted }
         LaunchedEffect(state.season.id, highlight) {
             if (!scrolled && highlight >= 0) {
-                list.scrollToItem(HEADER_ITEMS + highlight)
+                list.scrollToItem(HEADER_KEYS.size + highlight)
                 scrolled = true
             }
         }
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
-            item(key = "header") { SeriesHeader(state) }
-            item(key = "selector") { SeasonSelector(state.seasons, state.season.id, onOpenSeason) }
-            item(key = "summary") { Summary(state) }
-            item(key = "message") {
-                state.message?.let { MessageBanner(it, onDismissMessage, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            items(HEADER_KEYS, key = { it }) { key ->
+                when (key) {
+                    "header" -> SeriesHeader(state)
+                    "selector" -> SeasonSelector(state.seasons, state.season.id, onOpenSeason)
+                    "summary" -> Summary(state)
+                    "message" -> state.message?.let {
+                        MessageBanner(it, onDismissMessage, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
+                }
             }
             items(state.episodes, key = { it.id }) { episode ->
                 Box(Modifier.padding(horizontal = 8.dp)) {
-                    if (episode.highlighted) HighlightedEpisode(episode, onPlay) else EpisodeLine(episode, onPlay)
+                    val enabled = episode.playable && !state.launching
+                    if (episode.highlighted) HighlightedEpisode(episode, enabled, onPlay) else EpisodeLine(episode, enabled, onPlay)
                 }
             }
         }
@@ -201,7 +211,7 @@ private fun Summary(state: SeasonUi) {
 
 /** Ligne d'épisode (64 dp, filet bas) : vu (coche), « Reprendre » si entamé, « Depuis le début ». */
 @Composable
-private fun EpisodeLine(episode: EpisodeUi, onPlay: (Long, StartMode) -> Unit) {
+private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -230,11 +240,11 @@ private fun EpisodeLine(episode: EpisodeUi, onPlay: (Long, StartMode) -> Unit) {
             Icon(RcIcons.Check, contentDescription = null, tint = RcColors.seen, modifier = Modifier.size(22.dp))
         }
         if (episode.canResume) {
-            IconButton(onClick = { onPlay(episode.id, StartMode.Resume) }, enabled = episode.playable) {
+            IconButton(onClick = { onPlay(episode.id, StartMode.Resume) }, enabled = enabled) {
                 Icon(RcIcons.Resume, contentDescription = Texts.episodeAction(Texts.resume, episode.label), tint = RcColors.accentStrong)
             }
         }
-        IconButton(onClick = { onPlay(episode.id, StartMode.Start) }, enabled = episode.playable) {
+        IconButton(onClick = { onPlay(episode.id, StartMode.Start) }, enabled = enabled) {
             Icon(RcIcons.Play, contentDescription = Texts.episodeAction(Texts.fromStart, episode.label), tint = RcColors.text)
         }
     }
@@ -242,7 +252,7 @@ private fun EpisodeLine(episode: EpisodeUi, onPlay: (Long, StartMode) -> Unit) {
 
 /** Épisode mis en évidence : carte laiton doux, badge « En cours », barre d'avancement et boutons. */
 @Composable
-private fun HighlightedEpisode(episode: EpisodeUi, onPlay: (Long, StartMode) -> Unit) {
+private fun HighlightedEpisode(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit) {
     Column(
         Modifier
             .padding(vertical = 6.dp)
@@ -281,16 +291,16 @@ private fun HighlightedEpisode(episode: EpisodeUi, onPlay: (Long, StartMode) -> 
             if (episode.canResume) {
                 PillButton(
                     Texts.resume, RcIcons.Play, { onPlay(episode.id, StartMode.Resume) },
-                    Modifier.weight(1.3f), enabled = episode.playable, height = 48.dp,
+                    Modifier.weight(1.3f), enabled = enabled, height = 48.dp,
                 )
                 PillButton(
                     Texts.fromStart, RcIcons.FromStart, { onPlay(episode.id, StartMode.Start) },
-                    Modifier.weight(1f), tone = Tone.Outlined, enabled = episode.playable, height = 48.dp,
+                    Modifier.weight(1f), tone = Tone.Outlined, enabled = enabled, height = 48.dp,
                 )
             } else {
                 PillButton(
                     Texts.fromStart, RcIcons.Play, { onPlay(episode.id, StartMode.Start) },
-                    Modifier.fillMaxWidth(), enabled = episode.playable, height = 48.dp,
+                    Modifier.fillMaxWidth(), enabled = enabled, height = 48.dp,
                 )
             }
         }

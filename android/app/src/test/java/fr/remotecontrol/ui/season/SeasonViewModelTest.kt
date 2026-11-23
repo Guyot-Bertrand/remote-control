@@ -13,8 +13,10 @@ import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
+import fr.remotecontrol.testing.collectNow
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.NavEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -78,9 +80,32 @@ class SeasonViewModelTest {
     @Test fun play_episode_resume() = runBlocking {
         val vm = viewModel(1)
         vm.await()
+        val nav = collectNow(vm.events)
         vm.play(2, StartMode.Resume)
-        assertEquals(NavEvent.ToRemote, withTimeout(5_000) { vm.events.first() })
+        assertEquals(listOf(NavEvent.ToRemote), nav.items)
         assertTrue(api.calls.contains("play(${PlayRequestDto("episode", 2, "resume")})"))
+        nav.stop()
+    }
+
+    @Test fun double_tap_launches_once() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        api.playGate = gate
+        val vm = viewModel(1)
+        vm.await()
+        val nav = collectNow(vm.events)
+        vm.play(2, StartMode.Resume)
+        vm.play(1, StartMode.Start)
+        assertTrue(vm.await { it.launching }.launching)
+        assertEquals(1, api.calls.count { it.startsWith("play(") })
+        gate.complete(Unit)
+        vm.await { !it.launching }
+        assertEquals(listOf(NavEvent.ToRemote), nav.items)
+        nav.stop()
+    }
+
+    @Test fun unknown_season_is_missing() = runBlocking {
+        val vm = viewModel(99)
+        assertTrue(withTimeout(5_000) { vm.missing.first { it } })
     }
 
     @Test fun play_error_shows_message() = runBlocking {

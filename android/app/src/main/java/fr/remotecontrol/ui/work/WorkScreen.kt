@@ -41,6 +41,7 @@ import fr.remotecontrol.player.Availability
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.NoticeCard
+import fr.remotecontrol.ui.common.NotFound
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
@@ -66,6 +67,7 @@ private const val LONG_TITLE = 24
 @Composable
 fun WorkScreen(
     state: WorkUi?,
+    missing: Boolean,
     server: ServerState,
     onPlayFromStart: () -> Unit,
     onResume: () -> Unit,
@@ -77,7 +79,10 @@ fun WorkScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(title = null, server = server, onBack = onBack)
-        if (state == null) return@Column
+        if (state == null) {
+            if (missing) NotFound(Texts.workNotFound)
+            return@Column
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -133,7 +138,7 @@ private fun Identity(state: WorkUi) {
                     work.directors.joinToString(", "),
                     style = body14,
                     color = RcColors.text2,
-                    modifier = Modifier.semantics { contentDescription = "${Texts.directors} : ${work.directors.joinToString(", ")}" },
+                    modifier = Modifier.semantics { contentDescription = Texts.directorsDescription(work.directors) },
                 )
             }
             if (work.genres.isNotEmpty()) {
@@ -146,9 +151,15 @@ private fun Identity(state: WorkUi) {
 @Composable
 private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PillButton(Texts.playFromStart, RcIcons.Play, onPlayFromStart, Modifier.fillMaxWidth(), enabled = state.canPlay)
+        PillButton(
+            Texts.playFromStart, RcIcons.Play, onPlayFromStart, Modifier.fillMaxWidth(),
+            enabled = state.canPlay && !state.launching,
+        )
         if (state.canPlay && state.resumeLabel != null) {
-            PillButton(state.resumeLabel, RcIcons.Resume, onResume, Modifier.fillMaxWidth(), tone = Tone.Soft, progress = state.resumeProgress)
+            PillButton(
+                state.resumeLabel, RcIcons.Resume, onResume, Modifier.fillMaxWidth(),
+                tone = Tone.Soft, enabled = !state.launching, progress = state.resumeProgress,
+            )
         }
         when (val a = state.availability) {
             is Availability.VolumeAbsent -> NoticeCard(
@@ -157,7 +168,7 @@ private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: ()
                 body = Texts.volumeAbsentHelp,
                 warn = true,
                 // Le serveur sait si le disque vient d'être branché : on retente la lecture.
-                action = Texts.retry,
+                action = Texts.retry.takeIf { !state.launching },
                 onAction = onPlayFromStart,
             )
             Availability.NotDigitized -> NoticeCard(RcIcons.Disc, Texts.notDigitized, Texts.notDigitizedHelp, warn = false)
@@ -234,7 +245,7 @@ private fun Versions(state: WorkUi) {
             QualityPill(
                 v.label,
                 dimmed = !v.present,
-                modifier = if (v.absentLabel != null) Modifier.semantics { contentDescription = "${v.label}, ${v.absentLabel}" } else Modifier,
+                modifier = if (v.absentLabel != null) Modifier.semantics { contentDescription = Texts.versionDescription(v.label, v.absentLabel) } else Modifier,
             )
         }
         Spacer(Modifier.weight(1f))

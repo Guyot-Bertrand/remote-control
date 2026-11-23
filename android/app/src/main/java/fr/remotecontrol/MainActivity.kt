@@ -181,10 +181,12 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             val id = entry.toRoute<WorkRoute>().id
             val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher) }
             val state by vm.state.collectAsStateWithLifecycle()
+            val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.events.collect(nav::onNavEvent) }
             WorkScreen(
                 state = state,
+                missing = missing,
                 server = server,
                 onPlayFromStart = vm::playFromStart,
                 onResume = vm::resume,
@@ -199,10 +201,12 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             val id = entry.toRoute<SeasonRoute>().id
             val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher) }
             val state by vm.state.collectAsStateWithLifecycle()
+            val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
             LaunchedEffect(vm) { vm.events.collect(nav::onNavEvent) }
             SeasonScreen(
                 state = state,
+                missing = missing,
                 server = server,
                 onPlay = vm::play,
                 onPrePlay = { _, _ -> },
@@ -219,7 +223,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
 }
 
 private fun NavController.onNavEvent(event: NavEvent) = when (event) {
-    NavEvent.ToRemote -> navigate(RemoteRoute)
+    NavEvent.ToRemote -> navigate(RemoteRoute) { launchSingleTop = true }
     is NavEvent.ToWork -> navigate(WorkRoute(event.id))
     is NavEvent.ToSeason -> navigate(SeasonRoute(event.id))
 }

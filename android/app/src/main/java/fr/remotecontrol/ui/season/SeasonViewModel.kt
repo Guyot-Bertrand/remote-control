@@ -9,15 +9,14 @@ import fr.remotecontrol.data.db.WorkEntity
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.PlayLauncher
-import fr.remotecontrol.player.PlayOutcome
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.player.TargetKind
 import fr.remotecontrol.player.highlightEpisode
 import fr.remotecontrol.ui.common.NavEvent
+import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,7 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -53,6 +52,7 @@ data class SeasonUi(
     val work: WorkEntity? = null,
     val seasons: List<SeasonEntity> = emptyList(),
     val onTv: Boolean = false,
+    val launching: Boolean = false,
 )
 
 private data class Catalog(
@@ -67,12 +67,13 @@ class SeasonViewModel(
     private val seasonId: Long,
     dao: CatalogDao,
     private val api: RcApi,
-    private val launcher: PlayLauncher,
+    launcher: PlayLauncher,
 ) : ViewModel() {
-    private val message = MutableStateFlow<String?>(null)
+    private val playAction = PlayAction(viewModelScope, launcher)
     private val onTv = MutableStateFlow(false)
-    private val navEvents = Channel<NavEvent>(Channel.BUFFERED)
-    val events: Flow<NavEvent> = navEvents.receiveAsFlow()
+
+    /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
+    val events: Flow<NavEvent> = playAction.events
 
     private val catalog: Flow<Catalog?> = dao.season(seasonId).flatMapLatest { season ->
         if (season == null) {
@@ -84,8 +85,13 @@ class SeasonViewModel(
         }
     }
 
-    val state: StateFlow<SeasonUi?> = combine(catalog, message, onTv) { c, msg, tv -> c?.let { toUi(it, msg, tv) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val state: StateFlow<SeasonUi?> = combine(catalog, playAction.message, onTv, playAction.launching) { c, msg, tv, busy ->
+        c?.let { toUi(it, msg, tv).copy(launching = busy) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** La base a répondu sans cette saison. */
+    val missing: StateFlow<Boolean> = dao.season(seasonId).map { it == null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         viewModelScope.launch {
@@ -94,17 +100,10 @@ class SeasonViewModel(
         }
     }
 
-    fun play(episodeId: Long, mode: StartMode) {
-        viewModelScope.launch {
-            when (val outcome = launcher.launch(PlayTarget(TargetKind.Episode, episodeId), mode)) {
-                PlayOutcome.Started -> navEvents.send(NavEvent.ToRemote)
-                is PlayOutcome.Failed -> message.value = outcome.message
-            }
-        }
-    }
+    fun play(episodeId: Long, mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Episode, episodeId), mode)
 
     fun clearMessage() {
-        message.value = null
+        playAction.message.value = null
     }
 
     private fun toUi(c: Catalog, msg: String?, tv: Boolean): SeasonUi {

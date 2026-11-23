@@ -204,3 +204,14 @@ fun MessageBanner(text: String, onDismiss: () -> Unit, modifier: Modifier = Modi
         }
     }
 }
+
+/** Fiche demandée absente du catalogue local (supprimée, ou QR-code périmé). */
+@Composable
+fun NotFound(text: String) {
+    Text(
+        text,
+        style = TextStyle(fontFamily = Inter, fontSize = 15.sp),
+        color = RcColors.text2,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+    )
+}
