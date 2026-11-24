@@ -636,3 +636,12 @@ def test_unexpected_error_gives_json_500_and_logs(env, monkeypatch, caplog):
                         "message": "Erreur interne du serveur."}
     assert any(r.exc_info and "panne imprévue" in str(r.exc_info[1])
                for r in caplog.records)
+
+
+def test_play_same_media_does_not_restart(env):
+    body = {"target_kind": "work", "target_id": 1, "start": "start"}
+    assert env.client.post("/api/play", json=body).json() == {"ok": True}
+    mid = env.client.get("/api/player/state").json()["current"]["media_file_id"]
+    r = env.client.post("/api/play", json={**body, "start": "resume", "media_file_id": mid})
+    assert r.json() == {"ok": True}
+    assert [c[0] for c in env.player.calls] == ["start"]

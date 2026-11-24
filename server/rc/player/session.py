@@ -212,6 +212,15 @@ class PlaybackService:
             await self._play_locked(req)
 
     async def _play_locked(self, req: PlayRequest) -> None:
+        if self._is_current(req):
+            try:
+                await self._rejoin(req)
+                return
+            except PlayError:
+                raise
+            except Exception:  # lecteur figé ou parti : on relance normalement
+                log.warning("reprise de la lecture en cours impossible, relance",
+                            exc_info=True)
         mf = self._choose_version(req)
         path = self._resolve(mf)
         if not self.player_available():
@@ -237,6 +246,36 @@ class PlaybackService:
         self._state = PlayerState(position=start_at, running=True)
         self.tv.set_playing(current["work_id"])
         self._publish()
+
+    def _is_current(self, req: PlayRequest) -> bool:
+        s = self._session
+        return (s is not None and s.current["target_kind"] == req.target_kind
+                and s.current["target_id"] == req.target_id
+                and req.media_file_id in (None, s.current["media_file_id"]))
+
+    async def _rejoin(self, req: PlayRequest) -> None:
+        """Lecture demandée du média déjà en cours : pas de relance du lecteur (la télé
+        ne clignote pas). « start » revient au début, « resume » garde la position ;
+        pistes demandées appliquées (refusées si inconnues), pause levée."""
+        s = self._session
+        assert s is not None
+        if req.audio is not None and not audio_valid(req.audio, s.tracks):
+            raise PlayError("invalid")
+        if req.subtitle is not None and req.subtitle != {"kind": "none"} and not sub_valid(
+                req.subtitle, s.tracks):
+            raise PlayError("invalid")
+        if req.start == "start":
+            await self.player.seek(0, False)
+        if req.audio is not None and req.audio != s.audio:
+            await self.player.set_audio(req.audio)
+            s.audio = req.audio
+        if req.subtitle is not None and req.subtitle != s.subtitle:
+            await self.player.set_subtitle(req.subtitle)
+            s.subtitle = req.subtitle
+        if self._state.paused:
+            await self.player.set_pause(False)
+        if self.tv.state.screen != "playing":
+            self.tv.set_playing(s.current["work_id"])
 
     def _fail_start(self, code: Literal["player", "player_missing"]) -> None:
         self._state = replace(self._state, running=False)
