@@ -172,7 +172,14 @@ Sur reprise : `minimize` → restaurer, plein écran, `pause=no` ; `restart` →
 - Valeurs fines de limitation, dans le respect de § 5.1.
 - Valeur par défaut de `pause_background` après l'essai sur la machine de l'utilisateur.
 
-## 9. Maquettes à produire (Claude Design) — prérequis des écrans
+## 9. Maquettes (Claude Design) — livrées le 2026-11-24
+
+Fichiers dans `docs/design/` : « 4a - Télé, vues miroir », « 4b - Saison, pause, composants », « 4c - Téléphone ». **Ils font foi pour les écrans.** Choix notables du designer :
+- **Zone de l'image en pause : le « coin d'état » en haut à droite**, environ 448 × 252, à la place de l'horloge. Aucune vue n'a besoin d'une seconde mise en page : en pause, le coin montre l'image, l'icône, le titre, le temps et une fine barre de progression.
+- **Repère de position :** grande lettre en laiton (« M · 1 240 / 2 552 ») pour Parcourir, rang (« n° 412 · 408–419 sur 1000 ») pour Collection.
+- Chaque vue est montrée sans et avec la pause, plus le plein écran en pause.
+
+### Brief initial
 
 Un **brief Claude Design** sera rédigé, sur le modèle de `docs/design/brief-claude-design.md` et en réutilisant l'identité existante. Il couvrira :
 - **Les vues télé qui répliquent le téléphone, en horizontal 1920×1080 :** accueil, parcourir (grille centrée sur la position), collection, recherche (sections Personnes / Œuvres / Aussi connu sous), fiche saison avec l'épisode sélectionné, choix des pistes.
