@@ -103,6 +103,7 @@ class SeasonViewModelTest {
         assertEquals("Entamé — 5:00", second.status)
         assertTrue(second.canResume)
         assertEquals(listOf(1L, 2L), ui.seasons.map { it.id })
+        assertEquals(listOf("FHD"), ui.qualities)
     }
 
     @Test fun play_episode_resume() = runBlocking {

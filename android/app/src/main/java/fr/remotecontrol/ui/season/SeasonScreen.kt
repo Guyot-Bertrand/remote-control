@@ -56,6 +56,7 @@ import fr.remotecontrol.ui.common.NotFound
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
+import fr.remotecontrol.ui.common.QualityPill
 import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.ScreenHeader
 import fr.remotecontrol.ui.common.Texts
@@ -147,6 +148,11 @@ private fun SeriesHeader(state: SeasonUi) {
                 if (details.isNotEmpty()) Text(details, style = caption13, color = RcColors.text2)
                 work?.directors?.takeIf { it.isNotEmpty() }?.let {
                     Text(it.joinToString(", "), style = caption13, color = RcColors.text2)
+                }
+                if (state.qualities.isNotEmpty()) {
+                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        state.qualities.forEach { QualityPill(it) }
+                    }
                 }
             }
         }

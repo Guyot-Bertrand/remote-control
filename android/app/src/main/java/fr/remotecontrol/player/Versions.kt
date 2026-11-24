@@ -31,6 +31,9 @@ fun Availability.label(): String? = when (this) {
 private fun qualityRank(quality: String): Int =
     QUALITY_ORDER.indexOf(quality).let { if (it < 0) QUALITY_ORDER.size else it }
 
+/** Qualités triées de la meilleure à la moins bonne ([QUALITY_ORDER]), inconnues en dernier. */
+fun sortQualities(qualities: Collection<String>): List<String> = qualities.distinct().sortedBy(::qualityRank)
+
 /** Tri par qualité ([QUALITY_ORDER]), qualités inconnues en dernier ; tri stable sinon. */
 fun sortVersions(files: List<MediaFileRow>): List<MediaFileRow> = files.sortedBy { qualityRank(it.quality) }
 

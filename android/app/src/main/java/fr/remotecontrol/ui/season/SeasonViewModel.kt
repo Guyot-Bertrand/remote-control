@@ -14,6 +14,7 @@ import fr.remotecontrol.player.TargetKind
 import fr.remotecontrol.player.TvSheet
 import fr.remotecontrol.player.TvStatus
 import fr.remotecontrol.player.highlightEpisode
+import fr.remotecontrol.player.sortQualities
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
@@ -52,6 +53,8 @@ data class SeasonUi(
     val seasons: List<SeasonEntity> = emptyList(),
     val onTv: Boolean = false,
     val launching: Boolean = false,
+    /** Qualités disponibles dans la saison (« FHD »), de la meilleure à la moins bonne. */
+    val qualities: List<String> = emptyList(),
 )
 
 private data class Catalog(
@@ -59,6 +62,7 @@ private data class Catalog(
     val work: WorkEntity?,
     val seasons: List<SeasonEntity>,
     val episodes: List<EpisodeRow>,
+    val qualities: List<String>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,8 +85,13 @@ class SeasonViewModel(
         if (season == null) {
             flowOf(null)
         } else {
-            combine(dao.work(season.workId), dao.seasonsOfWork(season.workId), dao.episodesOfSeason(seasonId)) { w, all, eps ->
-                Catalog(season, w, all, eps)
+            combine(
+                dao.work(season.workId),
+                dao.seasonsOfWork(season.workId),
+                dao.episodesOfSeason(seasonId),
+                dao.seasonQualities(seasonId),
+            ) { w, all, eps, q ->
+                Catalog(season, w, all, eps, sortQualities(q))
             }
         }
     }
@@ -115,6 +124,7 @@ class SeasonViewModel(
             work = c.work,
             seasons = c.seasons,
             onTv = tv,
+            qualities = c.qualities,
         )
     }
 }
