@@ -126,7 +126,7 @@ class OkHttpRcApi(
                 }
                 when {
                     code == 409 && err != null -> ApiResult.Err(ApiError.Server(err.error, err.volumeLabel, err.message?.takeIf { it.isNotBlank() }))
-                    else -> ApiResult.Err(ApiError.Http(code, err?.message?.takeIf { it.isNotBlank() }))
+                    else -> ApiResult.Err(ApiError.Http(code, err?.error, err?.message?.takeIf { it.isNotBlank() }))
                 }
             }
             else -> try {

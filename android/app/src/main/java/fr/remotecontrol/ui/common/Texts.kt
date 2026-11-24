@@ -98,6 +98,8 @@ object Texts {
     const val notPlayable = "Aucun fichier lisible pour cette œuvre"
     const val notFound = "Fichier introuvable"
     const val badResponse = "Réponse inattendue du serveur."
+    const val serverInternal = "Erreur interne du serveur."
+    const val itemNotFound = "Élément introuvable."
     const val idle = "Aucune lecture en cours"
     const val notDigitized = "Non numérisé"
     const val playFromStart = "Lire depuis le début"

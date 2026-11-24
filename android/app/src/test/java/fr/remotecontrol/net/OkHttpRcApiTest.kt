@@ -160,11 +160,23 @@ class OkHttpRcApiTest {
     }
 
     @Test
-    fun internal_500_shows_server_message() = runTest {
+    fun internal_500_uses_app_text() = runTest {
         server.enqueue(MockResponse.Builder().code(500).body(Fixtures.text("error_internal.json")).build())
         val err = (api.play(PlayRequestDto("work", 1, "start")) as ApiResult.Err).error
-        assertEquals(500, (err as ApiError.Http).status)
-        assertEquals("Erreur interne du serveur : le lecteur n'a pas pu démarrer.", err.messageFr())
+        assertEquals(ApiError.Http(500, code = "internal", message = "Erreur interne du serveur."), err)
+        assertEquals("Erreur interne du serveur.", err.messageFr())
+    }
+
+    @Test
+    fun not_found_404_uses_app_text() = runTest {
+        server.enqueue(MockResponse.Builder().code(404).body("""{"error":"not_found","message":"Element introuvable (serveur)."}""").build())
+        assertEquals("Élément introuvable.", (api.tracks(99) as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun unknown_5xx_code_shows_server_message() = runTest {
+        server.enqueue(MockResponse.Builder().code(503).body("""{"error":"busy","message":"Le PC est occupé."}""").build())
+        assertEquals("Le PC est occupé.", (api.stop() as ApiResult.Err).error.messageFr())
     }
 
     @Test
@@ -177,7 +189,7 @@ class OkHttpRcApiTest {
 
     @Test
     fun error_without_message_falls_back_to_generic_text() = runTest {
-        server.enqueue(MockResponse.Builder().code(500).body("""{"error":"internal"}""").build())
+        server.enqueue(MockResponse.Builder().code(500).body("""{"error":"oops"}""").build())
         assertEquals("Erreur du serveur (500)", (api.stop() as ApiResult.Err).error.messageFr())
         server.enqueue(MockResponse.Builder().code(502).body("<html>Bad gateway</html>").build())
         assertEquals("Erreur du serveur (502)", (api.stop() as ApiResult.Err).error.messageFr())
