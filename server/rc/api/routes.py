@@ -224,6 +224,8 @@ def build_router(services: Services) -> APIRouter:
         try:
             await s.playback.play(req)
         except PlayError as exc:
+            if exc.code == "invalid":
+                return invalid()
             return conflict(exc.code, exc.volume_label)
         return OK
 
@@ -235,6 +237,8 @@ def build_router(services: Services) -> APIRouter:
         donnent 409 {"error": "player"} plutôt qu'une erreur 500."""
         try:
             await action
+        except PlayError:  # sélection absente des pistes connues
+            return invalid()
         except (MpvError, ConnectionError, RuntimeError):
             log.warning("commande au lecteur impossible", exc_info=True)
             return conflict("player")

@@ -473,3 +473,65 @@ async def test_trailing_publish_cancelled_at_finish(env, monkeypatch):
     q = env.bus.subscribe()
     await asyncio.sleep(0.25)
     assert drain(q) == []
+
+
+async def _video_with_sub(env):
+    """Chemin de la version lue par défaut, et un sous-titre externe voisin."""
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    video = env.player.starts()[-1]["path"]
+    sub = video.with_name(video.stem + ".fr.srt")
+    sub.touch()
+    await env.svc.stop()
+    env.player.calls.clear()
+    return sub
+
+
+async def test_play_rejects_foreign_external_sub(env, tmp_path):
+    foreign = tmp_path / "secret.srt"
+    foreign.touch()
+    with pytest.raises(PlayError) as exc:
+        await env.svc.play(PlayRequest("work", 1, "start",
+                                       subtitle={"kind": "external", "path": str(foreign)}))
+    assert exc.value.code == "invalid"
+    assert env.player.starts() == []
+
+
+async def test_play_rejects_unknown_embedded_sub_and_audio(env):
+    for kw in ({"subtitle": {"kind": "embedded", "index": 99}}, {"audio": 99}):
+        with pytest.raises(PlayError) as exc:
+            await env.svc.play(PlayRequest("work", 1, "start", **kw))
+        assert exc.value.code == "invalid"
+    assert env.player.starts() == []
+
+
+async def test_play_accepts_known_external_sub(env):
+    sub = await _video_with_sub(env)
+    await env.svc.play(PlayRequest("work", 1, "start",
+                                   subtitle={"kind": "external", "path": str(sub)}))
+    assert env.player.starts()[-1]["subtitle"] == {"kind": "external", "path": str(sub)}
+
+
+async def test_set_subtitle_and_audio_reject_unknown(env, tmp_path):
+    foreign = tmp_path / "secret.srt"
+    foreign.touch()
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.calls.clear()
+    for sel in ({"kind": "external", "path": str(foreign)},
+                {"kind": "embedded", "index": 99}, {"kind": "bogus"}):
+        with pytest.raises(PlayError) as exc:
+            await env.svc.set_subtitle(sel)
+        assert exc.value.code == "invalid"
+    with pytest.raises(PlayError):
+        await env.svc.set_audio(99)
+    assert env.player.calls == []
+
+
+async def test_set_subtitle_accepts_known_external_and_none(env):
+    sub = await _video_with_sub(env)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    await env.svc.set_subtitle({"kind": "external", "path": str(sub)})
+    await env.svc.set_subtitle({"kind": "none"})
+    await env.svc.set_audio(None)
+    assert env.player.calls[-3:] == [
+        ("set_subtitle", {"kind": "external", "path": str(sub)}),
+        ("set_subtitle", {"kind": "none"}), ("set_audio", None)]

@@ -579,3 +579,27 @@ def test_tv_home_showcase(env):
     assert show["id"] in (1, 3) and show["collection_name"] is None
     env.conn.execute("UPDATE work SET poster_asset = NULL")
     assert env.client.get("/api/tv/home").json()["showcase"] is None
+
+
+def test_foreign_external_subtitle_422(env, tmp_path):
+    foreign = tmp_path / "secret.srt"
+    foreign.touch()
+    sel = {"kind": "external", "path": str(foreign)}
+    r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                           "start": "start", "subtitle": sel})
+    assert r.status_code == 422
+    assert r.json() == {"error": "invalid", "volume_label": None}
+    assert env.player.starts() == []
+    r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                           "start": "start",
+                                           "subtitle": {"kind": "embedded", "index": 9}})
+    assert r.status_code == 422
+    env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                       "start": "start"})
+    env.player.calls.clear()
+    for path, body in (("subtitle", sel), ("subtitle", {"kind": "embedded", "index": 9}),
+                       ("audio", {"index": 9})):
+        r = env.client.post(f"/api/player/{path}", json=body)
+        assert r.status_code == 422, path
+        assert r.json() == {"error": "invalid", "volume_label": None}
+    assert env.player.calls == []

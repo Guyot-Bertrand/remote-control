@@ -83,7 +83,8 @@ class PlayRequest:
 
 
 class PlayError(Exception):
-    def __init__(self, code: Literal["not_playable", "volume_absent", "not_found", "player"],
+    def __init__(self, code: Literal["not_playable", "volume_absent", "not_found", "player",
+                              "invalid"],
                  volume_label: str | None = None) -> None:
         super().__init__(code)
         self.code = code
@@ -126,6 +127,10 @@ def load_tracks(conn: sqlite3.Connection, mf: sqlite3.Row, path: Path) -> MediaT
     return tracks
 
 
+def audio_valid(index: int | None, tracks: MediaTracks) -> bool:
+    return index is None or index in {t.index for t in tracks.audio}
+
+
 def sub_valid(sel: SubSel | None, tracks: MediaTracks) -> bool:
     if sel is None:
         return False
@@ -141,8 +146,13 @@ def sub_valid(sel: SubSel | None, tracks: MediaTracks) -> bool:
 
 def pick_tracks(prog: sqlite3.Row | None, tracks: MediaTracks, audio: int | None = None,
                 subtitle: SubSel | None = None) -> tuple[int | None, SubSel]:
-    """Choix explicite, sinon dernier choix enregistré s'il est encore valide, sinon défaut."""
+    """Choix explicite (refusé s'il n'est pas dans les pistes connues : PlayError invalid),
+    sinon dernier choix enregistré s'il est encore valide, sinon défaut."""
     default_audio, default_sub = default_selection(tracks)
+    if audio is not None and not audio_valid(audio, tracks):
+        raise PlayError("invalid")
+    if subtitle is not None and not sub_valid(subtitle, tracks) and subtitle != {"kind": "none"}:
+        raise PlayError("invalid")
     if audio is None:
         stored = decode_audio(prog["audio"]) if prog is not None else None
         audio = stored if stored in {t.index for t in tracks.audio} else default_audio
@@ -162,6 +172,7 @@ class _Session:
     audio: int | None
     subtitle: SubSel
     last_save: float
+    tracks: MediaTracks
     paused: bool = False
 
 
@@ -218,7 +229,7 @@ class PlaybackService:
             self._publish()
             raise PlayError("player") from None
         current = self._describe(req, mf["id"])
-        self._session = _Session(current, audio, subtitle, self.clock())
+        self._session = _Session(current, audio, subtitle, self.clock(), tracks)
         self._state = PlayerState(position=start_at, running=True)
         self.tv.set_playing(current["work_id"])
         self._publish()
@@ -277,11 +288,16 @@ class PlaybackService:
         await self.player.set_volume(level)
 
     async def set_audio(self, index: int | None) -> None:
+        if self._session is not None and not audio_valid(index, self._session.tracks):
+            raise PlayError("invalid")
         await self.player.set_audio(index)
         if self._session is not None:
             self._session.audio = index
 
     async def set_subtitle(self, sel: SubSel) -> None:
+        if self._session is not None and sel != {"kind": "none"} and not sub_valid(
+                sel, self._session.tracks):
+            raise PlayError("invalid")
         await self.player.set_subtitle(sel)
         if self._session is not None:
             self._session.subtitle = sel
