@@ -1,5 +1,6 @@
 package fr.remotecontrol.ui.remote
 
+import fr.remotecontrol.data.db.PlayingInfo
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.MediaTracksDto
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -94,6 +97,21 @@ class RemoteViewModelTest {
         assertEquals(2, ui.selectedAudio)
         assertEquals(2, ui.audio.size)
         assertTrue(api.calls.contains("tracks(2)"))
+    }
+
+    @Test fun shows_poster_and_year_quality_language() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(playing)
+        api.tracksResult = ApiResult.Ok(tracks)
+        val asked = mutableListOf<Pair<Long, Long>>()
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope)) { work, file ->
+            asked += work to file
+            flowOf(PlayingInfo(poster = "abc", year = 2017, quality = "FHD"))
+        }.also { vms += it }
+        observe(vm, scope)
+        val ui = withTimeout(5_000) { vm.state.first { it.details.isNotEmpty() } }
+        assertEquals("abc", ui.poster)
+        assertEquals("2017 · FHD · Français", ui.details)
+        assertEquals(listOf(1L to 2L), asked)
     }
 
     @Test fun skip_and_restart_commands() = runBlocking {

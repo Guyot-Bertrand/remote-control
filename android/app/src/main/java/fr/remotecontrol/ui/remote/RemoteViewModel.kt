@@ -2,6 +2,7 @@ package fr.remotecontrol.ui.remote
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import fr.remotecontrol.data.db.PlayingInfo
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.MediaTracksDto
@@ -24,7 +25,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -61,6 +66,10 @@ data class RemoteUi(
     val interrupted: Boolean = false,
     val finishedTitle: String? = null,
     val loading: Boolean = false,
+    /** Affiche de l'œuvre en cours (catalogue local) ; nulle si inconnue. */
+    val poster: String? = null,
+    /** « 2017 · FHD · Français » : année, qualité du fichier, langue de la piste audio choisie (éléments connus). */
+    val details: String = "",
 )
 
 /** Saisie en cours : position ou volume tenus par le doigt (ou envoyés et pas encore confirmés). */
@@ -73,7 +82,14 @@ private const val HOLD_MS = 2_000L
 private const val SEEK_TOLERANCE = 2.0
 private const val VOLUME_TOLERANCE = 2
 
-class RemoteViewModel(private val api: RcApi, private val controller: RemoteController) : ViewModel() {
+/**
+ * [playingInfo] : affiche, année et qualité d'une lecture (œuvre, fichier), lues dans le catalogue local.
+ */
+class RemoteViewModel(
+    private val api: RcApi,
+    private val controller: RemoteController,
+    private val playingInfo: (workId: Long, mediaFileId: Long) -> Flow<PlayingInfo?> = { _, _ -> flowOf(null) },
+) : ViewModel() {
     private val local = MutableStateFlow(Local())
     private val tracks = MutableStateFlow<Map<Long, MediaTracksDto>>(emptyMap())
     private val loading = mutableSetOf<Long>()
@@ -101,8 +117,14 @@ class RemoteViewModel(private val api: RcApi, private val controller: RemoteCont
         }
     }
 
-    val state: StateFlow<RemoteUi> = combine(live, local, tracks, lastCurrent) { s, l, t, last ->
-        toUi(s, l, t, last)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val info: Flow<PlayingInfo?> = lastCurrent
+        .map { it?.let { c -> c.workId to c.mediaFileId } }
+        .distinctUntilChanged()
+        .flatMapLatest { ids -> ids?.let { (w, m) -> playingInfo(w, m) } ?: flowOf(null) }
+
+    val state: StateFlow<RemoteUi> = combine(live, local, tracks, lastCurrent, info) { s, l, t, last, i ->
+        toUi(s, l, t, last, i)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RemoteUi())
 
     private fun onSnapshot(s: PlayerSnapshotDto?) {
@@ -200,7 +222,7 @@ class RemoteViewModel(private val api: RcApi, private val controller: RemoteCont
     }
 }
 
-private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, last: CurrentDto?): RemoteUi {
+private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, last: CurrentDto?, info: PlayingInfo?): RemoteUi {
     val st = s?.state ?: PlayerStateDto()
     val current = s?.current
     val running = st.running && !st.ended
@@ -233,5 +255,11 @@ private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, 
         interrupted = !loading && !running && st.error != null,
         finishedTitle = if (!loading && !running) last?.title else null,
         loading = loading,
+        poster = info?.poster,
+        details = Texts.details(
+            info?.year?.toString(),
+            info?.quality,
+            media?.audio?.firstOrNull { it.index == st.audio }?.lang?.let(Texts::languageName),
+        ),
     )
 }

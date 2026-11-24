@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,7 @@ import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.common.PosterThumb
 import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.ScreenHeader
 import fr.remotecontrol.ui.common.Texts
@@ -128,17 +130,24 @@ private fun KeepScreenOn() {
 
 @Composable
 private fun Title(state: RemoteUi) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            state.title,
-            style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 30.sp, lineHeight = 33.sp),
-            color = RcColors.text,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.semantics { heading() },
-        )
-        if (state.running && state.paused) {
-            Text(Texts.pausedNow, style = TextStyle(fontFamily = Inter, fontSize = 13.sp), color = RcColors.text2)
+    // Maquette : affiche 56×84 à gauche, titre (Fraunces 30) et « 2017 · FHD · Français » à droite.
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (state.running || state.loading) {
+            PosterThumb(hash = state.poster, title = state.title, modifier = Modifier.width(56.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                state.title,
+                style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 30.sp, lineHeight = 33.sp),
+                color = RcColors.text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { heading() },
+            )
+            val line = Texts.details(state.details.ifEmpty { null }, Texts.pausedNow.takeIf { state.running && state.paused })
+            if (line.isNotEmpty()) {
+                Text(line, style = TextStyle(fontFamily = Inter, fontSize = 13.sp), color = RcColors.text2)
+            }
         }
     }
 }

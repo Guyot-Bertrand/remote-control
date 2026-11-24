@@ -277,7 +277,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             )
         }
         composable<RemoteRoute> {
-            val vm = viewModel { RemoteViewModel(c.api, c.remote) }
+            val vm = viewModel { RemoteViewModel(c.api, c.remote, c.catalogDao::playingInfo) }
             val state by vm.state.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
             RemoteScreen(

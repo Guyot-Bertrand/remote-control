@@ -123,6 +123,12 @@ interface CatalogDao {
     @Query("SELECT * FROM progress WHERE targetKind = :kind AND targetId = :id")
     fun progress(kind: String, id: Long): Flow<ProgressEntity?>
 
+    @Query(
+        "SELECT w.poster AS poster, w.year AS year, " +
+            "(SELECT m.quality FROM media_file m WHERE m.id = :mediaFileId) AS quality FROM work w WHERE w.id = :workId",
+    )
+    fun playingInfo(workId: Long, mediaFileId: Long): Flow<PlayingInfo?>
+
     @Query("SELECT COUNT(*) FROM work")
     suspend fun workCount(): Int
 
