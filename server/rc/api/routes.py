@@ -13,9 +13,11 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, RootModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from rc.api import serialize
 from rc.assets import SIZES, asset_path
@@ -109,8 +111,8 @@ OK = {"ok": True}
 
 
 def not_found() -> JSONResponse:
-    return JSONResponse({"error": "not_found", "message": RESOURCE_NOT_FOUND},
-                        status_code=404)
+    return JSONResponse({"error": "not_found", "volume_label": None,
+                         "message": RESOURCE_NOT_FOUND}, status_code=404)
 
 
 def conflict(code: str, volume_label: str | None = None) -> JSONResponse:
@@ -119,6 +121,18 @@ def conflict(code: str, volume_label: str | None = None) -> JSONResponse:
 
 def invalid() -> JSONResponse:
     return JSONResponse(error_body("invalid"), status_code=422)
+
+
+async def http_error_handler(request: Request, exc: StarletteHTTPException) -> Response:
+    """Erreurs de routage (route inconnue, méthode non permise) : format de l'API sous
+    /api/, comportement par défaut ailleurs (page télé)."""
+    if not request.url.path.startswith("/api/"):
+        return await http_exception_handler(request, exc)
+    if exc.status_code == 404:
+        return not_found()
+    code = "internal" if exc.status_code >= 500 else "invalid"
+    return JSONResponse(error_body(code), status_code=exc.status_code,
+                        headers=getattr(exc, "headers", None))
 
 
 async def validation_error_handler(request: Request,

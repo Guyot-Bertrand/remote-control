@@ -72,7 +72,7 @@ def env(tmp_path, monkeypatch):
     conn.close()
 
 
-NOT_FOUND = {"error": "not_found", "message": "Élément introuvable."}
+NOT_FOUND = {"error": "not_found", "volume_label": None, "message": "Élément introuvable."}
 
 
 def reimport(env, text):
@@ -645,3 +645,12 @@ def test_play_same_media_does_not_restart(env):
     r = env.client.post("/api/play", json={**body, "start": "resume", "media_file_id": mid})
     assert r.json() == {"ok": True}
     assert [c[0] for c in env.player.calls] == ["start"]
+
+
+def test_routing_errors_use_api_format(env):
+    r = env.client.get("/api/nexiste/pas")
+    assert r.status_code == 404 and r.json() == NOT_FOUND
+    r = env.client.get("/api/play")  # POST seulement
+    assert r.status_code == 405
+    assert r.json() == {"error": "invalid", "volume_label": None,
+                        "message": "Requête invalide."}

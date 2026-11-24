@@ -13,7 +13,7 @@ Complète la Task 10 du plan serveur ; fait foi pour le serveur et l'appli Andro
 
 ## Ajouts (2026-11-24, retours d'essai)
 
-9. Toutes les réponses d'erreur 409 portent en plus `"message"` : une phrase en français prête à afficher (ex. `{"error":"player_missing","volume_label":null,"message":"Le lecteur vidéo (mpv) n'est pas installé sur le PC."}`). Le client affiche son propre texte pour les codes connus, et `message` pour un code inconnu.
+9. Toutes les réponses d'erreur 409 (et 403, 404, 405, 422, 500 sous `/api/`, au même format `{error, volume_label, message}`) portent en plus `"message"` : une phrase en français prête à afficher (ex. `{"error":"player_missing","volume_label":null,"message":"Le lecteur vidéo (mpv) n'est pas installé sur le PC."}`). Le client affiche son propre texte pour les codes connus, et `message` pour un code inconnu.
 10. Nouveau code 409 `player_missing` : l'exécutable du lecteur (mpv) est introuvable sur le PC. `player` reste pour « le lecteur ne répond pas / n'a pas démarré ».
 11. `GET /api/info` ajoute `"player_available": bool` (exécutable du lecteur présent sur le PC).
-12. `POST /api/play` sur le média déjà en cours de lecture ne relance pas le lecteur : le serveur se repositionne (`start` → 0, `resume` → position enregistrée) et applique les pistes demandées, sans fermer la vidéo.
+12. `POST /api/play` sur le média déjà en cours de lecture ne relance pas le lecteur : `start` revient au début (0), `resume` garde la position en cours (aucun saut) ; le serveur applique les pistes demandées et lève la pause, sans fermer la vidéo. Si la lecture se termine pendant ce traitement, le lecteur est relancé normalement.

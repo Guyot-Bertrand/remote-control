@@ -7,11 +7,13 @@ import logging
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from rc.api.origin import OriginCheckMiddleware
-from rc.api.routes import Services, build_router, validation_error_handler
+from rc.api.routes import (Services, build_router, http_error_handler,
+                           validation_error_handler)
 from rc.api.ws import build_ws_router
 from rc.messages import error_body
 
@@ -71,12 +73,13 @@ class InternalErrorMiddleware:
 def install_api(app: FastAPI, services: Services) -> None:
     """Monte les routeurs, la compression gzip (réponses de 1 000 octets ou plus, hors
     affiches) et les
-    erreurs au format de l'API (422 {"error": "invalid", ...}, 500 {"error": "internal",
-    ...}), et le refus
+    erreurs au format de l'API (404/405 de routage, 422 {"error": "invalid", ...},
+    500 {"error": "internal", ...}), et le refus
     des hôtes non autorisés et des requêtes inter-origines (403 / WebSocket 1008)."""
     app.add_middleware(InternalErrorMiddleware)  # au plus près des routes
     app.add_middleware(SelectiveGZipMiddleware, minimum_size=GZIP_MIN_SIZE)
     app.add_middleware(OriginCheckMiddleware, allowed_hosts=services.config.allowed_hosts)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.include_router(build_router(services))
     app.include_router(build_ws_router(services))

@@ -6,6 +6,8 @@
 document.getElementById('nojs')?.remove();
 
 const RECONNECT_MS = 2000;
+// Copie de rc/messages.py (SHEET_UNAVAILABLE) ; les autres messages viennent du serveur.
+const MSG_SHEET_UNAVAILABLE = 'Fiche indisponible';
 const CLOCK_MS = 10000;
 const HOME_ROTATE_MS = 3 * 60 * 1000; // alternance « Vu récemment » / « Dans la collection »
 const RECENT_SHOWN = 5;
@@ -443,7 +445,7 @@ async function show(state) {
     html = await load(state);
   } catch (err) {
     console.warn('écran télé :', err);
-    html = renderMessage({ message: 'Fiche indisponible' });
+    html = renderMessage({ message: MSG_SHEET_UNAVAILABLE });
   }
   if (my !== seq) return;
   mount(html);

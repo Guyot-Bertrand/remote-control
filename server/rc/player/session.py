@@ -17,7 +17,7 @@ from typing import Literal
 from rc.catalog.paths import QUALITY_ORDER
 from rc.db import current_revision, next_revision
 from rc.events import EventBus
-from rc.messages import message
+from rc.messages import INTERRUPTED, message
 from rc.player.base import Player, PlayerState, SubSel
 from rc.probe import MediaTracks, cached_tracks, default_selection, find_external_subs
 from rc.volumes import resolve_media_path
@@ -27,7 +27,6 @@ log = logging.getLogger(__name__)
 SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
-MSG_INTERRUPTED = "Lecture interrompue : fichier inaccessible"
 
 Screen = Literal["home", "work", "season", "playing", "message"]
 
@@ -214,8 +213,8 @@ class PlaybackService:
     async def _play_locked(self, req: PlayRequest) -> None:
         if self._is_current(req):
             try:
-                await self._rejoin(req)
-                return
+                if await self._rejoin(req):
+                    return
             except PlayError:
                 raise
             except Exception:  # lecteur figé ou parti : on relance normalement
@@ -223,9 +222,9 @@ class PlaybackService:
                             exc_info=True)
         mf = self._choose_version(req)
         path = self._resolve(mf)
-        if not self.player_available():
-            self._fail_start("player_missing")
         await self._stop_locked(show_tv=False)
+        if not self.player_available():  # après l'arrêt : aucune session périmée
+            self._fail_start("player_missing")
         prog = self._progress(req.target_kind, req.target_id)
         start_at = 0.0
         if req.start == "resume" and prog is not None:
@@ -253,10 +252,13 @@ class PlaybackService:
                 and s.current["target_id"] == req.target_id
                 and req.media_file_id in (None, s.current["media_file_id"]))
 
-    async def _rejoin(self, req: PlayRequest) -> None:
+    async def _rejoin(self, req: PlayRequest) -> bool:
         """Lecture demandée du média déjà en cours : pas de relance du lecteur (la télé
         ne clignote pas). « start » revient au début, « resume » garde la position ;
-        pistes demandées appliquées (refusées si inconnues), pause levée."""
+        pistes demandées appliquées (refusées si inconnues), pause levée.
+
+        Faux si la lecture s'est terminée entre-temps (fin de fichier pendant une
+        commande) : l'appelant relance alors normalement."""
         s = self._session
         assert s is not None
         if req.audio is not None and not audio_valid(req.audio, s.tracks):
@@ -274,8 +276,11 @@ class PlaybackService:
             s.subtitle = req.subtitle
         if self._state.paused:
             await self.player.set_pause(False)
+        if self._session is not s:
+            return False
         if self.tv.state.screen != "playing":
             self.tv.set_playing(s.current["work_id"])
+        return True
 
     def _fail_start(self, code: Literal["player", "player_missing"]) -> None:
         self._state = replace(self._state, running=False)
@@ -374,7 +379,7 @@ class PlaybackService:
         if s is None:
             self._state = replace(state, running=False)
         elif state.error is not None:
-            self._finish(state, MSG_INTERRUPTED)
+            self._finish(state, INTERRUPTED)
             return
         elif state.ended or not state.running:
             self._finish(state, None)

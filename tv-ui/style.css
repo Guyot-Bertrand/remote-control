@@ -285,7 +285,10 @@ svg { flex-shrink: 0; display: block; }
   position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
   background: var(--rc-bg); color: var(--rc-text); font-family: var(--rc-font-text);
   padding: 4vw 8vw; box-sizing: border-box;
+  /* Visible seulement si app.js ne l'a pas retiré au bout de 1,5 s : pas d'éclair. */
+  animation: nojs-show .4s ease-out 1.5s both;
 }
+@keyframes nojs-show { from { opacity: 0; } to { opacity: 1; } }
 .nojs-box { max-width: 72vw; display: flex; flex-direction: column; gap: 2.6vw; }
 .nojs .brand-name { font-size: max(24px, 2.2vw); }
 .nojs-title { font-family: var(--rc-font-display); font-weight: 500; font-size: max(32px, 3.6vw); line-height: 1.15; }

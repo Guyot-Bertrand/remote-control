@@ -17,6 +17,10 @@ MESSAGES = {
 UNKNOWN = "Erreur inattendue."
 RESOURCE_NOT_FOUND = "Élément introuvable."  # 404 : œuvre, saison, média inexistants
 
+# Messages propres à la télé (écran « message »).
+INTERRUPTED = "Lecture interrompue : fichier inaccessible"
+SHEET_UNAVAILABLE = "Fiche indisponible"  # copie dans tv-ui/app.js (MSG_SHEET_UNAVAILABLE)
+
 
 def message(code: str, volume_label: str | None = None) -> str:
     if code == "volume_absent":
