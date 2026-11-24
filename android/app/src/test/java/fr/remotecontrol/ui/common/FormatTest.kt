@@ -95,4 +95,16 @@ class FormatTest {
         assertEquals("Série · A, B", Texts.workLine(null, "serie", listOf("A", "B")))
         assertEquals("2012 · Théâtre", Texts.workLine(2012, "theatre", emptyList()))
     }
+
+    @Test
+    fun last_sync_label() {
+        val zone = java.time.ZoneId.of("Europe/Paris")
+        val at = java.time.ZonedDateTime.of(2026, 11, 24, 21, 12, 0, 0, zone).toInstant().toEpochMilli()
+        val now = at + 3_600_000L
+        val counts = "4\u202F012\u00A0œuvres, dont 2\u202F655 lisibles"
+        assertEquals("Aujourd'hui à 21:12 · $counts", Texts.lastSync(at, now, 4012, 2655, zone))
+        assertEquals("Hier à 21:12 · $counts", Texts.lastSync(at, now + 86_400_000L, 4012, 2655, zone))
+        assertEquals("Le 24 nov. 2026 à 21:12 · 1\u00A0œuvre, dont 1 lisible", Texts.lastSync(at, now + 3 * 86_400_000L, 1, 1, zone))
+        assertEquals("Jamais synchronisé", Texts.lastSync(null, now, 0, 0, zone))
+    }
 }

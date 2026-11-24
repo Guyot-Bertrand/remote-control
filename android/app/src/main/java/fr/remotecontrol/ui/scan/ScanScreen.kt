@@ -84,6 +84,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.remotecontrol.qr.QrAnalyzer
 import fr.remotecontrol.ui.common.NoticeCard
 import fr.remotecontrol.ui.common.RcIcons
+import fr.remotecontrol.ui.common.RcSnackbar
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
@@ -175,9 +176,9 @@ fun ScanScreen(state: ScanUi, onDecoded: (String) -> Unit, onDismissMessage: () 
             }
         }
         state.message?.let { message ->
-            ScanMessage(
+            RcSnackbar(
                 text = if (message == Texts.qrUnknown) Texts.qrUnknownDetail else message,
-                onDismiss = onDismissMessage,
+                onAction = onDismissMessage,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 16.dp),
             )
         }
@@ -350,27 +351,6 @@ private fun ScanHeader(torchVisible: Boolean, torchOn: Boolean, onTorch: () -> U
             IconButton(onClick = onTorch) {
                 Icon(RcIcons.Torch, contentDescription = Texts.torch, tint = if (torchOn) RcColors.accentStrong else RcColors.text)
             }
-        }
-    }
-}
-
-/** Message en bas d'écran (ivoire sur fond sombre inversé), refermé par « OK ». */
-@Composable
-private fun ScanMessage(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(RcColors.text)
-            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(text, style = TextStyle(fontFamily = Inter, fontSize = 14.sp), color = RcColors.surface, modifier = Modifier.weight(1f))
-        TextButton(onClick = onDismiss, modifier = Modifier.height(40.dp)) {
-            Text(Texts.ok, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp), color = RcColors.accentStrong)
         }
     }
 }

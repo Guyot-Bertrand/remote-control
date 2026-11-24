@@ -165,6 +165,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onSaveManual = vm::saveManual,
                 onRediscover = vm::rediscover,
                 onResync = vm::resync,
+                onDismissMessage = vm::clearMessage,
                 onBack = { nav.popBackStack() },
             )
         }

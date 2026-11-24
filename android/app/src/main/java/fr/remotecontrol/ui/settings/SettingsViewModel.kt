@@ -17,13 +17,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * [syncedAt] : heure de la dernière synchronisation réussie (nulle avant) ; [syncFailed] : [message] vient d'une
+ * synchronisation en échec (l'écran propose alors de réessayer).
+ */
 data class SettingsUi(
     val serverLabel: String,
+    val server: ServerState = ServerState.Searching,
     val manualInput: String = "",
     val revision: Long? = null,
     val workCount: Int = 0,
+    val playableCount: Int = 0,
+    val syncedAt: Long? = null,
     val busy: Boolean = false,
     val message: String? = null,
+    val syncFailed: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -31,14 +39,17 @@ class SettingsViewModel(
     private val sync: SyncRepository,
     private val dao: CatalogDao,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(SettingsUi(serverLabel = label(locator.state.value)))
+    private val _state = MutableStateFlow(SettingsUi(serverLabel = label(locator.state.value), server = locator.state.value))
     val state: StateFlow<SettingsUi> = _state.asStateFlow()
 
     private val initJob: Job
 
     init {
         viewModelScope.launch {
-            locator.state.collect { s -> _state.update { it.copy(serverLabel = label(s)) } }
+            locator.state.collect { s -> _state.update { it.copy(serverLabel = label(s), server = s) } }
+        }
+        viewModelScope.launch {
+            sync.syncedAt.collect { at -> _state.update { it.copy(syncedAt = at) } }
         }
         initJob = viewModelScope.launch { refreshInfo() }
     }
@@ -53,22 +64,25 @@ class SettingsViewModel(
     private suspend fun refreshInfo(): Int {
         val revision = sync.localRevision()
         val count = dao.workCount()
-        _state.update { it.copy(revision = revision, workCount = count) }
+        val playable = dao.playableCount()
+        _state.update { it.copy(revision = revision, workCount = count, playableCount = playable) }
         return count
     }
 
     fun onManualInput(text: String) = _state.update { it.copy(manualInput = text) }
 
+    fun clearMessage() = _state.update { it.copy(message = null, syncFailed = false) }
+
     fun saveManual() {
         val address = parseManualAddress(_state.value.manualInput)
         if (address == null) {
-            _state.update { it.copy(message = Texts.invalidAddress) }
+            _state.update { it.copy(message = Texts.invalidAddress, syncFailed = false) }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.copy(busy = true, message = null, syncFailed = false) }
             if (!locator.setManual(address)) {
-                _state.update { it.copy(busy = false, message = Texts.addressUnreachable) }
+                _state.update { it.copy(busy = false, message = Texts.addressUnreachable, syncFailed = false) }
             } else {
                 fullSync()
             }
@@ -77,7 +91,7 @@ class SettingsViewModel(
 
     fun rediscover() {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.copy(busy = true, message = null, syncFailed = false) }
             try {
                 locator.locate(force = true)
             } finally {
@@ -88,7 +102,7 @@ class SettingsViewModel(
 
     fun resync() {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, message = null) }
+            _state.update { it.copy(busy = true, message = null, syncFailed = false) }
             fullSync()
         }
     }
@@ -102,7 +116,7 @@ class SettingsViewModel(
                 is SyncOutcome.Done -> Texts.synced(count)
                 is SyncOutcome.Failed -> outcome.error.messageFr()
             }
-            _state.update { it.copy(message = message) }
+            _state.update { it.copy(message = message, syncFailed = outcome is SyncOutcome.Failed) }
         } finally {
             _state.update { it.copy(busy = false) }
         }

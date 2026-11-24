@@ -26,7 +26,7 @@ import fr.remotecontrol.ui.theme.RcColors
 
 /**
  * En-tête d'écran des maquettes (64 dp) : retour facultatif (ou fermeture, avec [backIcon] et [backLabel]),
- * titre facultatif, pastille de connexion.
+ * titre facultatif, pastille de connexion (sauf [showChip] faux : les réglages montrent l'état en détail).
  */
 @Composable
 fun ScreenHeader(
@@ -35,6 +35,7 @@ fun ScreenHeader(
     onBack: (() -> Unit)? = null,
     backIcon: ImageVector = RcIcons.Back,
     backLabel: String = Texts.back,
+    showChip: Boolean = true,
 ) {
     Row(
         Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
@@ -61,6 +62,6 @@ fun ScreenHeader(
         } else {
             Spacer(Modifier.weight(1f))
         }
-        ConnectionChip(server, Modifier.padding(end = 4.dp))
+        if (showChip) ConnectionChip(server, Modifier.padding(end = 4.dp))
     }
 }

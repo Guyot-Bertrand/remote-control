@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 const val META_REVISION = "sync.revision"
+const val META_SYNCED_AT = "sync.at"
 const val META_SERVER_HOST = "server.host"
 const val META_SERVER_PORT = "server.port"
 const val META_SERVER_MANUAL = "server.manual"

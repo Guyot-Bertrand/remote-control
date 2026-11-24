@@ -45,6 +45,9 @@ object RcIcons {
     val Stop = icon("Stop", fill(rrect(6f, 6f, 12f, 12f, 1.5f)))
     val Rewind = Resume
     val Forward = icon("Forward", "M20 12a8 8 0 1 1-2.4-5.7", "M20 4v4.5h-4.5")
+    val Server = icon("Server", rrect(3.5f, 4f, 17f, 7f, 1.5f), rrect(3.5f, 13f, 17f, 7f, 1.5f), "M7.5 7.5h.01M7.5 16.5h.01")
+    val Edit = icon("Edit", "M4 20h4L19 9l-4-4L4 16z")
+    val Sync = icon("Sync", "M19.5 10A8 8 0 0 0 5.6 7.2L4 8.8", "M4 4.5v4.3h4.3", "M4.5 14a8 8 0 0 0 13.9 2.8l1.6-1.6", "M20 19.5v-4.3h-4.3")
     val VolumeDown = icon("VolumeDown", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5")
     val VolumeUp = icon("VolumeUp", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5M18.5 9.5v5")
 

@@ -1,5 +1,9 @@
 package fr.remotecontrol.ui.common
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /** Tous les textes visibles par l'utilisateur, en français. */
@@ -21,6 +25,19 @@ object Texts {
     const val save = "Enregistrer"
     const val rediscover = "Rechercher le serveur"
     const val resync = "Resynchroniser"
+    const val neverSynced = "Jamais synchronisé"
+    const val sectionServer = "SERVEUR"
+    const val sectionCatalog = "CATALOGUE"
+    const val sectionAbout = "À PROPOS"
+    const val enterAddress = "Saisir l'adresse manuellement"
+    const val lastSyncTitle = "Dernière synchronisation"
+    const val appVersion = "Version de l'appli"
+    const val detectedAuto = "détecté automatiquement"
+    const val enteredByHand = "saisi à la main"
+    const val statusConnected = "Connecté"
+    const val noServerYet = "Aucun serveur"
+    const val addressHint = "192.168.1.20:8765"
+    fun appVersionLabel(version: String) = "$appName $version"
     const val seasons = "Saisons"
     const val versions = "Versions"
     const val version = "Version"
@@ -150,6 +167,23 @@ object Texts {
     fun episodesSummary(count: Int, watched: Int) =
         "${if (count == 1) "1 épisode" else "$count épisodes"} · $watched ${if (watched > 1) "vus" else "vu"}"
     fun synced(count: Int) = "Catalogue synchronisé ($count œuvres)"
+
+    /**
+     * « Aujourd'hui à 21:12 · 4 012 œuvres, dont 2 655 lisibles » (puis « Hier à », « Le 3 nov. 2026 à ») ;
+     * « Jamais synchronisé » sans synchronisation réussie.
+     */
+    fun lastSync(at: Long?, now: Long, count: Int, playable: Int, zone: ZoneId = ZoneId.systemDefault()): String {
+        if (at == null) return neverSynced
+        val time = Instant.ofEpochMilli(at).atZone(zone)
+        val days = ChronoUnit.DAYS.between(time.toLocalDate(), Instant.ofEpochMilli(now).atZone(zone).toLocalDate())
+        val clock = time.format(DateTimeFormatter.ofPattern("HH:mm", Locale.FRENCH))
+        val day = when (days) {
+            0L -> "Aujourd'hui"
+            1L -> "Hier"
+            else -> "Le ${time.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.FRENCH))}"
+        }
+        return "$day à $clock · ${countOfType(null, count)}, dont ${formatCount(playable)} ${if (playable > 1) "lisibles" else "lisible"}"
+    }
 
     // Fonctions de libellé
     fun typeLabel(type: String): String = when (type) {

@@ -116,6 +116,9 @@ interface CatalogDao {
     @Query("SELECT COUNT(*) FROM work")
     fun observeWorkCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM work WHERE playable = 1")
+    suspend fun playableCount(): Int
+
     @Query("SELECT EXISTS(SELECT 1 FROM work WHERE id = :id)")
     suspend fun hasWork(id: Long): Boolean
 

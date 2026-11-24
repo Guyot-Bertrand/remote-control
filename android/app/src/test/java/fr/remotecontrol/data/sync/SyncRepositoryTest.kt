@@ -126,6 +126,17 @@ class SyncRepositoryTest {
         assertEquals(3L, repo.localRevision())
     }
 
+    @Test fun successful_sync_records_its_time() = runTest {
+        val timed = SyncRepository(db, api, clock = { 1_700_000_000_000L })
+        assertEquals(null, timed.syncedAt.first())
+        api.syncResponses.addLast(ApiResult.Err(ApiError.Unreachable))
+        timed.sync()
+        assertEquals(null, timed.syncedAt.first())
+        api.syncResponses.addLast(ApiResult.Ok(full))
+        timed.sync()
+        assertEquals(1_700_000_000_000L, timed.syncedAt.first())
+    }
+
     @Test fun write_failure_reports_failed_and_resets_syncing() = runTest {
         val failing = SyncRepository(db, api, SyncWriter(db, afterUpserts = { error("panne") }))
         api.syncResponses.addLast(ApiResult.Ok(full))

@@ -95,5 +95,15 @@ class SettingsViewModelTest {
         vm.resync()
         awaitMessage()
         assertEquals("Serveur injoignable", vm.state.value.message)
+        assertTrue(vm.state.value.syncFailed)
+    }
+
+    @Test fun resync_records_time_and_playable_count() = runBlocking {
+        val full: SyncDto = RcJson.decodeFromString(Fixtures.text("sync_full.json"))
+        api.syncResponses.addLast(ApiResult.Ok(full))
+        vm.resync()
+        val ui = withTimeout(5_000) { vm.state.first { it.syncedAt != null && it.message != null } }
+        assertEquals(3, ui.playableCount)
+        assertEquals(false, ui.syncFailed)
     }
 }
