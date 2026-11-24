@@ -21,6 +21,16 @@ fun formatHhMm(seconds: Double): String {
     return "%02d:%02d".format(Locale.ROOT, total / 3600, (total % 3600) / 60)
 }
 
+/** Position de reprise : hh:mm à partir d'une heure, sinon en minutes (ou secondes sous la minute). */
+fun formatResumePosition(seconds: Double): String {
+    val total = seconds.coerceAtLeast(0.0).toLong()
+    return when {
+        total >= 3600 -> formatHhMm(seconds)
+        total >= 60 -> "${total / 60} min"
+        else -> "$total s"
+    }
+}
+
 /** Minutes restantes, arrondies (0 si la position dépasse la durée). */
 fun remainingMinutes(position: Double, duration: Double): Int =
     ((duration - position).coerceAtLeast(0.0) / 60.0).roundToInt()

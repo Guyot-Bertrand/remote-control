@@ -24,8 +24,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,13 +84,14 @@ fun SeasonScreen(
     onDismissMessage: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val list = rememberLazyListState()
+    val headerVisible by remember { derivedStateOf { list.firstVisibleItemIndex == 0 } }
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader(title = null, server = server, onBack = onBack)
+        ScreenHeader(title = state?.let { seasonBarTitle(it.workTitle, headerVisible) }, server = server, onBack = onBack)
         if (state == null) {
             if (missing) NotFound(Texts.seasonNotFound)
             return@Column
         }
-        val list = rememberLazyListState()
         var scrolled by rememberSaveable(state.season.id) { mutableStateOf(false) }
         val highlight = state.episodes.indexOfFirst { it.highlighted }
         LaunchedEffect(state.season.id, highlight) {
@@ -117,6 +120,10 @@ fun SeasonScreen(
         }
     }
 }
+
+/** Titre de la barre : celui de la série dès que son en-tête n'est plus à l'écran (ouverture sur l'épisode en cours). */
+internal fun seasonBarTitle(workTitle: String, headerVisible: Boolean): String? =
+    workTitle.takeIf { !headerVisible && it.isNotBlank() }
 
 @Composable
 private fun SeriesHeader(state: SeasonUi) {
@@ -295,13 +302,14 @@ private fun HighlightedEpisode(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (episode.canResume) {
+                // « Depuis le début » garde sa largeur naturelle (jamais tronqué) ; « Reprendre » prend le reste.
                 PillButton(
                     Texts.resume, RcIcons.Play, { onPlay(episode.id, StartMode.Resume) },
-                    Modifier.weight(1.3f), enabled = enabled, height = 48.dp,
+                    Modifier.weight(1f), enabled = enabled, height = 48.dp,
                 )
                 PillButton(
                     Texts.fromStart, RcIcons.FromStart, { onPlay(episode.id, StartMode.Start) },
-                    Modifier.weight(1f), tone = Tone.Outlined, enabled = enabled, height = 48.dp,
+                    tone = Tone.Outlined, enabled = enabled, height = 48.dp,
                 )
             } else {
                 PillButton(

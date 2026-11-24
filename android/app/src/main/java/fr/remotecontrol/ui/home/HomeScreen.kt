@@ -189,8 +189,9 @@ private fun FilterRow(playableOnly: Boolean, onPlayableOnly: (Boolean) -> Unit, 
         RcFilterChip(Texts.playableOnly, playableOnly) { onPlayableOnly(true) }
         RcFilterChip(Texts.wholeCatalogue, !playableOnly) { onPlayableOnly(false) }
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onRemote) {
-            Text(Texts.remote, style = MaterialTheme.typography.labelLarge, color = RcColors.accentStrong)
+        // Icône seule : le libellé ne tenait pas à côté des deux filtres et passait à la ligne.
+        IconButton(onClick = onRemote) {
+            Icon(RcIcons.Remote, contentDescription = Texts.remote, tint = RcColors.accentStrong)
         }
     }
 }

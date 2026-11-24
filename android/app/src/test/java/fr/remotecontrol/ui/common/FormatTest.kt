@@ -42,6 +42,10 @@ class FormatTest {
     @Test
     fun texts() {
         assertEquals("Reprendre à 01:12", Texts.resumeAt(4320.0))
+        assertEquals("Reprendre à 01:00", Texts.resumeAt(3600.0))
+        assertEquals("Reprendre à 3 min", Texts.resumeAt(200.0))
+        assertEquals("Reprendre à 59 min", Texts.resumeAt(3599.0))
+        assertEquals("Reprendre à 45 s", Texts.resumeAt(45.0))
         assertEquals("Disque « DISK1 » non branché", Texts.volumeAbsent("DISK1"))
         assertEquals("Disque non branché", Texts.volumeAbsent(null))
         assertEquals("Théâtre", Texts.typeLabel("theatre"))

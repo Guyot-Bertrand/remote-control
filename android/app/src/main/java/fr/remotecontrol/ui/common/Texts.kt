@@ -132,7 +132,8 @@ object Texts {
 
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"
-    fun resumeAt(seconds: Double) = "Reprendre à ${formatHhMm(seconds)}"
+    /** « Reprendre à 01:12 » à partir d'une heure, « Reprendre à 3 min » ou « Reprendre à 45 s » avant. */
+    fun resumeAt(seconds: Double) = "Reprendre à ${formatResumePosition(seconds)}"
     fun started(seconds: Double) = "Entamé — ${formatClock(seconds)}"
     fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"
     fun collectionCounts(count: Int, playable: Int) = "${workCount(count)} · $playable ${if (playable > 1) "lisibles" else "lisible"}"

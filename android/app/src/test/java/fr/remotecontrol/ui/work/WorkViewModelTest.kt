@@ -114,7 +114,7 @@ class WorkViewModelTest {
         val ui = viewModel(1).await()
         assertEquals("Films", ui.typeLabel)
         assertEquals("1 h 39", ui.durationLabel)
-        assertEquals("Reprendre à 00:10", ui.resumeLabel)
+        assertEquals("Reprendre à 10 min", ui.resumeLabel)
         assertTrue(ui.canPlay)
         assertNull(ui.availabilityLabel)
         assertEquals(listOf("FHD · 3.8G", "HD · 1.6G"), ui.versions.map { it.label })

@@ -67,7 +67,7 @@ class HomeViewModelTest {
 
     @Test fun resume_label_falls_back_without_duration() {
         val row = ResumeRow("work", 1, 1, null, "Ava", null, null, null, 300.0, null, 0.0)
-        assertEquals("Reprendre à 00:05", toResumeItem(row).label)
+        assertEquals("Reprendre à 5 min", toResumeItem(row).label)
         assertEquals(0f, toResumeItem(row).progress)
     }
 

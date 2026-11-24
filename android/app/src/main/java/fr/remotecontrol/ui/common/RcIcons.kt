@@ -33,6 +33,7 @@ object RcIcons {
     val Play = icon("Play", fill("M7 4.5v15l12.5-7.5z"))
     val Resume = icon("Resume", "M4 12a8 8 0 1 0 2.4-5.7", "M4 4v4.5h4.5")
     val FromStart = icon("FromStart", "M6 5v14", fill("M18.5 5.5v13L9.5 12z"))
+    val Remote = icon("Remote", rrect(7f, 2.5f, 10f, 19f, 3f), circle(12f, 8f, 2f), "M10 13h.01M14 13h.01M10 16.5h.01M14 16.5h.01")
     val Tv = icon("Tv", rrect(3f, 4.5f, 18f, 12.5f, 2f), "M8.5 20.5h7")
     val Disk = icon("Disk", rrect(3f, 7f, 18f, 10f, 2f), fill(circle(7.5f, 12f, 1f)), "M11 12h6")
     val Disc = icon("Disc", circle(12f, 12f, 8.5f), circle(12f, 12f, 2.5f))
