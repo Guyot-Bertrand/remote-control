@@ -10,7 +10,12 @@ private const val SUMMARY = "work.id, work.type, work.titleFr, work.year, work.p
     "work.directors, " +
     "(SELECT MIN(p.position / p.duration, 1.0) $WORK_PROGRESS " +
     "AND p.watched = 0 AND p.position > 0 AND p.duration > 0) AS progress, " +
-    "COALESCE((SELECT p.watched $WORK_PROGRESS), 0) AS watched"
+    "COALESCE((SELECT p.watched $WORK_PROGRESS), 0) AS watched, " +
+    // Œuvre non lisible mais numérisée : libellé du disque débranché qui porte un de ses fichiers ('' si inconnu).
+    "CASE WHEN work.playable = 1 THEN NULL ELSE (SELECT COALESCE(v.label, '') FROM media_file m " +
+    "LEFT JOIN volume v ON m.volumeUuid = v.uuid WHERE m.present = 0 AND (m.workId = work.id OR m.episodeId IN " +
+    "(SELECT e.id FROM episode e JOIN season s ON s.id = e.seasonId WHERE s.workId = work.id)) " +
+    "ORDER BY v.label IS NULL, v.label LIMIT 1) END AS absentVolume"
 
 @Dao
 interface CatalogDao {

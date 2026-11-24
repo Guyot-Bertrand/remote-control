@@ -101,7 +101,7 @@ fun HomeScreen(
                                     hash = work.poster,
                                     title = work.titleFr,
                                     year = work.year,
-                                    unavailableLabel = if (work.playable) null else Texts.notAvailable,
+                                    unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                                 Text(

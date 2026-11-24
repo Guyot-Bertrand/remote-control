@@ -14,6 +14,11 @@ data class WorkSummary(
     /** Position / durée quand l'œuvre est entamée et non vue ; nulle sinon. */
     val progress: Double?,
     val watched: Boolean,
+    /**
+     * Œuvre non lisible : libellé du disque débranché où sont ses fichiers ('' s'il n'a pas de nom) ; nul si
+     * l'œuvre est lisible ou n'a aucun fichier (non numérisée).
+     */
+    val absentVolume: String? = null,
 )
 
 /** Résultat de recherche : l'œuvre, plus les champs qui expliquent la correspondance. */

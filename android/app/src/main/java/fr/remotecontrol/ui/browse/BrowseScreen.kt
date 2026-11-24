@@ -1,5 +1,24 @@
 package fr.remotecontrol.ui.browse
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
+import fr.remotecontrol.ui.common.indexLetter
+import fr.remotecontrol.ui.theme.Fraunces
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -114,19 +133,95 @@ private fun TypeContent(
         LazyGridState()
     }
     // Clés stables (id) : la grille tient les ~3 600 films sans recomposer les cellules au défilement.
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 104.dp),
-        state = gridState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        items(state.works, key = { it.id }, contentType = { "work" }) { work ->
-            GridCell(work, onOpen)
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 104.dp),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(state.works, key = { it.id }, contentType = { "work" }) { work ->
+                GridCell(work, onOpen)
+            }
         }
+        if (!state.recent) FastScroller(gridState, state.works, Modifier.align(Alignment.TopEnd))
     }
 }
+
+/**
+ * Défilement rapide de la maquette « Parcourir » (tri par titre) : poignée au bord droit, à faire glisser,
+ * et bulle laiton avec la lettre du premier titre affiché, pendant le défilement.
+ */
+@Composable
+private fun FastScroller(grid: LazyGridState, works: List<WorkSummary>, modifier: Modifier = Modifier) {
+    if (works.size < FAST_SCROLL_MIN) return
+    val scope = rememberCoroutineScope()
+    var dragging by remember { mutableStateOf(false) }
+    val fraction by remember(grid) {
+        derivedStateOf {
+            val info = grid.layoutInfo
+            val last = (info.totalItemsCount - info.visibleItemsInfo.size).coerceAtLeast(1)
+            (grid.firstVisibleItemIndex.toFloat() / last).coerceIn(0f, 1f)
+        }
+    }
+    val active = dragging || grid.isScrollInProgress
+    val alpha by animateFloatAsState(if (active) 1f else 0f, label = "fastScroll")
+    BoxWithConstraints(modifier.fillMaxHeight().padding(vertical = 8.dp)) {
+        val track = maxHeight - THUMB_HEIGHT
+        val offset = track * fraction
+        if (alpha > 0f) {
+            Row(
+                Modifier.padding(top = offset - 2.dp, end = 4.dp).alpha(alpha),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 4.dp, bottomStart = 22.dp))
+                        .background(RcColors.accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        indexLetter(works.getOrNull(grid.firstVisibleItemIndex)?.titleFr.orEmpty()),
+                        style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.SemiBold, fontSize = 22.sp),
+                        color = RcColors.onAccent,
+                    )
+                }
+                Box(Modifier.size(width = 4.dp, height = THUMB_HEIGHT).clip(RoundedCornerShape(2.dp)).background(RcColors.text3))
+            }
+        }
+        // Zone de saisie étroite, au bord : les affiches de la dernière colonne restent touchables.
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .width(20.dp)
+                .fillMaxHeight()
+                .pointerInput(works) {
+                    fun jump(y: Float) {
+                        val f = (y / size.height).coerceIn(0f, 1f)
+                        scope.launch { grid.scrollToItem((f * (works.size - 1)).roundToInt()) }
+                    }
+                    detectVerticalDragGestures(
+                        onDragStart = {
+                            dragging = true
+                            jump(it.y)
+                        },
+                        onDragEnd = { dragging = false },
+                        onDragCancel = { dragging = false },
+                    ) { change, _ ->
+                        change.consume()
+                        jump(change.position.y)
+                    }
+                },
+        )
+    }
+}
+
+private const val FAST_SCROLL_MIN = 60
+private val THUMB_HEIGHT = 40.dp
 
 @Composable
 private fun TypeChips(selected: String?, onType: (String?) -> Unit) {
@@ -178,7 +273,7 @@ private fun GridCell(work: WorkSummary, onOpen: (WorkSummary) -> Unit) {
             year = work.year,
             progress = work.progress?.toFloat(),
             watched = work.watched,
-            unavailableLabel = if (work.playable) null else Texts.notAvailable,
+            unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
             modifier = Modifier.fillMaxWidth(),
         )
         Column {

@@ -154,4 +154,19 @@ class CatalogDaoTest {
         assertEquals("Théâtre", row.volumeLabel)
         assertEquals(false, row.present)
     }
+
+    @Test fun summary_names_the_absent_volume() = runTest {
+        val byId = dao.allWorks(false).first().associateBy { it.id }
+        assertEquals("Théâtre", byId.getValue(4).absentVolume) // fichier sur un disque débranché
+        assertEquals(null, byId.getValue(2).absentVolume) // aucun fichier : non numérisé
+        assertEquals(null, byId.getValue(1).absentVolume) // lisible
+    }
+
+    @Test fun summary_looks_at_episode_files_of_a_series() = runTest {
+        db.seed(
+            works = listOf(sync.works.first { it.id == 5L }.toEntity().copy(playable = false)),
+            files = listOf(MediaFileEntity(5, null, 1, "FHD", null, "x.mp4", "DISK2", false)),
+        )
+        assertEquals("Théâtre", dao.allWorks(false).first().single { it.id == 5L }.absentVolume)
+    }
 }

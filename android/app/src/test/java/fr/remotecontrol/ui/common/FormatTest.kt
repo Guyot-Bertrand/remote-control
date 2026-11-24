@@ -107,4 +107,13 @@ class FormatTest {
         assertEquals("Le 24 nov. 2026 à 21:12 · 1\u00A0œuvre, dont 1 lisible", Texts.lastSync(at, now + 3 * 86_400_000L, 1, 1, zone))
         assertEquals("Jamais synchronisé", Texts.lastSync(null, now, 0, 0, zone))
     }
+
+    @Test
+    fun index_letter() {
+        assertEquals("E", indexLetter("Étrange Histoire"))
+        assertEquals("O", indexLetter("Œdipe roi"))
+        assertEquals("#", indexLetter("2001 : l'odyssée de l'espace"))
+        assertEquals("L", indexLetter("« L'Aurore »"))
+        assertEquals("#", indexLetter(""))
+    }
 }

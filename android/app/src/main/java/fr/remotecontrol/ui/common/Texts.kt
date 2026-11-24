@@ -157,6 +157,9 @@ object Texts {
     const val showMore = "Afficher plus"
     const val showLess = "Afficher moins"
 
+    /** Mention courte d'une œuvre non lisible : nom du disque débranché, ou « Non numérisé ». */
+    fun unavailableLabel(absentVolume: String?) = absentVolume?.ifEmpty { disk } ?: notDigitized
+    const val disk = "Disque"
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"
     /** « Reprendre à 01:12 » à partir d'une heure, « Reprendre à 3 min » ou « Reprendre à 45 s » avant. */

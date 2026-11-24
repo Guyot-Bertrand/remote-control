@@ -1,5 +1,6 @@
 package fr.remotecontrol.ui.common
 
+import fr.remotecontrol.data.fold
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -40,4 +41,10 @@ fun formatCount(n: Int): String {
     val digits = kotlin.math.abs(n.toLong()).toString()
     val grouped = digits.reversed().chunked(3).joinToString(" ").reversed()
     return if (n < 0) "-$grouped" else grouped
+}
+
+/** Lettre d'index d'un titre (sans accents), pour le défilement rapide ; « # » s'il commence par un chiffre. */
+fun indexLetter(title: String): String {
+    val first = fold(title).firstOrNull { it.isLetterOrDigit() } ?: return "#"
+    return if (first.isLetter()) first.uppercase() else "#"
 }

@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -116,9 +118,7 @@ fun WorkRow(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = RcColors.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (!work.playable) {
-            Text(Texts.notAvailable, style = MaterialTheme.typography.bodySmall, color = RcColors.text3)
-        }
+        if (!work.playable) Unavailable(work.absentVolume)
     }
 }
 
@@ -130,5 +130,20 @@ fun highlighted(text: String, query: String?): AnnotatedString {
         matchRanges(text, query).forEach { r ->
             addStyle(SpanStyle(color = RcColors.accentStrong, fontWeight = FontWeight.SemiBold), r.first, r.last + 1)
         }
+    }
+}
+
+/** Pourquoi l'œuvre n'est pas lisible : disque débranché (terre cuite, son nom) ou non numérisée (atténué). */
+@Composable
+private fun Unavailable(absentVolume: String?) {
+    val color = if (absentVolume != null) RcColors.warn else RcColors.text3
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(
+            if (absentVolume != null) RcIcons.Disk else RcIcons.Disc,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(Texts.unavailableLabel(absentVolume), style = MaterialTheme.typography.bodySmall, color = color, maxLines = 1)
     }
 }
