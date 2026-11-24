@@ -112,8 +112,13 @@ object Texts {
     const val playableOnly = "Œuvres lisibles"
     const val wholeCatalogue = "Tout le catalogue"
     const val seeAll = "Tout voir"
-    const val catalogEmptySearching = "Catalogue vide : recherche du serveur…"
-    const val catalogEmptySyncing = "Catalogue vide : synchronisation…"
+    const val firstSync = "Première synchronisation…"
+    const val firstSyncHelp =
+        "Le catalogue est copié sur le téléphone pour pouvoir le parcourir même sans le PC. Les affiches suivront en arrière-plan."
+    const val catalogEmptyTitle = "Catalogue vide"
+    const val catalogEmptyHelp =
+        "Le PC n'a encore trouvé aucune œuvre. Ajoutez des fichiers sur un disque branché, puis resynchronisez."
+    const val checkServerAddress = "Vérifier l'adresse du serveur"
     const val qrUnknown = "QR-code non reconnu"
     const val cameraPermission = "Autorisez l'appareil photo pour scanner les QR-codes"
 
@@ -255,6 +260,9 @@ object Texts {
         "nl" -> "Néerlandais"
         else -> code.uppercase()
     }
+
+    /** « S2 É3 » (« É3 » hors saison), dans la ligne de reprise de l'accueil. */
+    fun episodeShort(season: Int, number: Int): String = if (season == 0) "É$number" else "S$season É$number"
 
     fun episodeCode(season: Int, number: Int): String =
         if (season == 0) "Épisode $number" else "S%02dE%02d".format(Locale.ROOT, season, number)

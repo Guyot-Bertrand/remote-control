@@ -27,6 +27,14 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.theme.Fraunces
+import fr.remotecontrol.ui.theme.Inter
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,15 +66,21 @@ fun HomeScreen(
     onSeeAllRecent: () -> Unit,
     onRemote: () -> Unit,
     onSettings: () -> Unit,
+    onResync: () -> Unit,
 ) {
+    if (state.banner == HomeBanner.Searching || state.banner == HomeBanner.Syncing) {
+        FirstSync(state.server, syncing = state.banner == HomeBanner.Syncing)
+        return
+    }
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
         HomeHeader(state.server, onSettings)
+        if (state.banner == HomeBanner.Empty) {
+            EmptyCatalog(onResync, onSettings)
+            return@Column
+        }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
-            when (state.banner) {
-                HomeBanner.NoServer -> item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
-                HomeBanner.Searching -> item { Banner(Texts.catalogEmptySearching, RcColors.surface2) }
-                HomeBanner.Syncing -> item { Banner(Texts.catalogEmptySyncing, RcColors.surface2) }
-                null -> Unit
+            if (state.banner == HomeBanner.NoServer) {
+                item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
             }
             item { FilterRow(state.playableOnly, onPlayableOnly, onRemote) }
             if (state.resume.isNotEmpty()) {
@@ -125,6 +139,71 @@ fun HomeScreen(
                 items(state.collections, key = { it.id }) { c ->
                     CollectionRow(c.name, Texts.collectionCounts(c.count, c.playableCount)) { onOpenCollection(c.id) }
                 }
+            }
+        }
+    }
+}
+
+/** Maquette « Première synchronisation » : marque, barre d'avancement, explication, serveur. */
+@Composable
+private fun FirstSync(server: ServerState, syncing: Boolean) {
+    Column(
+        Modifier.fillMaxSize().background(RcColors.bg).padding(horizontal = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(12.dp).clip(CircleShape).background(RcColors.accent))
+            Text(Texts.appName, style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 32.sp))
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Le serveur envoie le catalogue d'un bloc : l'avancement n'est pas connu, la barre est indéterminée.
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = RcColors.accent,
+                trackColor = RcColors.surface3,
+                strokeCap = StrokeCap.Round,
+                gapSize = 0.dp,
+            )
+            Text(
+                if (syncing) Texts.firstSync else Texts.searching,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                color = RcColors.text2,
+            )
+        }
+        Text(Texts.firstSyncHelp, style = body15, color = RcColors.text2, textAlign = TextAlign.Center)
+        (server as? ServerState.Connected)?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(RcIcons.Server, contentDescription = null, tint = RcColors.text3, modifier = Modifier.size(18.dp))
+                Text(it.address.display, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = RcColors.text3)
+            }
+        }
+    }
+}
+
+private val body15 = TextStyle(fontFamily = Inter, fontSize = 15.sp, lineHeight = 23.sp)
+
+/** Maquette « Catalogue vide » : le serveur répond mais n'a aucune œuvre. */
+@Composable
+private fun EmptyCatalog(onResync: () -> Unit, onSettings: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(96.dp).clip(CircleShape).background(RcColors.surface2), contentAlignment = Alignment.Center) {
+            Icon(RcIcons.Film, contentDescription = null, tint = RcColors.accent, modifier = Modifier.size(40.dp))
+        }
+        Text(
+            Texts.catalogEmptyTitle,
+            style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 26.sp),
+            modifier = Modifier.padding(top = 8.dp).semantics { heading() },
+        )
+        Text(Texts.catalogEmptyHelp, style = body15, color = RcColors.text2, textAlign = TextAlign.Center)
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton(Texts.resync, RcIcons.Sync, onResync, Modifier.fillMaxWidth())
+            TextButton(onClick = onSettings, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                Text(Texts.checkServerAddress, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 15.sp), color = RcColors.accentStrong)
             }
         }
     }

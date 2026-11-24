@@ -7,6 +7,7 @@ import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.CollectionSummary
 import fr.remotecontrol.data.db.ResumeRow
 import fr.remotecontrol.data.db.WorkSummary
+import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.ui.common.Texts
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class ResumeItem(
     val targetKind: String,
@@ -29,36 +31,41 @@ data class ResumeItem(
     val label: String,
 )
 
+/** Titre de l'œuvre ; pour un épisode, la ligne de détail commence par « S2 É3 · ». */
 fun toResumeItem(row: ResumeRow): ResumeItem {
-    val title = if (row.targetKind == "episode" && row.seasonNumber != null && row.episodeNumber != null) {
-        Texts.episodeTitle(row.titleFr, row.seasonNumber, row.episodeNumber)
+    val episode = if (row.targetKind == "episode" && row.seasonNumber != null && row.episodeNumber != null) {
+        Texts.episodeShort(row.seasonNumber, row.episodeNumber)
     } else {
-        row.titleFr
+        null
     }
     val duration = row.duration
-    if (duration == null || duration <= 0.0) {
-        return ResumeItem(
-            row.targetKind, row.targetId, row.workId, row.seasonId, title, row.poster, 0f, Texts.resumeAt(row.position),
-        )
-    }
-    val progress = (row.position / duration).toFloat().coerceIn(0f, 1f)
-    val label = Texts.remaining(remainingMinutes(row.position, duration))
-    return ResumeItem(row.targetKind, row.targetId, row.workId, row.seasonId, title, row.poster, progress, label)
+    val known = duration != null && duration > 0.0
+    val progress = if (known) (row.position / duration).toFloat().coerceIn(0f, 1f) else 0f
+    val left = if (known) Texts.remaining(remainingMinutes(row.position, duration)) else Texts.resumeAt(row.position)
+    return ResumeItem(
+        row.targetKind, row.targetId, row.workId, row.seasonId, row.titleFr, row.poster, progress, Texts.details(episode, left),
+    )
 }
 
-/** Bandeau d'état en tête de l'accueil. */
-enum class HomeBanner { Searching, NoServer, Syncing }
+/**
+ * État particulier de l'accueil : [NoServer] est un bandeau ; les autres remplacent le contenu (catalogue vide) :
+ * recherche du serveur, première synchronisation, ou catalogue vide sur le serveur ([Empty]).
+ */
+enum class HomeBanner { Searching, NoServer, Syncing, Empty }
 
 /**
  * Sans serveur : « Aucun serveur trouvé » (avec accès aux réglages), catalogue vide ou non.
- * Catalogue vide : recherche du serveur en cours, ou synchronisation une fois connecté.
+ * Catalogue vide : recherche du serveur en cours, synchronisation une fois connecté, ou — après une
+ * synchronisation réussie ([everSynced]) et hors synchronisation — catalogue vide sur le serveur.
  */
-fun homeBanner(server: ServerState, catalogEmpty: Boolean): HomeBanner? = when {
-    server == ServerState.NotFound -> HomeBanner.NoServer
-    !catalogEmpty -> null
-    server is ServerState.Connected -> HomeBanner.Syncing
-    else -> HomeBanner.Searching
-}
+fun homeBanner(server: ServerState, catalogEmpty: Boolean, everSynced: Boolean = false, syncing: Boolean = false): HomeBanner? =
+    when {
+        server == ServerState.NotFound -> HomeBanner.NoServer
+        !catalogEmpty -> null
+        server is ServerState.Connected && everSynced && !syncing -> HomeBanner.Empty
+        server is ServerState.Connected -> HomeBanner.Syncing
+        else -> HomeBanner.Searching
+    }
 
 data class HomeUi(
     val resume: List<ResumeItem> = emptyList(),
@@ -81,7 +88,10 @@ class HomeViewModel(
     dao: CatalogDao,
     private val filter: CatalogFilter,
     locator: ServerLocator,
+    private val sync: SyncRepository,
 ) : ViewModel() {
+    private val syncState = combine(sync.syncing, sync.syncedAt) { syncing, at -> syncing to (at != null) }
+
     private val filtered = filter.playableOnly.flatMapLatest { playable ->
         combine(dao.recentWorks(playable, 20), dao.collections(playable)) { recent, collections ->
             Filtered(playable, recent, collections)
@@ -93,7 +103,8 @@ class HomeViewModel(
         filtered,
         dao.observeWorkCount(),
         locator.state,
-    ) { resume, f, count, server ->
+        syncState,
+    ) { resume, f, count, server, (syncing, everSynced) ->
         HomeUi(
             resume = resume.map(::toResumeItem),
             recent = f.recent,
@@ -101,11 +112,16 @@ class HomeViewModel(
             playableOnly = f.playableOnly,
             catalogEmpty = count == 0,
             server = server,
-            banner = homeBanner(server, count == 0),
+            banner = homeBanner(server, count == 0, everSynced, syncing),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
     fun setPlayableOnly(value: Boolean) {
         filter.playableOnly.value = value
+    }
+
+    /** « Resynchroniser » du catalogue vide : synchronisation complète. */
+    fun resync() {
+        viewModelScope.launch { sync.sync(forceFull = true) }
     }
 }

@@ -3,16 +3,19 @@ package fr.remotecontrol.ui.home
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.data.db.ResumeRow
+import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.discovery.ServerAddress
 import fr.remotecontrol.discovery.ServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.InfoDto
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.ServerProbe
 import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.testing.FakeKeyValueStore
+import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
@@ -23,6 +26,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -46,10 +50,15 @@ class HomeViewModelTest {
         db.close()
     }
 
+    private val api = FakeRcApi()
+    private val empty = SyncDto(revision = 1, full = true)
+    private val locator = ServerLocator(FakeKeyValueStore(), ServerProbe { InfoDto("rc", 1, 1) }, ServerDiscovery { emptyFlow() })
+
     private fun viewModel() = HomeViewModel(
         db.catalogDao(),
         CatalogFilter(),
-        ServerLocator(FakeKeyValueStore(), ServerProbe { InfoDto("rc", 1, 1) }, ServerDiscovery { emptyFlow() }),
+        locator,
+        SyncRepository(db, api),
     ).also { vms += it }
 
     // Room exécute ses requêtes hors du dispatcher de test : on attend l'état voulu.
@@ -60,8 +69,8 @@ class HomeViewModelTest {
         SyncWriter(db).apply(full)
         val vm = viewModel()
         val ui = vm.await { it.resume.size == 2 }
-        assertEquals(listOf("Back to Life — S01E02", "Ava"), ui.resume.map { it.title })
-        assertEquals("reste 19 min", ui.resume[0].label)
+        assertEquals(listOf("Back to Life", "Ava"), ui.resume.map { it.title })
+        assertEquals("S1 É2 · reste 19 min", ui.resume[0].label)
         assertEquals("reste 1 h 29", ui.resume[1].label)
     }
 
@@ -79,6 +88,19 @@ class HomeViewModelTest {
         assertEquals(HomeBanner.Syncing, homeBanner(here, catalogEmpty = true))
         assertEquals(null, homeBanner(here, catalogEmpty = false))
         assertEquals(null, homeBanner(ServerState.Searching, catalogEmpty = false))
+        // Déjà synchronisé et toujours vide : le serveur n'a aucune œuvre.
+        assertEquals(HomeBanner.Empty, homeBanner(here, catalogEmpty = true, everSynced = true))
+        assertEquals(HomeBanner.Syncing, homeBanner(here, catalogEmpty = true, everSynced = true, syncing = true))
+    }
+
+    @Test fun catalog_empty_after_a_sync_offers_resync() = runBlocking {
+        api.syncResponses.addLast(ApiResult.Ok(empty))
+        val vm = viewModel()
+        locator.setManual(ServerAddress("10.0.0.1"))
+        vm.resync()
+        val ui = vm.await { it.banner == HomeBanner.Empty }
+        assertTrue(ui.catalogEmpty)
+        assertTrue("sync(null)" in api.calls)
     }
 
     @Test fun collections_show_total_and_playable() = runBlocking {

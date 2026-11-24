@@ -142,7 +142,7 @@ private fun RcScaffold(c: AppContainer) {
 private fun RcNavHost(c: AppContainer, nav: NavHostController) {
     NavHost(nav, startDestination = HomeRoute) {
         composable<HomeRoute> {
-            val vm = viewModel { HomeViewModel(c.catalogDao, c.filter, c.locator) }
+            val vm = viewModel { HomeViewModel(c.catalogDao, c.filter, c.locator, c.sync) }
             val state by vm.state.collectAsStateWithLifecycle()
             HomeScreen(
                 state = state,
@@ -154,6 +154,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onSeeAllRecent = { nav.navigate(BrowseRoute(sort = SORT_RECENT)) },
                 onRemote = { nav.navigate(RemoteRoute) },
                 onSettings = { nav.navigate(SettingsRoute) },
+                onResync = vm::resync,
             )
         }
         composable<SettingsRoute> {
