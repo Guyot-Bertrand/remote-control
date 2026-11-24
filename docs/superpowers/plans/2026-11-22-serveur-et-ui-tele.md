@@ -416,7 +416,7 @@ Règles :
 
 Règles :
 - **Choix de la version** : `media_file_id` s'il est fourni, sinon la version mémorisée dans `progress` (pour `resume`), sinon la meilleure qualité présente selon `QUALITY_ORDER`.
-- **Erreurs** : aucun fichier lisible → `not_playable`. Fichier connu mais disque absent → `volume_absent` avec le libellé du disque, et la télé affiche `f"Disque « {label} » non branché"`. Chemin introuvable → `not_found`. Échec de démarrage du lecteur → `player` (409 `{"error":"player"}`), message télé « Le lecteur ne répond pas ».
+- **Erreurs** : aucun fichier lisible → `not_playable`. Fichier connu mais disque absent → `volume_absent` avec le libellé du disque, et la télé affiche `f"Disque « {label} » non branché"`. Chemin introuvable → `not_found`. Échec de démarrage du lecteur → `player` (409 `{"error":"player"}`), message télé « Le lecteur vidéo ne répond pas. » ; exécutable absent → `player_missing` (voir Task 10, ajouts 9–12).
 - **Position de départ** : 0 pour `start`. Pour `resume`, la position de `progress` si `watched == 0`, sinon 0.
 - **Pistes** : celles de la requête, sinon le dernier choix de `progress`, sinon `default_selection`.
 - **Lecture déjà en cours** : elle est arrêtée (avec enregistrement de sa position) avant de démarrer la nouvelle.
@@ -459,6 +459,7 @@ Règles :
   - `POST /api/player/pause {"paused": bool}`, `/seek {"seconds": float, "relative": bool}`, `/volume {"level": 0..100}`, `/audio {"index": int|null}`, `/subtitle {SubSel}`, `/stop` → `{"ok": true}`. Sans lecture en cours, `409 {"error": "idle"}`.
   - `GET /api/player/state` → `{"state", "current"}`
   - `WS /api/events` : envoie d'abord `{"type": "hello", "revision", "tv", "player"}`, puis relaie les messages du bus (`player`, `tv`, `catalog`).
+  - Ajouts 9–12 de `2026-11-22-api-contract-rulings.md` (font foi) : toute erreur porte `"message"` en français (textes centralisés dans `rc/messages.py`, aussi pour la télé ; exception imprévue → `500 {"error": "internal", ...}`) ; code `player_missing` (mpv absent) ; `GET /api/info` ajoute `"player_available"` ; `POST /api/play` sur le média en cours ne relance pas le lecteur (`start` → retour au début, `resume` → position gardée, pistes appliquées, pause levée).
 
 - [ ] **Step 1: tests qui échouent** (FastAPI `TestClient`, `FakePlayer`) :
   - `test_sync_full_then_incremental` : synchronisation complète, puis modification d'une œuvre et réimport → `since=rev` ne renvoie que cette œuvre.
