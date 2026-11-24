@@ -46,10 +46,13 @@ import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkCollectionRow
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.Availability
+import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.NoticeCard
 import fr.remotecontrol.ui.common.NotFound
+import fr.remotecontrol.ui.common.OpenRemoteAction
+import fr.remotecontrol.ui.common.PlayerMissingBanner
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
@@ -81,6 +84,7 @@ fun WorkScreen(
     onPlayFromStart: () -> Unit,
     onResume: () -> Unit,
     onPrePlay: (StartMode) -> Unit,
+    onOpenRemote: () -> Unit,
     onOpenSeason: (Long) -> Unit,
     onOpenCollection: (Long) -> Unit,
     onDismissMessage: () -> Unit,
@@ -96,6 +100,7 @@ fun WorkScreen(
         // Maquette « PC injoignable » : on parcourt la fiche, la lecture attend le retour du serveur.
         val offline = server == ServerState.NotFound
         if (offline) OfflineBanner(onRetryServer)
+        if (state.playerMissing) PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         Column(
             Modifier
                 .fillMaxSize()
@@ -104,7 +109,12 @@ fun WorkScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Identity(state)
-            if (!state.work.episodic) PlayActions(state, offline, onPlayFromStart, onResume, onPrePlay)
+            // Déjà en lecture sur la télé : on rouvre la télécommande au lieu de relancer (la télé ne clignote pas).
+            if (state.action == SheetAction.OpenRemote) {
+                OpenRemoteAction(onOpenRemote)
+            } else if (!state.work.episodic) {
+                PlayActions(state, offline, onPlayFromStart, onResume, onPrePlay)
+            }
             state.message?.let { MessageBanner(it, onDismissMessage) }
             state.work.synopsis?.let { Synopsis(it) }
             if (state.work.episodic && state.seasons.isNotEmpty()) Seasons(state.seasons, onOpenSeason)
@@ -169,7 +179,7 @@ private fun PlayActions(
     onResume: () -> Unit,
     onPrePlay: (StartMode) -> Unit,
 ) {
-    val ready = !state.launching && !offline
+    val ready = !state.launching && !offline && state.action == SheetAction.Play
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(
             Texts.playFromStart, RcIcons.Play, onPlayFromStart, Modifier.fillMaxWidth(),
@@ -195,7 +205,7 @@ private fun PlayActions(
                 body = Texts.volumeAbsentHelp,
                 warn = true,
                 // Le serveur sait si le disque vient d'être branché : on retente la lecture.
-                action = Texts.retry.takeIf { !state.launching },
+                action = Texts.retry.takeIf { !state.launching && state.action == SheetAction.Play },
                 onAction = onPlayFromStart,
             )
             Availability.NotDigitized -> NoticeCard(RcIcons.Disc, Texts.notDigitized, Texts.notDigitizedHelp, warn = false)

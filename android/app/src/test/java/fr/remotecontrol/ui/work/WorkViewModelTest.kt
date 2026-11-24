@@ -8,6 +8,7 @@ import fr.remotecontrol.net.PlayRequestDto
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.player.PlayLauncher
+import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
@@ -20,7 +21,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.net.PlayerStateDto
+import kotlinx.coroutines.flow.MutableStateFlow
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
 import fr.remotecontrol.player.TvStatus
@@ -65,6 +69,44 @@ class WorkViewModelTest {
     // Room répond hors du dispatcher de test : on attend l'état voulu.
     private suspend fun WorkViewModel.await(predicate: (WorkUi) -> Boolean = { true }) =
         withTimeout(5_000) { state.filterNotNull().first(predicate) }
+
+    private val live = MutableStateFlow<PlayerSnapshotDto?>(null)
+    private val playerAvailable = MutableStateFlow(true)
+
+    private fun liveViewModel(id: Long) =
+        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerAvailable).also { vms += it }
+
+    private fun playing(current: CurrentDto, ended: Boolean = false) =
+        PlayerSnapshotDto(PlayerStateDto(running = true, ended = ended), current)
+
+    @Test fun sheet_of_the_work_playing_on_tv_opens_the_remote() = runBlocking {
+        val vm = liveViewModel(1)
+        assertEquals(SheetAction.Play, vm.await().action)
+        live.value = playing(CurrentDto("work", 1, 1, 1, title = "Film"))
+        assertTrue(vm.await { it.action == SheetAction.OpenRemote }.playingHere)
+        live.value = playing(CurrentDto("work", 1, 1, 1), ended = true)
+        vm.await { it.action == SheetAction.Play }
+        // Une autre œuvre en lecture : cette fiche garde « Lire ».
+        live.value = playing(CurrentDto("work", 2, 3, 2))
+        vm.await { it.action == SheetAction.Play && !it.playingHere }
+        Unit
+    }
+
+    @Test fun series_sheet_follows_its_episode_playing() = runBlocking {
+        val vm = liveViewModel(5)
+        live.value = playing(CurrentDto("episode", 2, 6, 5, seasonId = 1))
+        vm.await { it.playingHere }
+        Unit
+    }
+
+    @Test fun player_missing_disables_play() = runBlocking {
+        val vm = liveViewModel(1)
+        playerAvailable.value = false
+        vm.await { it.action == SheetAction.PlayerMissing }
+        playerAvailable.value = true
+        vm.await { it.action == SheetAction.Play }
+        Unit
+    }
 
     @Test fun retry_server_searches_again() = runBlocking {
         val searched = CompletableDeferred<Unit>()

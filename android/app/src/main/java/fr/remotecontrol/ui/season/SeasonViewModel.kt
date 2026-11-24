@@ -6,7 +6,14 @@ import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.EpisodeRow
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkEntity
+import fr.remotecontrol.net.CurrentDto
+import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.RcApi
+import fr.remotecontrol.player.SheetAction
+import fr.remotecontrol.player.live
+import fr.remotecontrol.player.playsEpisode
+import fr.remotecontrol.player.playsSeason
+import fr.remotecontrol.player.sheetAction
 import fr.remotecontrol.player.PlayLauncher
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.StartMode
@@ -23,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -41,6 +49,8 @@ data class EpisodeUi(
     val playable: Boolean,
     val watched: Boolean = false,
     val progress: Float? = null,
+    /** Lire, rouvrir la télécommande (cet épisode joue sur la télé), ou lecteur absent du PC. */
+    val action: SheetAction = SheetAction.Play,
 )
 
 /** [work] et [seasons] : en-tête de la série et sélecteur de saison des maquettes. */
@@ -55,6 +65,10 @@ data class SeasonUi(
     val launching: Boolean = false,
     /** Qualités disponibles dans la saison (« FHD »), de la meilleure à la moins bonne. */
     val qualities: List<String> = emptyList(),
+    /** Un épisode de cette saison joue sur la télé en ce moment. */
+    val playingHere: Boolean = false,
+    /** Le lecteur n'est pas installé sur le PC (bandeau ; lecture impossible). */
+    val playerMissing: Boolean = false,
 )
 
 private data class Catalog(
@@ -72,6 +86,10 @@ class SeasonViewModel(
     api: RcApi,
     launcher: PlayLauncher,
     tvStatus: TvStatus,
+    /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
+    live: Flow<PlayerSnapshotDto?> = flowOf(null),
+    /** Le lecteur est installé sur le PC ([fr.remotecontrol.discovery.ServerLocator.playerAvailable]). */
+    playerAvailable: Flow<Boolean> = flowOf(true),
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
 
@@ -96,8 +114,12 @@ class SeasonViewModel(
         }
     }
 
-    val state: StateFlow<SeasonUi?> = combine(catalog, playAction.message, tvSheet.onTv, playAction.launching) { c, msg, tv, busy ->
-        c?.let { toUi(it, msg, tv).copy(launching = busy) }
+    private val current: Flow<CurrentDto?> = live.map { it.live() }.distinctUntilChanged()
+
+    val state: StateFlow<SeasonUi?> = combine(
+        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(current, playerAvailable, ::Pair),
+    ) { c, msg, tv, busy, (playing, available) ->
+        c?.let { toUi(it, msg, tv).copy(launching = busy).withPlayback(playing, available) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** La base a répondu sans cette saison. */
@@ -128,6 +150,13 @@ class SeasonViewModel(
         )
     }
 }
+
+/** Épisode en cours sur la télé : « Ouvrir la télécommande » à la place de la lecture. */
+private fun SeasonUi.withPlayback(playing: CurrentDto?, available: Boolean) = copy(
+    playingHere = playing?.playsSeason(season.id) == true,
+    playerMissing = !available,
+    episodes = episodes.map { it.copy(action = sheetAction(playing?.playsEpisode(it.id) == true, available)) },
+)
 
 private fun EpisodeRow.toUi(seasonNumber: Int, highlighted: Boolean): EpisodeUi {
     val seen = watched == true

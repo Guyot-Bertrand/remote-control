@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.common.PlayerMissingBanner
 import fr.remotecontrol.ui.common.PosterThumb
 import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.ScreenHeader
@@ -60,6 +61,8 @@ import java.util.Locale
 fun PrePlayScreen(
     state: PrePlayUi,
     server: ServerState,
+    /** Le lecteur n'est pas installé sur le PC : bandeau, et « Lire sur la télé » désactivé. */
+    playerMissing: Boolean,
     onVersion: (Long) -> Unit,
     onAudio: (Int) -> Unit,
     onSubtitle: (SubSel) -> Unit,
@@ -69,6 +72,7 @@ fun PrePlayScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.prePlayTitle, server, onBack = onClose, backIcon = RcIcons.Clear, backLabel = Texts.close)
+        if (playerMissing) PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
             Header(state)
             Section(Texts.version, RcIcons.Film) {
@@ -109,7 +113,7 @@ fun PrePlayScreen(
             Modifier.background(RcColors.bg).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PillButton(Texts.playOnTv, RcIcons.Play, onConfirm, Modifier.fillMaxWidth(), enabled = state.canConfirm)
+            PillButton(Texts.playOnTv, RcIcons.Play, onConfirm, Modifier.fillMaxWidth(), enabled = state.canConfirm && !playerMissing)
             Text(
                 state.footer,
                 style = TextStyle(fontFamily = Inter, fontSize = 12.sp),

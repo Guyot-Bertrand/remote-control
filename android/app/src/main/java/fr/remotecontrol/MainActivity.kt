@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -38,6 +40,7 @@ import androidx.navigation.toRoute
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.TargetKind
+import fr.remotecontrol.player.playerMissing
 import fr.remotecontrol.ui.browse.BrowseScreen
 import fr.remotecontrol.ui.browse.BrowseViewModel
 import fr.remotecontrol.ui.common.BrowseRoute
@@ -129,19 +132,28 @@ private fun RcScaffold(c: AppContainer) {
     var lastTab by rememberSaveable { mutableStateOf(TopDestination.Home) }
     val shown = shownTab(top, lastTab)
     LaunchedEffect(shown) { lastTab = shown }
+    // Lecture en cours : bandeau « Sur la télé » en bas de tous les écrans (fiches comprises), sauf la
+    // télécommande elle-même, l'écran de choix avant lecture et le scanner (plein écran).
+    val miniPlayer = entry?.destination?.let { d ->
+        !d.hasRoute<RemoteRoute>() && !d.hasRoute<PrePlayRoute>() && !d.hasRoute<ScanRoute>()
+    } == true
     Column(Modifier.fillMaxSize()) {
-        val insets = if (top != null) {
+        val insets = if (top != null || miniPlayer) {
             Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
         } else {
             Modifier.safeDrawingPadding()
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
-        // Lecture en cours : bandeau « Sur la télé » au-dessus de la barre (sauf sur le scanner, plein écran).
-        if (top != null && top != TopDestination.Scan) NowPlaying(c) { nav.navigate(RemoteRoute) { launchSingleTop = true } }
-        if (top != null) RcBottomBar(selected = shown, onSelect = {
-            lastTab = it
-            nav.navigateTop(it, shown)
-        })
+        if (miniPlayer) NowPlaying(c) { nav.navigate(RemoteRoute) { launchSingleTop = true } }
+        if (top != null) {
+            RcBottomBar(selected = shown, onSelect = {
+                lastTab = it
+                nav.navigateTop(it, shown)
+            })
+        } else if (miniPlayer) {
+            // Sans barre de navigation : le bandeau (ou le clavier) reste au-dessus de la barre système.
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
+        }
     }
 }
 
@@ -161,6 +173,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             val state by vm.state.collectAsStateWithLifecycle()
             HomeScreen(
                 state = state,
+                playerMissing = c.playerMissing(),
                 onPlayableOnly = vm::setPlayableOnly,
                 onOpenWork = { nav.navigate(WorkRoute(it)) },
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
@@ -216,7 +229,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
-            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) { c.locator.locate(force = true) } }
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.remote.snapshot, c.locator.playerAvailable) { c.locator.locate(force = true) } }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -232,6 +245,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onPlayFromStart = vm::playFromStart,
                 onResume = vm::resume,
                 onPrePlay = { nav.navigate(PrePlayArgs(PlayTarget(TargetKind.Work, id), it).toRoute()) },
+                onOpenRemote = { nav.navigate(RemoteRoute) { launchSingleTop = true } },
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onDismissMessage = vm::clearMessage,
@@ -241,7 +255,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
-            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) }
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.remote.snapshot, c.locator.playerAvailable) }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -256,6 +270,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 server = server,
                 onPlay = vm::play,
                 onPrePlay = { episode, mode -> nav.navigate(PrePlayArgs(PlayTarget(TargetKind.Episode, episode), mode).toRoute()) },
+                onOpenRemote = { nav.navigate(RemoteRoute) { launchSingleTop = true } },
                 // Changer de saison remplace la fiche affichée (le retour ramène à la série).
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) { popUpTo<SeasonRoute> { inclusive = true } } },
                 onDismissMessage = vm::clearMessage,
@@ -284,6 +299,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             PrePlayScreen(
                 state = state,
                 server = server,
+                playerMissing = c.playerMissing(),
                 onVersion = vm::selectVersion,
                 onAudio = vm::selectAudio,
                 onSubtitle = vm::selectSubtitle,
@@ -325,6 +341,14 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             ScanScreen(state = state, onDecoded = vm::onDecoded, onDismissMessage = vm::clearMessage)
         }
     }
+}
+
+/** Bandeau « lecteur absent du PC » : suivi à chaque sonde du serveur ([fr.remotecontrol.discovery.ServerLocator]). */
+@Composable
+private fun AppContainer.playerMissing(): Boolean {
+    val server by locator.state.collectAsStateWithLifecycle()
+    val available by locator.playerAvailable.collectAsStateWithLifecycle()
+    return playerMissing(server, available)
 }
 
 /**

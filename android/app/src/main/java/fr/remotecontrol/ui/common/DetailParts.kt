@@ -24,7 +24,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -214,4 +217,51 @@ fun NotFound(text: String) {
         color = RcColors.text2,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
     )
+}
+
+/**
+ * Bandeau persistant « lecteur absent du PC » (terre cuite) : fiches, écran de choix et accueil. Les boutons
+ * de lecture sont désactivés à côté ; ce bandeau en donne la raison.
+ */
+@Composable
+fun PlayerMissingBanner(modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(RcColors.warnSoft)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(RcIcons.Tv, contentDescription = null, tint = RcColors.warn, modifier = Modifier.size(22.dp))
+        Text(
+            Texts.playerUnavailable,
+            style = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 18.sp),
+            color = RcColors.text,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * La cible de la fiche joue déjà sur la télé : « Ouvrir la télécommande » (sans relancer la lecture, la télé
+ * ne clignote pas) et la mention « En cours sur la télé ».
+ */
+@Composable
+fun OpenRemoteAction(onOpenRemote: () -> Unit, modifier: Modifier = Modifier, height: Dp = 56.dp) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PillButton(Texts.openRemote, RcIcons.Remote, onOpenRemote, Modifier.fillMaxWidth(), height = height)
+        PlayingOnTv()
+    }
+}
+
+/** Mention « En cours sur la télé » (petite, icône télé). */
+@Composable
+fun PlayingOnTv(modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(RcIcons.Tv, contentDescription = null, tint = RcColors.accentStrong, modifier = Modifier.size(16.dp))
+        Text(Texts.playingOnTv, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 12.sp), color = RcColors.accentStrong)
+    }
 }
