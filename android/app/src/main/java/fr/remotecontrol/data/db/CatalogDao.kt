@@ -118,6 +118,11 @@ interface CatalogDao {
             "WHERE e.seasonId = :seasonId AND m.present = 1")
     fun seasonQualities(seasonId: Long): Flow<List<String>>
 
+    /** Qualités des fichiers présents de chaque épisode d'une saison (carte de l'épisode choisi). */
+    @Query("SELECT DISTINCT m.episodeId AS episodeId, m.quality AS quality FROM media_file m JOIN episode e ON m.episodeId = e.id " +
+            "WHERE e.seasonId = :seasonId AND m.present = 1")
+    fun episodeQualitiesOfSeason(seasonId: Long): Flow<List<EpisodeQuality>>
+
     @Query(
         "SELECT e.number AS number, e.title AS title, s.number AS seasonNumber, w.titleFr AS workTitle, " +
             "w.poster AS poster, w.year AS year FROM episode e JOIN season s ON s.id = e.seasonId " +

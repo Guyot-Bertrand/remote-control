@@ -171,6 +171,9 @@ object Texts {
     const val seasonNotFound = "Saison introuvable."
     const val dismiss = "Fermer"
     const val inProgress = "En cours"
+    const val upNext = "À suivre"
+    /** Libellé accessible du toucher d'une ligne d'épisode (sélection, sans lecture). */
+    const val showEpisode = "Afficher l'épisode"
     const val showMore = "Afficher plus"
     const val change = "Modifier"
     const val withoutSubtitles = "Sans sous-titres"

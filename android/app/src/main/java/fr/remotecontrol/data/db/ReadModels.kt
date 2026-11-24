@@ -83,5 +83,8 @@ data class EpisodeRow(
     val playable: Boolean,
 )
 
+/** Qualité d'un fichier présent d'un épisode. */
+data class EpisodeQuality(val episodeId: Long, val quality: String)
+
 /** Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre, qualité du fichier. */
 data class PlayingInfo(val poster: String?, val year: Int?, val quality: String?, val title: String? = null)

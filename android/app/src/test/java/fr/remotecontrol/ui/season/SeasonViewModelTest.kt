@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
+import androidx.lifecycle.SavedStateHandle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -169,5 +170,45 @@ class SeasonViewModelTest {
         assertEquals("Aucun fichier lisible pour cette œuvre", vm.await { it.message != null }.message)
         vm.clearMessage()
         assertNull(vm.await { it.message == null }.message)
+    }
+
+    @Test fun selection_defaults_to_highlight_then_follows_taps() = runBlocking {
+        val vm = viewModel(1)
+        val ui = vm.await { it.episodes.size == 2 }
+        assertEquals(listOf(false, true), ui.episodes.map { it.selected })
+        val second = ui.episodes[1]
+        assertEquals("24 min · reste 19 min", second.details)
+        assertEquals(listOf("FHD"), second.qualities)
+        assertNull(ui.episodes[0].details)
+        vm.select(1)
+        val picked = vm.await { it.episodes[0].selected }
+        assertEquals(listOf(true, false), picked.episodes.map { it.selected })
+        // L'épisode à suivre garde sa mise en évidence (repère « En cours »), sans être lancé.
+        assertEquals(listOf(false, true), picked.episodes.map { it.highlighted })
+        assertFalse(api.calls.any { it.startsWith("play(") })
+    }
+
+    @Test fun selection_survives_recreation_and_resets_on_another_season() = runBlocking {
+        val saved = SavedStateHandle()
+        val first = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, savedState = saved).also { vms += it }
+        first.await { it.episodes.size == 2 }
+        first.select(1)
+        first.await { it.episodes[0].selected }
+        // Rotation : nouveau ViewModel, même état sauvegardé.
+        val again = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, savedState = saved).also { vms += it }
+        assertEquals(listOf(true, false), again.await { it.episodes.size == 2 }.episodes.map { it.selected })
+        // Autre saison : retour à l'épisode mis en évidence.
+        val other = SeasonViewModel(2, db.catalogDao(), api, PlayLauncher(api), tvStatus, savedState = saved).also { vms += it }
+        val ui = other.await { it.episodes.size == 1 }
+        assertTrue(ui.episodes.single().selected)
+    }
+
+    @Test fun selected_playing_episode_offers_the_remote() = runBlocking {
+        val vm = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
+        vm.await { it.episodes.size == 2 }
+        live.value = PlayerSnapshotDto(PlayerStateDto(running = true), CurrentDto("episode", 1, 5, 5, seasonId = 1))
+        vm.select(1)
+        val ui = vm.await { it.playingHere && it.episodes[0].selected }
+        assertEquals(SheetAction.OpenRemote, ui.episodes.single { it.selected }.action)
     }
 }
