@@ -1,5 +1,7 @@
 package fr.remotecontrol.data.db
 
+import androidx.room.Embedded
+
 data class WorkSummary(
     val id: Long,
     val type: String,
@@ -12,6 +14,14 @@ data class WorkSummary(
     /** Position / durée quand l'œuvre est entamée et non vue ; nulle sinon. */
     val progress: Double?,
     val watched: Boolean,
+)
+
+/** Résultat de recherche : l'œuvre, plus les champs qui expliquent la correspondance. */
+data class SearchHit(
+    @Embedded val work: WorkSummary,
+    val titleVo: String?,
+    val titleAlt: String?,
+    val cast: List<String>,
 )
 
 /** En-tête de l'écran de choix pour un épisode : série, saison et numéro. */

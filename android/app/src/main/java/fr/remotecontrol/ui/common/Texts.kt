@@ -66,6 +66,16 @@ object Texts {
     const val searchHelp = "Titres, titres originaux et alternatifs, réalisation, casting — sans tenir compte des accents."
     const val clear = "Effacer"
     const val openWork = "Ouvrir la fiche"
+    const val sectionPeople = "Personnes"
+    const val sectionWorks = "Œuvres"
+    const val sectionAka = "Aussi connu sous"
+    const val acting = "Interprétation"
+    const val searchPerson = "Chercher ses œuvres"
+    fun personRole(directing: Boolean, count: Int) = "${if (directing) directors else acting} · ${countOfType(null, count)}"
+    fun altTitle(original: Boolean, title: String) = "${if (original) "Titre original" else "Titre alternatif"} : $title"
+    /** Initiales d'un nom (« LM » pour « Léa Mysius »), au plus deux. */
+    fun initials(name: String) = name.split(' ', '-').filter { it.isNotBlank() }.let { if (it.size > 2) listOf(it.first(), it.last()) else it }
+        .joinToString("") { it.first().uppercase() }
 
     // Barre de navigation
     const val navHome = "Accueil"

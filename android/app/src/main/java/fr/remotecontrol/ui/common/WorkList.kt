@@ -20,13 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.remotecontrol.data.db.WorkSummary
+import fr.remotecontrol.ui.search.matchRanges
 import fr.remotecontrol.ui.theme.Fraunces
 import fr.remotecontrol.ui.theme.RcColors
 
@@ -54,8 +58,18 @@ fun WorkList(
     }
 }
 
+/**
+ * Ligne d'œuvre (80 dp, 76 avec un rang). [highlight] : saisie de recherche, mise en évidence (laiton) dans le
+ * titre et la ligne de détail ; [note] : troisième ligne (« Titre alternatif : … »).
+ */
 @Composable
-private fun WorkRow(work: WorkSummary, rank: String?, onOpen: (WorkSummary) -> Unit) {
+fun WorkRow(
+    work: WorkSummary,
+    rank: String?,
+    onOpen: (WorkSummary) -> Unit,
+    highlight: String? = null,
+    note: String? = null,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -85,16 +99,36 @@ private fun WorkRow(work: WorkSummary, rank: String?, onOpen: (WorkSummary) -> U
             modifier = Modifier.width(if (rank != null) 40.dp else 44.dp),
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(work.titleFr, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                Texts.workLine(work.year, work.type, work.directors),
+                highlighted(work.titleFr, highlight),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                highlighted(Texts.workLine(work.year, work.type, work.directors), highlight),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
                 color = RcColors.text2,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            note?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = RcColors.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         if (!work.playable) {
             Text(Texts.notAvailable, style = MaterialTheme.typography.bodySmall, color = RcColors.text3)
+        }
+    }
+}
+
+/** [text] avec les passages répondant à [query] en laiton (maquette « Recherche »). */
+fun highlighted(text: String, query: String?): AnnotatedString {
+    if (query.isNullOrBlank()) return AnnotatedString(text)
+    return buildAnnotatedString {
+        append(text)
+        matchRanges(text, query).forEach { r ->
+            addStyle(SpanStyle(color = RcColors.accentStrong, fontWeight = FontWeight.SemiBold), r.first, r.last + 1)
         }
     }
 }

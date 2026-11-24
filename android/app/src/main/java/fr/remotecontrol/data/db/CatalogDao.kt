@@ -64,6 +64,14 @@ interface CatalogDao {
     )
     fun search(match: String, playableOnly: Boolean, limit: Int = 200): Flow<List<WorkSummary>>
 
+    /** Comme [search], avec les titres original et alternatif et le casting (sections de la recherche). */
+    @Query(
+        "SELECT $SUMMARY, work.titleVo, work.titleAlt, work.`cast` FROM work JOIN work_fts ON work_fts.rowid = work.id " +
+            "WHERE work_fts MATCH :match AND (:playableOnly = 0 OR work.playable = 1) " +
+            "ORDER BY work.sortKey, work.id LIMIT :limit",
+    )
+    fun searchHits(match: String, playableOnly: Boolean, limit: Int = 200): Flow<List<SearchHit>>
+
     @Query("SELECT * FROM work WHERE id = :id")
     fun work(id: Long): Flow<WorkEntity?>
 

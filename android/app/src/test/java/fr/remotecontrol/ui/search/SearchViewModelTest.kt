@@ -3,6 +3,7 @@ package fr.remotecontrol.ui.search
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.data.db.CatalogDao
+import fr.remotecontrol.data.db.SearchHit
 import fr.remotecontrol.data.db.WorkSummary
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.RcJson
@@ -57,9 +58,9 @@ class SearchViewModelTest {
     private fun TestScope.viewModel(): SearchViewModel {
         val real = db.catalogDao()
         val spy = object : CatalogDao by real {
-            override fun search(match: String, playableOnly: Boolean, limit: Int): Flow<List<WorkSummary>> {
+            override fun searchHits(match: String, playableOnly: Boolean, limit: Int): Flow<List<SearchHit>> {
                 matches += match
-                return real.search(match, playableOnly, limit)
+                return real.searchHits(match, playableOnly, limit)
             }
         }
         val vm = SearchViewModel(spy, filter).also { vms += it }
@@ -126,5 +127,20 @@ class SearchViewModelTest {
         assertEquals("ava", vm.state.value.query)
         assertEquals(emptyList<WorkSummary>(), vm.state.value.results)
         assertEquals(emptyList<String>(), matches.toList())
+    }
+
+    @Test fun people_and_alternative_titles_sections() = runTest {
+        val vm = viewModel()
+        vm.setPlayableOnly(false)
+        vm.onQuery("lea mysi")
+        advanceTimeBy(200)
+        val ui = vm.await { it.sections.people.isNotEmpty() }
+        assertEquals(listOf(PersonHit("Léa Mysius", directing = true, workCount = 1)), ui.sections.people)
+        assertEquals(listOf(1L), ui.sections.works.map { it.work.id })
+        vm.onQuery("etranger")
+        advanceTimeBy(200)
+        val aka = vm.await { it.sections.aka.isNotEmpty() }
+        assertEquals(listOf(2L), aka.sections.aka.map { it.work.id })
+        assertEquals(listOf(2L), aka.ids())
     }
 }
