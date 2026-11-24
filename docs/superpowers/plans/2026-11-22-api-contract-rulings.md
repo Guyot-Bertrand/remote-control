@@ -10,3 +10,10 @@ Complète la Task 10 du plan serveur ; fait foi pour le serveur et l'appli Andro
 6. La requête de lecture utilise le champ `start` (`"start"`/`"resume"`). Toutes les erreurs 409 ont la forme `{"error": code, "volume_label": str|null}`. Un sous-titre externe est renvoyé tel que fourni par `/tracks`, avec son `path` absolu côté serveur.
 7. `progress.audio` et `progress.subtitle` : le serveur les renvoie décodés (`audio`: int|null, `subtitle`: SubSel|null). Le client peut les ignorer : sans choix explicite, le serveur réapplique de lui-même le dernier choix.
 8. `GET /api/media/{id}/tracks` → `default` reflète d'abord le dernier choix enregistré dans `progress` pour la cible (s'il existe et que la piste existe encore), sinon `default_selection`. Le client envoie donc toujours explicitement les pistes affichées.
+
+## Ajouts (2026-11-24, retours d'essai)
+
+9. Toutes les réponses d'erreur 409 portent en plus `"message"` : une phrase en français prête à afficher (ex. `{"error":"player_missing","volume_label":null,"message":"Le lecteur vidéo (mpv) n'est pas installé sur le PC."}`). Le client affiche son propre texte pour les codes connus, et `message` pour un code inconnu.
+10. Nouveau code 409 `player_missing` : l'exécutable du lecteur (mpv) est introuvable sur le PC. `player` reste pour « le lecteur ne répond pas / n'a pas démarré ».
+11. `GET /api/info` ajoute `"player_available": bool` (exécutable du lecteur présent sur le PC).
+12. `POST /api/play` sur le média déjà en cours de lecture ne relance pas le lecteur : le serveur se repositionne (`start` → 0, `resume` → position enregistrée) et applique les pistes demandées, sans fermer la vidéo.
