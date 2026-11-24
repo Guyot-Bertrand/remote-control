@@ -63,6 +63,7 @@ fun PrePlayScreen(
     server: ServerState,
     /** Le lecteur n'est pas installé sur le PC : bandeau, et « Lire sur la télé » désactivé. */
     playerMissing: Boolean,
+    onRetryPlayer: () -> Unit,
     onVersion: (Long) -> Unit,
     onAudio: (Int) -> Unit,
     onSubtitle: (SubSel) -> Unit,
@@ -72,7 +73,7 @@ fun PrePlayScreen(
 ) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.prePlayTitle, server, onBack = onClose, backIcon = RcIcons.Clear, backLabel = Texts.close)
-        if (playerMissing) PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+        if (playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
             Header(state)
             Section(Texts.version, RcIcons.Film) {

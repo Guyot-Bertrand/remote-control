@@ -10,7 +10,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -76,6 +78,25 @@ class ServerLocatorTest {
         l.refresh()
         assertEquals(ServerState.NotFound, l.state.value)
         assertTrue(l.playerAvailable.value)
+    }
+
+    @Test fun player_missing_reported_by_play_until_next_probe() = runBlocking<Unit> {
+        remember("10.0.0.1", false); alive += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        assertEquals(false, l.playerMissing.first())
+        l.reportPlayerMissing() // 409 player_missing reçu sur une lecture
+        assertEquals(true, l.playerMissing.first())
+        l.refresh() // « Réessayer » : mpv installé entre-temps
+        assertEquals(false, l.playerMissing.first())
+    }
+
+    @Test fun player_missing_only_while_connected() = runBlocking<Unit> {
+        remember("10.0.0.1", false); alive += "10.0.0.1"; noPlayer += "10.0.0.1"
+        val l = locator()
+        assertEquals(false, l.playerMissing.first()) // pas encore connecté
+        l.locate()
+        assertEquals(true, l.playerMissing.first())
     }
 
     @Test fun locate_is_noop_when_connected() = runTest {

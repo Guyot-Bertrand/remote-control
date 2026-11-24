@@ -71,10 +71,10 @@ class WorkViewModelTest {
         withTimeout(5_000) { state.filterNotNull().first(predicate) }
 
     private val live = MutableStateFlow<PlayerSnapshotDto?>(null)
-    private val playerAvailable = MutableStateFlow(true)
+    private val playerMissing = MutableStateFlow(false)
 
     private fun liveViewModel(id: Long) =
-        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerAvailable).also { vms += it }
+        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
 
     private fun playing(current: CurrentDto, ended: Boolean = false) =
         PlayerSnapshotDto(PlayerStateDto(running = true, ended = ended), current)
@@ -101,9 +101,9 @@ class WorkViewModelTest {
 
     @Test fun player_missing_disables_play() = runBlocking {
         val vm = liveViewModel(1)
-        playerAvailable.value = false
+        playerMissing.value = true
         vm.await { it.action == SheetAction.PlayerMissing }
-        playerAvailable.value = true
+        playerMissing.value = false
         vm.await { it.action == SheetAction.Play }
         Unit
     }

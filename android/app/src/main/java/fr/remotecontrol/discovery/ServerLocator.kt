@@ -6,6 +6,7 @@ import fr.remotecontrol.data.META_SERVER_MANUAL
 import fr.remotecontrol.data.META_SERVER_PORT
 import fr.remotecontrol.net.InfoDto
 import fr.remotecontrol.net.ServerProbe
+import fr.remotecontrol.player.playerMissing
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
@@ -55,6 +58,14 @@ class ServerLocator(
      * cadence que la joignabilité). Vrai tant qu'aucun serveur n'est connecté : rien n'est signalé à tort.
      */
     val playerAvailable: StateFlow<Boolean> = _playerAvailable.asStateFlow()
+
+    /** Bandeau « lecteur absent » : le serveur connecté signale l'absence du lecteur (jamais hors connexion). */
+    val playerMissing: Flow<Boolean> = combine(state, playerAvailable, ::playerMissing).distinctUntilChanged()
+
+    /** Une lecture a reçu `409 player_missing` : signalé tout de suite, sans attendre la prochaine sonde. */
+    fun reportPlayerMissing() {
+        _playerAvailable.value = false
+    }
 
     fun currentBaseUrl(): HttpUrl? = (state.value as? ServerState.Connected)?.address?.baseUrl
 

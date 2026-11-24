@@ -61,6 +61,7 @@ fun HomeScreen(
     state: HomeUi,
     /** Le lecteur n'est pas installé sur le PC : bandeau persistant en tête. */
     playerMissing: Boolean,
+    onRetryPlayer: () -> Unit,
     onPlayableOnly: (Boolean) -> Unit,
     onOpenWork: (Long) -> Unit,
     onOpenSeason: (Long) -> Unit,
@@ -89,7 +90,7 @@ fun HomeScreen(
             if (state.banner == HomeBanner.NoServer) {
                 item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
             }
-            if (playerMissing) item { PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) }
+            if (playerMissing) item { PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) }
             item { FilterRow(state.playableOnly, onPlayableOnly, onRemote) }
             if (state.resume.isNotEmpty()) {
                 item { SectionTitle(Texts.resume) }

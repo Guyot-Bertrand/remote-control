@@ -5,6 +5,9 @@ import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.PlayerStateDto
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -47,6 +50,14 @@ class PlayingTest {
         assertEquals(SheetAction.OpenRemote, sheetAction(playingHere = true, playerAvailable = false))
         assertEquals(SheetAction.Play, sheetAction(playingHere = false, playerAvailable = true))
         assertEquals(SheetAction.PlayerMissing, sheetAction(playingHere = false, playerAvailable = false))
+    }
+
+    @Test fun live_snapshot_unknown_while_not_connected() = runBlocking {
+        val connected = ServerState.Connected(ServerAddress("10.0.0.1"), manual = false)
+        val s = snap(film)
+        assertEquals(s, liveWhileConnected(flowOf(s), flowOf(connected)).first())
+        assertNull(liveWhileConnected(flowOf(s), flowOf(ServerState.NotFound)).first())
+        assertNull(liveWhileConnected(flowOf(s), flowOf(ServerState.Searching)).first())
     }
 
     @Test fun player_missing_only_when_connected() {

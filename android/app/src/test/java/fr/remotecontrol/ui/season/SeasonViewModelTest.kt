@@ -89,10 +89,10 @@ class SeasonViewModelTest {
     }
 
     private val live = MutableStateFlow<PlayerSnapshotDto?>(null)
-    private val playerAvailable = MutableStateFlow(true)
+    private val playerMissing = MutableStateFlow(false)
 
     @Test fun episode_playing_on_tv_opens_the_remote() = runBlocking {
-        val vm = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerAvailable).also { vms += it }
+        val vm = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
         vm.await { it.episodes.size == 2 && it.episodes.all { e -> e.action == SheetAction.Play } }
         live.value = PlayerSnapshotDto(
             PlayerStateDto(running = true),
@@ -100,7 +100,7 @@ class SeasonViewModelTest {
         )
         val ui = vm.await { it.playingHere }
         assertEquals(listOf(SheetAction.OpenRemote, SheetAction.Play), ui.episodes.map { it.action })
-        playerAvailable.value = false
+        playerMissing.value = true
         val missing = vm.await { it.episodes[1].action == SheetAction.PlayerMissing }
         assertEquals(SheetAction.OpenRemote, missing.episodes[0].action)
         live.value = null

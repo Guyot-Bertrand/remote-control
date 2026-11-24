@@ -88,8 +88,8 @@ class SeasonViewModel(
     tvStatus: TvStatus,
     /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
     live: Flow<PlayerSnapshotDto?> = flowOf(null),
-    /** Le lecteur est installé sur le PC ([fr.remotecontrol.discovery.ServerLocator.playerAvailable]). */
-    playerAvailable: Flow<Boolean> = flowOf(true),
+    /** Le serveur connecté signale l'absence du lecteur ([fr.remotecontrol.discovery.ServerLocator.playerMissing]). */
+    playerMissing: Flow<Boolean> = flowOf(false),
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
 
@@ -117,9 +117,9 @@ class SeasonViewModel(
     private val current: Flow<CurrentDto?> = live.map { it.live() }.distinctUntilChanged()
 
     val state: StateFlow<SeasonUi?> = combine(
-        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(current, playerAvailable, ::Pair),
-    ) { c, msg, tv, busy, (playing, available) ->
-        c?.let { toUi(it, msg, tv).copy(launching = busy).withPlayback(playing, available) }
+        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(current, playerMissing, ::Pair),
+    ) { c, msg, tv, busy, (playing, missing) ->
+        c?.let { toUi(it, msg, tv).copy(launching = busy).withPlayback(playing, playerAvailable = !missing) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** La base a répondu sans cette saison. */
@@ -152,10 +152,10 @@ class SeasonViewModel(
 }
 
 /** Épisode en cours sur la télé : « Ouvrir la télécommande » à la place de la lecture. */
-private fun SeasonUi.withPlayback(playing: CurrentDto?, available: Boolean) = copy(
+private fun SeasonUi.withPlayback(playing: CurrentDto?, playerAvailable: Boolean) = copy(
     playingHere = playing?.playsSeason(season.id) == true,
-    playerMissing = !available,
-    episodes = episodes.map { it.copy(action = sheetAction(playing?.playsEpisode(it.id) == true, available)) },
+    playerMissing = !playerAvailable,
+    episodes = episodes.map { it.copy(action = sheetAction(playing?.playsEpisode(it.id) == true, playerAvailable)) },
 )
 
 private fun EpisodeRow.toUi(seasonNumber: Int, highlighted: Boolean): EpisodeUi {

@@ -42,6 +42,20 @@ class PlayLauncherTest {
         )
     }
 
+    @Test fun player_missing_reported_at_once() = runBlocking {
+        var reported = 0
+        val l = PlayLauncher(api) { reported++ }
+        api.playResult = ApiResult.Err(ApiError.Server("player_missing", null))
+        assertEquals(
+            PlayOutcome.Failed("Le lecteur vidéo (mpv) n'est pas installé sur le PC."),
+            l.launch(PlayTarget(TargetKind.Work, 1), StartMode.Start),
+        )
+        assertEquals(1, reported)
+        api.playResult = ApiResult.Err(ApiError.Server("player", null))
+        l.launch(PlayTarget(TargetKind.Work, 1), StartMode.Start)
+        assertEquals(1, reported)
+    }
+
     @Test fun choice_is_forwarded() = runBlocking {
         launcher.launch(PlayTarget(TargetKind.Work, 1), StartMode.Start, TrackChoice(2, 1, SubSel.None))
         assertEquals(listOf("play(${PlayRequestDto("work", 1, "start", 2, 1, SubSel.None)})"), api.calls)

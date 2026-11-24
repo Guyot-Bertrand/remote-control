@@ -88,8 +88,8 @@ class WorkViewModel(
     tvStatus: TvStatus,
     /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
     live: Flow<PlayerSnapshotDto?> = flowOf(null),
-    /** Le lecteur est installé sur le PC ([fr.remotecontrol.discovery.ServerLocator.playerAvailable]). */
-    playerAvailable: Flow<Boolean> = flowOf(true),
+    /** Le serveur connecté signale l'absence du lecteur ([fr.remotecontrol.discovery.ServerLocator.playerMissing]). */
+    playerMissing: Flow<Boolean> = flowOf(false),
     private val locateServer: suspend () -> Unit = {},
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
@@ -112,14 +112,14 @@ class WorkViewModel(
     private val playingHere: Flow<Boolean> = live.map { it.live()?.playsWork(workId) == true }.distinctUntilChanged()
 
     val state: StateFlow<WorkUi?> = combine(
-        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(playingHere, playerAvailable, ::Pair),
-    ) { c, msg, tv, busy, (here, available) ->
+        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(playingHere, playerMissing, ::Pair),
+    ) { c, msg, tv, busy, (here, missing) ->
         c.work?.let {
             toUi(c, it, msg, tv).copy(
                 launching = busy,
                 playingHere = here,
-                action = sheetAction(here, available),
-                playerMissing = !available,
+                action = sheetAction(here, playerAvailable = !missing),
+                playerMissing = missing,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

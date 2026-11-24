@@ -224,13 +224,13 @@ fun NotFound(text: String) {
  * de lecture sont désactivés à côté ; ce bandeau en donne la raison.
  */
 @Composable
-fun PlayerMissingBanner(modifier: Modifier = Modifier) {
+fun PlayerMissingBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(RcColors.warnSoft)
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
             .semantics { liveRegion = LiveRegionMode.Polite },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -242,6 +242,10 @@ fun PlayerMissingBanner(modifier: Modifier = Modifier) {
             color = RcColors.text,
             modifier = Modifier.weight(1f),
         )
+        // mpv installé entre-temps : nouvelle sonde du serveur.
+        TextButton(onClick = onRetry, modifier = Modifier.height(40.dp)) {
+            Text(Texts.retry, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp), color = RcColors.accentStrong)
+        }
     }
 }
 

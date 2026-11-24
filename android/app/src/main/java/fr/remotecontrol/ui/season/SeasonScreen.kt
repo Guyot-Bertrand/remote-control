@@ -88,6 +88,7 @@ fun SeasonScreen(
     onOpenRemote: () -> Unit,
     onOpenSeason: (Long) -> Unit,
     onDismissMessage: () -> Unit,
+    onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
     val list = rememberLazyListState()
@@ -98,7 +99,7 @@ fun SeasonScreen(
             if (missing) NotFound(Texts.seasonNotFound)
             return@Column
         }
-        if (state.playerMissing) PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+        if (state.playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         var scrolled by rememberSaveable(state.season.id) { mutableStateOf(false) }
         val highlight = state.episodes.indexOfFirst { it.highlighted }
         LaunchedEffect(state.season.id, highlight) {

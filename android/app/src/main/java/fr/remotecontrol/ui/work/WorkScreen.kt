@@ -89,6 +89,7 @@ fun WorkScreen(
     onOpenCollection: (Long) -> Unit,
     onDismissMessage: () -> Unit,
     onRetryServer: () -> Unit,
+    onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -100,7 +101,7 @@ fun WorkScreen(
         // Maquette « PC injoignable » : on parcourt la fiche, la lecture attend le retour du serveur.
         val offline = server == ServerState.NotFound
         if (offline) OfflineBanner(onRetryServer)
-        if (state.playerMissing) PlayerMissingBanner(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+        if (state.playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         Column(
             Modifier
                 .fillMaxSize()

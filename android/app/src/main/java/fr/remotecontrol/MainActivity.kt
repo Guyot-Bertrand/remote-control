@@ -40,7 +40,6 @@ import androidx.navigation.toRoute
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.TargetKind
-import fr.remotecontrol.player.playerMissing
 import fr.remotecontrol.ui.browse.BrowseScreen
 import fr.remotecontrol.ui.browse.BrowseViewModel
 import fr.remotecontrol.ui.common.BrowseRoute
@@ -174,6 +173,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             HomeScreen(
                 state = state,
                 playerMissing = c.playerMissing(),
+                onRetryPlayer = c::retryPlayer,
                 onPlayableOnly = vm::setPlayableOnly,
                 onOpenWork = { nav.navigate(WorkRoute(it)) },
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
@@ -229,7 +229,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
-            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.remote.snapshot, c.locator.playerAvailable) { c.locator.locate(force = true) } }
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing) { c.locator.locate(force = true) } }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -250,12 +250,13 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onDismissMessage = vm::clearMessage,
                 onRetryServer = vm::retryServer,
+                onRetryPlayer = c::retryPlayer,
                 onBack = { nav.popBackStack() },
             )
         }
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
-            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.remote.snapshot, c.locator.playerAvailable) }
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing) }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -274,6 +275,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 // Changer de saison remplace la fiche affichée (le retour ramène à la série).
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) { popUpTo<SeasonRoute> { inclusive = true } } },
                 onDismissMessage = vm::clearMessage,
+                onRetryPlayer = c::retryPlayer,
                 onBack = { nav.popBackStack() },
             )
         }
@@ -300,6 +302,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 state = state,
                 server = server,
                 playerMissing = c.playerMissing(),
+                onRetryPlayer = c::retryPlayer,
                 onVersion = vm::selectVersion,
                 onAudio = vm::selectAudio,
                 onSubtitle = vm::selectSubtitle,
@@ -346,9 +349,8 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
 /** Bandeau « lecteur absent du PC » : suivi à chaque sonde du serveur ([fr.remotecontrol.discovery.ServerLocator]). */
 @Composable
 private fun AppContainer.playerMissing(): Boolean {
-    val server by locator.state.collectAsStateWithLifecycle()
-    val available by locator.playerAvailable.collectAsStateWithLifecycle()
-    return playerMissing(server, available)
+    val missing by locator.playerMissing.collectAsStateWithLifecycle(initialValue = false)
+    return missing
 }
 
 /**
