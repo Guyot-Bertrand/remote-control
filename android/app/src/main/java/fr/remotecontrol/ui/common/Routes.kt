@@ -38,3 +38,10 @@ fun topNavigation(target: TopDestination, current: TopDestination?): TopNavigati
     TopDestination.Search -> TopNavigation(SearchRoute, reset = false)
     TopDestination.Scan -> TopNavigation(ScanRoute, reset = false)
 }
+
+/**
+ * Onglet mis en évidence : celui dont la pile est affichée, pas le type de l'écran courant. Un parcours ouvert
+ * depuis « Scanner » ou l'accueil garde l'onglet d'origine ; seul le retour à l'accueil change de pile.
+ */
+fun shownTab(destination: TopDestination?, lastSelected: TopDestination): TopDestination =
+    if (destination == TopDestination.Home) TopDestination.Home else lastSelected

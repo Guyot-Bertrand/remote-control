@@ -17,6 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,6 +52,7 @@ import fr.remotecontrol.ui.common.SeasonRoute
 import fr.remotecontrol.ui.common.SettingsRoute
 import fr.remotecontrol.ui.common.TopDestination
 import fr.remotecontrol.ui.common.WorkRoute
+import fr.remotecontrol.ui.common.shownTab
 import fr.remotecontrol.ui.common.topNavigation
 import fr.remotecontrol.ui.home.HomeScreen
 import fr.remotecontrol.ui.home.HomeViewModel
@@ -117,6 +121,9 @@ private fun RcScaffold(c: AppContainer) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val top = entry?.destination?.topLevel()
+    var lastTab by rememberSaveable { mutableStateOf(TopDestination.Home) }
+    val shown = shownTab(top, lastTab)
+    LaunchedEffect(shown) { lastTab = shown }
     Column(Modifier.fillMaxSize()) {
         val insets = if (top != null) {
             Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
@@ -124,7 +131,10 @@ private fun RcScaffold(c: AppContainer) {
             Modifier.safeDrawingPadding()
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
-        if (top != null) RcBottomBar(selected = top, onSelect = { nav.navigateTop(it, top) })
+        if (top != null) RcBottomBar(selected = shown, onSelect = {
+            lastTab = it
+            nav.navigateTop(it, shown)
+        })
     }
 }
 

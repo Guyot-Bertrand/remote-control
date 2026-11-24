@@ -18,4 +18,16 @@ class RoutesTest {
         assertEquals(TopNavigation(HomeRoute, reset = false, restore = false), topNavigation(TopDestination.Home, TopDestination.Search))
         assertEquals(TopNavigation(HomeRoute, reset = false, restore = false), topNavigation(TopDestination.Home, TopDestination.Browse))
     }
+
+    @Test fun highlighted_tab_is_the_stack_shown() {
+        // Parcourir ouvert depuis une fiche scannée : la pile reste celle de « Scanner ».
+        assertEquals(TopDestination.Scan, shownTab(TopDestination.Browse, lastSelected = TopDestination.Scan))
+        // Fiche ou autre écran hors barre : l'onglet ne change pas.
+        assertEquals(TopDestination.Search, shownTab(null, lastSelected = TopDestination.Search))
+        // Parcours ouvert depuis l'accueil (type, collection, « Tout voir ») : « Accueil » reste en évidence.
+        assertEquals(TopDestination.Home, shownTab(TopDestination.Browse, lastSelected = TopDestination.Home))
+        // Retour jusqu'à l'accueil : c'est sa pile qui est affichée.
+        assertEquals(TopDestination.Home, shownTab(TopDestination.Home, lastSelected = TopDestination.Scan))
+        assertEquals(TopDestination.Browse, shownTab(TopDestination.Browse, lastSelected = TopDestination.Browse))
+    }
 }
