@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -43,7 +44,9 @@ import fr.remotecontrol.ui.common.HomeRoute
 import fr.remotecontrol.ui.common.LocalServerBaseUrl
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PrePlayRoute
+import fr.remotecontrol.ui.common.MiniPlayer
 import fr.remotecontrol.ui.common.RcBottomBar
+import fr.remotecontrol.ui.common.miniPlayerOf
 import fr.remotecontrol.ui.common.RemoteRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import fr.remotecontrol.ui.common.ScanRoute
@@ -132,11 +135,22 @@ private fun RcScaffold(c: AppContainer) {
             Modifier.safeDrawingPadding()
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
+        // Lecture en cours : bandeau « Sur la télé » au-dessus de la barre (sauf sur le scanner, plein écran).
+        if (top != null && top != TopDestination.Scan) NowPlaying(c) { nav.navigate(RemoteRoute) }
         if (top != null) RcBottomBar(selected = shown, onSelect = {
             lastTab = it
             nav.navigateTop(it, shown)
         })
     }
+}
+
+@Composable
+private fun NowPlaying(c: AppContainer, onOpen: () -> Unit) {
+    val snapshot by c.remote.snapshot.collectAsStateWithLifecycle()
+    val ui = miniPlayerOf(snapshot) ?: return
+    val info by remember(ui.workId, ui.mediaFileId) { c.catalogDao.playingInfo(ui.workId, ui.mediaFileId) }
+        .collectAsStateWithLifecycle(null)
+    MiniPlayer(ui, info?.poster, onOpen) { c.appScope.launch { c.api.pause(!ui.paused) } }
 }
 
 @Composable
