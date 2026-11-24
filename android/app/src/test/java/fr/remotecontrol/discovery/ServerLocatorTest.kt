@@ -23,11 +23,12 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServerLocatorTest {
     private val alive = mutableSetOf<String>()
+    private val noPlayer = mutableSetOf<String>()
     private var probes = 0
     private val probe = ServerProbe { base ->
         probes++
         if (base.host == "10.0.0.99") awaitCancellation() // serveur muet : ne répond jamais
-        if (base.host in alive) InfoDto("rc", 1, 1) else null
+        if (base.host in alive) InfoDto("rc", 1, 1, playerAvailable = base.host !in noPlayer) else null
     }
     private val store = FakeKeyValueStore()
     private var collected = false
@@ -53,6 +54,28 @@ class ServerLocatorTest {
         l.locate()
         assertEquals(ServerState.Connected(ServerAddress("10.0.0.1"), false), l.state.value)
         assertFalse(collected)
+    }
+
+    @Test fun player_available_follows_each_probe() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"; noPlayer += "10.0.0.1"
+        val l = locator()
+        assertTrue(l.playerAvailable.value) // inconnu : rien n'est signalé
+        l.locate()
+        assertFalse(l.playerAvailable.value)
+        noPlayer.clear()
+        l.refresh() // même cadence que la sonde de joignabilité
+        assertTrue(l.playerAvailable.value)
+    }
+
+    @Test fun player_available_reset_when_server_lost() = runTest {
+        remember("10.0.0.1", false); alive += "10.0.0.1"; noPlayer += "10.0.0.1"
+        val l = locator()
+        l.locate()
+        assertFalse(l.playerAvailable.value)
+        alive.clear()
+        l.refresh()
+        assertEquals(ServerState.NotFound, l.state.value)
+        assertTrue(l.playerAvailable.value)
     }
 
     @Test fun locate_is_noop_when_connected() = runTest {
