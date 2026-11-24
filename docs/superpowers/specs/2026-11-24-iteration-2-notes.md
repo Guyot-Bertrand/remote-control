@@ -26,6 +26,7 @@
 **Souhait.** Hors lecture, ou quand la vidéo est en pause (voir 1), l'écran télé reflète mieux l'écran du téléphone :
 - les vues de catalogue : Parcourir, Collection ;
 - la recherche ;
+- l'épisode sélectionné sur la fiche saison (mis en évidence sur la télé) ;
 - etc.
 
 **Impact.**
