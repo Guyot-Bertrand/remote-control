@@ -18,6 +18,7 @@ const LANG_TAGS = { '[FR]': 'Français', '[VO]': 'VO' };
 const stage = document.getElementById('stage');
 let tv = { screen: 'home', work_id: null, season_id: null, message: null };
 let current = null; // lecture en cours (player.current), pour le titre de l'écran « playing »
+let playerState = null; // dernier état du lecteur (position, durée, pause)
 let seq = 0; // jeton de rendu : une réponse arrivée après un changement d'écran est ignorée
 let homeTurn = 0;
 let homeTimer = null;
@@ -88,6 +89,7 @@ const ICON = {
   drive: (s, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><circle cx="7.5" cy="12" r="1" fill="currentColor"/><path d="M11 12h6"/></svg>`,
   warn: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.2M12 17h.01"/></svg>`,
   phone: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="2"/><path d="M10 13h.01M14 13h.01M10 16.5h.01M14 16.5h.01"/></svg>`,
+  screen: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/></svg>`,
   play: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>`,
 };
 
@@ -314,23 +316,67 @@ ${w.synopsis ? `<p class="season-synopsis">${esc(w.synopsis)}</p>` : ''}
 </div></div>`;
 }
 
-/** Lecture : fond noir et titre, visible un instant (mpv s'affiche par-dessus). */
-function renderPlaying({ work, current: cur }) {
+/** Secondes -> « 1:02:03 » ou « 12:03 ». */
+function fmtClock(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60));
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${mm.padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+}
+
+/** Lecture : affiche, titre, épisode, avancement. Reste lisible si la fenêtre du
+    navigateur passe devant mpv. data = { work, season, current }. */
+function renderPlaying({ work, season, current: cur }) {
   const title = work ? work.title_fr : (cur && cur.title) || '';
   let sub = '';
-  if (cur && cur.target_kind === 'episode' && cur.title && cur.title.includes(' — ')) {
-    sub = cur.title.split(' — ').pop();
+  if (cur && cur.target_kind === 'episode') {
+    const code = cur.title && cur.title.includes(' — ') ? cur.title.split(' — ').pop() : '';
+    const ep = season ? (season.episodes || []).find((e) => e.id === cur.target_id) : null;
+    sub = joinDot([code, ep && ep.title]);
   } else if (work) {
     sub = joinDot([work.year, (work.directors || []).join(', ')]);
   }
   const mf = work && cur ? (work.media_files || []).find((m) => m.id === cur.media_file_id) : null;
+  const art = work ? poster(work.poster, title, work.year)
+    : `<div class="poster noposter">${noPoster(title, null)}</div>`;
   return `<div class="screen playing">
-<div class="playing-box rc-fade">
-<span class="playing-head">${ICON.play(28)}LECTURE</span>
-<span class="playing-title${title.length > 28 ? ' long' : ''}">${esc(title)}</span>
+<div class="playing-art">${art}</div>
+<div class="playing-info rc-enter">
+<span class="playing-head">${ICON.play(28)}LECTURE${mf ? `<span class="playing-quality">${esc(mf.quality)}</span>` : ''}</span>
+<h1 class="playing-title${title.length > 40 ? ' very-long' : title.length > 22 ? ' long' : ''}">${esc(title)}</h1>
 ${sub ? `<span class="playing-sub">${esc(sub)}</span>` : ''}
-${mf ? `<span class="playing-meta">${esc(mf.quality)}</span>` : ''}
+<div class="playing-progress">
+<span class="bar playing-bar"><span data-progress></span></span>
+<span class="playing-times"><span data-elapsed></span><span data-paused class="playing-paused">En pause</span></span>
+</div>
+<div class="playing-hint">${ICON.screen(30)}La vidéo s'affiche dans le lecteur.</div>
 </div></div>`;
+}
+
+const PROGRESS_MS = 1000;
+let progressAt = 0;
+let progressTimer = null;
+
+/** Avancement de l'écran « playing » : au plus une fois par seconde (le dernier état
+    retenu est appliqué en fin d'intervalle), sans re-rendu ; barre animée par transform. */
+function updateProgress(force) {
+  const wait = PROGRESS_MS - (Date.now() - progressAt);
+  if (!force && wait > 0) {
+    if (!progressTimer) progressTimer = setTimeout(() => updateProgress(true), wait);
+    return;
+  }
+  clearTimeout(progressTimer);
+  progressTimer = null;
+  const st = playerState;
+  const bar = stage.querySelector('[data-progress]');
+  if (!st || !bar) return;
+  progressAt = Date.now();
+  const ratio = st.duration ? Math.min(1, Math.max(0, st.position / st.duration)) : 0;
+  bar.style.transform = `scaleX(${ratio})`;
+  stage.querySelector('[data-elapsed]').textContent = st.duration
+    ? `${fmtClock(st.position)} / ${fmtClock(st.duration)}` : fmtClock(st.position);
+  stage.querySelector('[data-paused]').classList.toggle('on', !!st.paused);
 }
 
 /** Message centré (erreur de lecture, disque absent…). */
@@ -367,9 +413,12 @@ async function load(state) {
       return renderSeason({ season, work });
     }
     case 'playing': {
-      const work = state.work_id != null
-        ? await getJson(`/api/works/${state.work_id}`).catch(() => null) : null;
-      return renderPlaying({ work, current });
+      const cur = current;
+      const [work, season] = await Promise.all([
+        state.work_id != null ? getJson(`/api/works/${state.work_id}`).catch(() => null) : null,
+        cur && cur.season_id != null
+          ? getJson(`/api/seasons/${cur.season_id}`).catch(() => null) : null]);
+      return renderPlaying({ work, season, current: cur });
     }
     case 'message':
       return renderMessage({ message: state.message });
@@ -395,6 +444,7 @@ async function show(state) {
   }
   if (my !== seq) return;
   mount(html);
+  if (state.screen === 'playing') updateProgress(true);
   if (state.screen === 'home') {
     homeTimer = setTimeout(() => { homeTurn += 1; show(tv); }, HOME_ROTATE_MS);
   }
@@ -410,13 +460,24 @@ function connect() {
     try { msg = JSON.parse(ev.data); } catch { return; }
     if (msg.type === 'hello') {
       current = msg.player ? msg.player.current : null;
+      playerState = msg.player ? msg.player.state : null;
       tv = msg.tv;
       show(tv);
     } else if (msg.type === 'tv') {
       tv = msg.state;
       show(tv);
     } else if (msg.type === 'player') {
+      const before = current;
       current = msg.current;
+      playerState = msg.state;
+      // La télé passe en « playing » avant l'annonce du média : on redessine à son arrivée.
+      if (tv.screen === 'playing' && current && (!before
+          || before.media_file_id !== current.media_file_id
+          || before.target_id !== current.target_id)) {
+        show(tv);
+      } else if (tv.screen === 'playing') {
+        updateProgress(false);
+      }
     } else if (msg.type === 'catalog' && tv.screen !== 'playing') {
       show(tv); // fiches rechargées après chaque import
     }
