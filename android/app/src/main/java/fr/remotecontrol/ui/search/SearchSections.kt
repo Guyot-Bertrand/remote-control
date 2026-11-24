@@ -20,7 +20,8 @@ data class SearchSections(
 )
 
 private const val MAX_PEOPLE = 5
-private val WORD = Regex("[\\p{L}\\p{N}]+")
+// Les diacritiques combinants (\\p{M}) font partie du mot : un titre en forme décomposée (NFD) reste d'un tenant.
+private val WORD = Regex("[\\p{L}\\p{M}\\p{N}]+")
 
 private fun tokens(query: String): List<String> = WORD.findAll(fold(query)).map { it.value }.toList()
 
@@ -78,6 +79,8 @@ fun matchRanges(text: String, query: String): List<IntRange> {
             covered += fold(word.value[length].toString()).length
             length++
         }
+        // Les accents combinants qui suivent la dernière lettre couverte en font partie.
+        while (length < word.value.length && Character.getType(word.value[length]) == Character.NON_SPACING_MARK.toInt()) length++
         val range = word.range.first until word.range.first + length
         val last = ranges.lastOrNull()
         if (last != null && text.substring(last.last + 1, range.first).isBlank()) {

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.remotecontrol.data.db.PlayingInfo
 import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
@@ -31,6 +32,7 @@ import fr.remotecontrol.ui.theme.RcColors
 /** Lecture en cours sur la télé, résumée au-dessus de la barre de navigation. */
 data class MiniPlayerUi(
     val title: String,
+    val poster: String?,
     val subtitle: String,
     val progress: Float,
     val paused: Boolean,
@@ -38,14 +40,18 @@ data class MiniPlayerUi(
     val mediaFileId: Long,
 )
 
-/** Rien sans lecture en cours (lecteur arrêté, lecture finie, ou cible inconnue). */
-fun miniPlayerOf(s: PlayerSnapshotDto?): MiniPlayerUi? {
+/**
+ * Rien sans lecture en cours (lecteur arrêté, lecture finie, ou cible inconnue). [info] : ce que le catalogue
+ * local sait de la lecture (affiche, et titre si le serveur n'en donne pas).
+ */
+fun miniPlayerOf(s: PlayerSnapshotDto?, info: PlayingInfo? = null): MiniPlayerUi? {
     val st = s?.state ?: return null
     val current = s.current ?: return null
     if (!st.running || st.ended) return null
     val times = st.duration?.let { "${formatClock(st.position)} / ${formatClock(it)}" } ?: formatClock(st.position)
     return MiniPlayerUi(
-        title = current.title ?: Texts.nothingPlaying,
+        title = current.title ?: info?.title.orEmpty(),
+        poster = info?.poster,
         subtitle = Texts.details(Texts.onTv, times),
         progress = st.duration?.takeIf { it > 0 }?.let { (st.position / it).coerceIn(0.0, 1.0).toFloat() } ?: 0f,
         paused = st.paused,
@@ -59,7 +65,7 @@ fun miniPlayerOf(s: PlayerSnapshotDto?): MiniPlayerUi? {
  * temps écoulé et total, lecture/pause, fine barre d'avancement ; le toucher ouvre la télécommande.
  */
 @Composable
-fun MiniPlayer(ui: MiniPlayerUi, poster: String?, onOpen: () -> Unit, onTogglePause: () -> Unit) {
+fun MiniPlayer(ui: MiniPlayerUi, onOpen: () -> Unit, onTogglePause: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -72,7 +78,7 @@ fun MiniPlayer(ui: MiniPlayerUi, poster: String?, onOpen: () -> Unit, onTogglePa
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            PosterThumb(hash = poster, title = ui.title, modifier = Modifier.width(32.dp))
+            PosterThumb(hash = ui.poster, title = ui.title, modifier = Modifier.width(32.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     ui.title,

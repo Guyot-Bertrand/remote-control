@@ -68,15 +68,19 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onResync: () -> Unit,
 ) {
-    if (state.banner == HomeBanner.Searching || state.banner == HomeBanner.Syncing) {
-        FirstSync(state.server, syncing = state.banner == HomeBanner.Syncing)
-        return
-    }
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
+        // L'en-tête (et son accès aux réglages) reste visible dans tous les états.
         HomeHeader(state.server, onSettings)
-        if (state.banner == HomeBanner.Empty) {
-            EmptyCatalog(onResync, onSettings)
-            return@Column
+        when (state.banner) {
+            HomeBanner.Searching, HomeBanner.Syncing -> {
+                FirstSync(state.server, syncing = state.banner == HomeBanner.Syncing)
+                return@Column
+            }
+            HomeBanner.Empty, HomeBanner.NotSynced -> {
+                EmptyCatalog(state.banner == HomeBanner.Empty, state.message, onResync, onSettings)
+                return@Column
+            }
+            else -> Unit
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
             if (state.banner == HomeBanner.NoServer) {
@@ -148,7 +152,7 @@ fun HomeScreen(
 @Composable
 private fun FirstSync(server: ServerState, syncing: Boolean) {
     Column(
-        Modifier.fillMaxSize().background(RcColors.bg).padding(horizontal = 40.dp),
+        Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 64.dp),
         verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -185,7 +189,7 @@ private val body15 = TextStyle(fontFamily = Inter, fontSize = 15.sp, lineHeight 
 
 /** Maquette « Catalogue vide » : le serveur répond mais n'a aucune œuvre. */
 @Composable
-private fun EmptyCatalog(onResync: () -> Unit, onSettings: () -> Unit) {
+private fun EmptyCatalog(synced: Boolean, message: String?, onResync: () -> Unit, onSettings: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
@@ -195,11 +199,19 @@ private fun EmptyCatalog(onResync: () -> Unit, onSettings: () -> Unit) {
             Icon(RcIcons.Film, contentDescription = null, tint = RcColors.accent, modifier = Modifier.size(40.dp))
         }
         Text(
-            Texts.catalogEmptyTitle,
+            if (synced) Texts.catalogEmptyTitle else Texts.catalogNotSyncedTitle,
             style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 26.sp),
             modifier = Modifier.padding(top = 8.dp).semantics { heading() },
         )
-        Text(Texts.catalogEmptyHelp, style = body15, color = RcColors.text2, textAlign = TextAlign.Center)
+        Text(
+            if (synced) Texts.catalogEmptyHelp else Texts.catalogNotSyncedHelp,
+            style = body15,
+            color = RcColors.text2,
+            textAlign = TextAlign.Center,
+        )
+        message?.let {
+            Text(it, style = body15.copy(fontWeight = FontWeight.Medium), color = RcColors.warn, textAlign = TextAlign.Center)
+        }
         Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PillButton(Texts.resync, RcIcons.Sync, onResync, Modifier.fillMaxWidth())
             TextButton(onClick = onSettings, modifier = Modifier.fillMaxWidth().height(48.dp)) {

@@ -11,6 +11,7 @@ import fr.remotecontrol.discovery.parseManualAddress
 import fr.remotecontrol.net.messageFr
 import fr.remotecontrol.ui.common.Texts
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,12 +33,17 @@ data class SettingsUi(
     val busy: Boolean = false,
     val message: String? = null,
     val syncFailed: Boolean = false,
+    /** Heure courante (rafraîchie chaque minute) : « Aujourd'hui / Hier » suit le changement de jour. */
+    val now: Long = 0L,
 )
+
+private const val CLOCK_TICK_MS = 60_000L
 
 class SettingsViewModel(
     private val locator: ServerLocator,
     private val sync: SyncRepository,
     private val dao: CatalogDao,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUi(serverLabel = label(locator.state.value), server = locator.state.value))
     val state: StateFlow<SettingsUi> = _state.asStateFlow()
@@ -47,6 +53,12 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             locator.state.collect { s -> _state.update { it.copy(serverLabel = label(s), server = s) } }
+        }
+        viewModelScope.launch {
+            while (true) {
+                _state.update { it.copy(now = clock()) }
+                delay(CLOCK_TICK_MS)
+            }
         }
         viewModelScope.launch {
             sync.syncedAt.collect { at -> _state.update { it.copy(syncedAt = at) } }

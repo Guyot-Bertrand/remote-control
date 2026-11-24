@@ -1,5 +1,6 @@
 package fr.remotecontrol.ui.common
 
+import fr.remotecontrol.data.db.PlayingInfo
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.PlayerStateDto
@@ -25,6 +26,13 @@ class MiniPlayerTest {
         assertEquals("Sur la télé · 1:12:04", ui.subtitle)
         assertEquals(0f, ui.progress)
         assertEquals(true, ui.paused)
+    }
+
+    @Test fun title_and_poster_from_local_catalogue() {
+        val untitled = playing.copy(current = current.copy(title = null))
+        val ui = miniPlayerOf(untitled, PlayingInfo(poster = "abc", year = 2017, quality = "FHD", title = "Ava"))!!
+        assertEquals("Ava", ui.title)
+        assertEquals("abc", ui.poster)
     }
 
     @Test fun nothing_when_idle_or_ended() {

@@ -116,4 +116,10 @@ class FormatTest {
         assertEquals("L", indexLetter("« L'Aurore »"))
         assertEquals("#", indexLetter(""))
     }
+
+    @Test
+    fun app_version_label() {
+        assertEquals("Remote-Control 0.1.0", Texts.appVersionLabel("0.1.0"))
+        assertEquals("Remote-Control", Texts.appVersionLabel(""))
+    }
 }

@@ -9,6 +9,7 @@ import fr.remotecontrol.discovery.ServerAddress
 import fr.remotecontrol.discovery.ServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.InfoDto
 import fr.remotecontrol.net.RcJson
@@ -85,7 +86,9 @@ class HomeViewModelTest {
         assertEquals(HomeBanner.Searching, homeBanner(ServerState.Searching, catalogEmpty = true))
         assertEquals(HomeBanner.NoServer, homeBanner(ServerState.NotFound, catalogEmpty = true))
         assertEquals(HomeBanner.NoServer, homeBanner(ServerState.NotFound, catalogEmpty = false))
-        assertEquals(HomeBanner.Syncing, homeBanner(here, catalogEmpty = true))
+        // Connecté, rien ne se synchronise, jamais synchronisé (première synchro en échec) : pas d'attente sans fin.
+        assertEquals(HomeBanner.NotSynced, homeBanner(here, catalogEmpty = true))
+        assertEquals(HomeBanner.Syncing, homeBanner(here, catalogEmpty = true, syncing = true))
         assertEquals(null, homeBanner(here, catalogEmpty = false))
         assertEquals(null, homeBanner(ServerState.Searching, catalogEmpty = false))
         // Déjà synchronisé et toujours vide : le serveur n'a aucune œuvre.
@@ -101,6 +104,16 @@ class HomeViewModelTest {
         val ui = vm.await { it.banner == HomeBanner.Empty }
         assertTrue(ui.catalogEmpty)
         assertTrue("sync(null)" in api.calls)
+    }
+
+    @Test fun failed_resync_from_home_shows_message() = runBlocking {
+        api.syncResponses.addLast(ApiResult.Err(ApiError.Unreachable))
+        val vm = viewModel()
+        locator.setManual(ServerAddress("10.0.0.1"))
+        vm.resync()
+        val ui = vm.await { it.message != null }
+        assertEquals("Serveur injoignable", ui.message)
+        assertEquals(HomeBanner.NotSynced, ui.banner)
     }
 
     @Test fun collections_show_total_and_playable() = runBlocking {

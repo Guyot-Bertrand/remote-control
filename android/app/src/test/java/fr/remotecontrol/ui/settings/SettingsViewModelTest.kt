@@ -98,6 +98,11 @@ class SettingsViewModelTest {
         assertTrue(vm.state.value.syncFailed)
     }
 
+    @Test fun now_comes_from_the_clock() = runBlocking {
+        val v = SettingsViewModel(locator, SyncRepository(db, api), db.catalogDao(), clock = { 42L }).also { vms += it }
+        assertEquals(42L, withTimeout(5_000) { v.state.first { it.now == 42L } }.now)
+    }
+
     @Test fun resync_records_time_and_playable_count() = runBlocking {
         val full: SyncDto = RcJson.decodeFromString(Fixtures.text("sync_full.json"))
         api.syncResponses.addLast(ApiResult.Ok(full))

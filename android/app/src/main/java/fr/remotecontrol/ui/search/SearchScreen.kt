@@ -114,7 +114,7 @@ fun SearchScreen(
             if (sections.aka.isNotEmpty()) {
                 item(key = "h-aka") { Heading(Texts.sectionAka) }
                 items(sections.aka, key = { "a-${it.work.id}" }, contentType = { "work" }) { aka ->
-                    WorkRow(aka.work, null, onOpen, note = Texts.altTitle(aka.kind == AltKind.Original, aka.title))
+                    WorkRow(aka.work, null, onOpen, highlight = shown, note = Texts.altTitle(aka.kind == AltKind.Original, aka.title))
                 }
             }
         }

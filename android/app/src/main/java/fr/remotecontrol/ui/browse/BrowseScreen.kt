@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -161,27 +160,24 @@ private fun FastScroller(grid: LazyGridState, works: List<WorkSummary>, modifier
     if (works.size < FAST_SCROLL_MIN) return
     val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
-    val fraction by remember(grid) {
-        derivedStateOf {
-            val info = grid.layoutInfo
-            val last = (info.totalItemsCount - info.visibleItemsInfo.size).coerceAtLeast(1)
-            (grid.firstVisibleItemIndex.toFloat() / last).coerceIn(0f, 1f)
-        }
-    }
     val active = dragging || grid.isScrollInProgress
     val alpha by animateFloatAsState(if (active) 1f else 0f, label = "fastScroll")
     BoxWithConstraints(modifier.fillMaxHeight().padding(vertical = 8.dp)) {
-        val track = maxHeight - THUMB_HEIGHT
-        val offset = track * fraction
+        // La bulle (44 dp, plus haute que la poignée) doit rester entière dans la piste.
+        val track = maxHeight - BUBBLE_SIZE
         if (alpha > 0f) {
             Row(
-                Modifier.offset { IntOffset(0, offset.roundToPx()) }.padding(end = 4.dp).alpha(alpha),
+                Modifier
+                    // Avancement lu à la mise en page seulement : le défilement ne recompose pas.
+                    .offset { IntOffset(0, (track.toPx() * scrollFraction(grid)).roundToInt()) }
+                    .padding(end = 4.dp)
+                    .alpha(alpha),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(
                     Modifier
-                        .size(44.dp)
+                        .size(BUBBLE_SIZE)
                         .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 4.dp, bottomStart = 22.dp))
                         .background(RcColors.accent),
                     contentAlignment = Alignment.Center,
@@ -195,35 +191,46 @@ private fun FastScroller(grid: LazyGridState, works: List<WorkSummary>, modifier
                 Box(Modifier.size(width = 4.dp, height = THUMB_HEIGHT).clip(RoundedCornerShape(2.dp)).background(RcColors.text3))
             }
         }
-        // Zone de saisie étroite, au bord : les affiches de la dernière colonne restent touchables.
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .width(20.dp)
-                .fillMaxHeight()
-                .pointerInput(works) {
-                    fun jump(y: Float) {
-                        val f = (y / size.height).coerceIn(0f, 1f)
-                        scope.launch { grid.scrollToItem((f * (works.size - 1)).roundToInt()) }
-                    }
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            dragging = true
-                            jump(it.y)
-                        },
-                        onDragEnd = { dragging = false },
-                        onDragCancel = { dragging = false },
-                    ) { change, _ ->
-                        change.consume()
-                        jump(change.position.y)
-                    }
-                },
-        )
+        // Zone de saisie étroite, au bord, active seulement quand la poignée est visible : hors défilement, les
+        // affiches de la dernière colonne restent entièrement touchables.
+        if (active || alpha > 0f) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .width(20.dp)
+                    .fillMaxHeight()
+                    .pointerInput(grid, works) {
+                        fun jump(y: Float) {
+                            val f = (y / size.height).coerceIn(0f, 1f)
+                            scope.launch { grid.scrollToItem((f * (works.size - 1)).roundToInt()) }
+                        }
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                dragging = true
+                                jump(it.y)
+                            },
+                            onDragEnd = { dragging = false },
+                            onDragCancel = { dragging = false },
+                        ) { change, _ ->
+                            change.consume()
+                            jump(change.position.y)
+                        }
+                    },
+            )
+        }
     }
+}
+
+/** Avancement du défilement de la grille, de 0 (haut) à 1 (bas). */
+private fun scrollFraction(grid: LazyGridState): Float {
+    val info = grid.layoutInfo
+    val last = (info.totalItemsCount - info.visibleItemsInfo.size).coerceAtLeast(1)
+    return (grid.firstVisibleItemIndex.toFloat() / last).coerceIn(0f, 1f)
 }
 
 private const val FAST_SCROLL_MIN = 60
 private val THUMB_HEIGHT = 40.dp
+private val BUBBLE_SIZE = 44.dp
 
 @Composable
 private fun TypeChips(selected: String?, onType: (String?) -> Unit) {

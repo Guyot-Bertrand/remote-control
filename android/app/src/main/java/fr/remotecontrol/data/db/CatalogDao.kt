@@ -113,8 +113,9 @@ interface CatalogDao {
     )
     fun episodesOfSeason(seasonId: Long): Flow<List<EpisodeRow>>
 
-    /** Qualités des fichiers des épisodes d'une saison (pastilles de l'en-tête). */
-    @Query("SELECT DISTINCT m.quality FROM media_file m JOIN episode e ON m.episodeId = e.id WHERE e.seasonId = :seasonId")
+    /** Qualités des fichiers présents des épisodes d'une saison (pastilles de l'en-tête). */
+    @Query("SELECT DISTINCT m.quality FROM media_file m JOIN episode e ON m.episodeId = e.id " +
+            "WHERE e.seasonId = :seasonId AND m.present = 1")
     fun seasonQualities(seasonId: Long): Flow<List<String>>
 
     @Query(
@@ -128,7 +129,7 @@ interface CatalogDao {
     fun progress(kind: String, id: Long): Flow<ProgressEntity?>
 
     @Query(
-        "SELECT w.poster AS poster, w.year AS year, " +
+        "SELECT w.poster AS poster, w.year AS year, w.titleFr AS title, " +
             "(SELECT m.quality FROM media_file m WHERE m.id = :mediaFileId) AS quality FROM work w WHERE w.id = :workId",
     )
     fun playingInfo(workId: Long, mediaFileId: Long): Flow<PlayingInfo?>

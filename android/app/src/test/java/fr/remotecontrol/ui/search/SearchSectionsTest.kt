@@ -65,5 +65,9 @@ class SearchSectionsTest {
         assertEquals(listOf(0..2, 6..8), matchRanges("Ava · Ava, Ava", "ava").take(2))
         assertEquals(emptyList<IntRange>(), matchRanges("Ava", ""))
         assertEquals(listOf(4..4), matchRanges("Les Œuvres", "oe"))
+        // Titre en forme décomposée (e + accent combinant) : mêmes passages, en indices de la chaîne d'origine.
+        assertEquals(listOf(0..8), matchRanges("Le\u0301a Mysius", "lea mysi"))
+        assertEquals(listOf(0..4), matchRanges("E\u0301tranger", "etra"))
+        assertEquals(listOf(0..2), matchRanges("Le\u0301a", "le")) // l'accent suit sa lettre
     }
 }

@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class VersionUi(val mediaFileId: Long, val label: String, val present: Boolean, val absentLabel: String?)
 
@@ -72,6 +73,7 @@ class WorkViewModel(
     api: RcApi,
     launcher: PlayLauncher,
     tvStatus: TvStatus,
+    private val locateServer: suspend () -> Unit = {},
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
 
@@ -98,6 +100,11 @@ class WorkViewModel(
     val missing: StateFlow<Boolean> = catalog.map { it.work == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+
+    /** « Réessayer » du bandeau « PC injoignable » : nouvelle recherche du serveur. */
+    fun retryServer() {
+        viewModelScope.launch { locateServer() }
+    }
 
     fun playFromStart() = launch(StartMode.Start)
 

@@ -7,12 +7,15 @@ import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.CollectionSummary
 import fr.remotecontrol.data.db.ResumeRow
 import fr.remotecontrol.data.db.WorkSummary
+import fr.remotecontrol.data.sync.SyncOutcome
 import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.net.messageFr
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.remainingMinutes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -49,22 +52,24 @@ fun toResumeItem(row: ResumeRow): ResumeItem {
 
 /**
  * État particulier de l'accueil : [NoServer] est un bandeau ; les autres remplacent le contenu (catalogue vide) :
- * recherche du serveur, première synchronisation, ou catalogue vide sur le serveur ([Empty]).
+ * recherche du serveur, synchronisation en cours, catalogue vide sur le serveur ([Empty]), ou catalogue jamais
+ * reçu hors synchronisation ([NotSynced] : première synchronisation en échec).
  */
-enum class HomeBanner { Searching, NoServer, Syncing, Empty }
+enum class HomeBanner { Searching, NoServer, Syncing, Empty, NotSynced }
 
 /**
  * Sans serveur : « Aucun serveur trouvé » (avec accès aux réglages), catalogue vide ou non.
- * Catalogue vide : recherche du serveur en cours, synchronisation une fois connecté, ou — après une
- * synchronisation réussie ([everSynced]) et hors synchronisation — catalogue vide sur le serveur.
+ * Catalogue vide : recherche du serveur, synchronisation seulement pendant qu'elle tourne ([syncing]) ; sinon,
+ * catalogue vide sur le serveur si une synchronisation a abouti ([everSynced]), ou jamais reçu.
  */
 fun homeBanner(server: ServerState, catalogEmpty: Boolean, everSynced: Boolean = false, syncing: Boolean = false): HomeBanner? =
     when {
         server == ServerState.NotFound -> HomeBanner.NoServer
         !catalogEmpty -> null
-        server is ServerState.Connected && everSynced && !syncing -> HomeBanner.Empty
-        server is ServerState.Connected -> HomeBanner.Syncing
-        else -> HomeBanner.Searching
+        server !is ServerState.Connected -> HomeBanner.Searching
+        syncing -> HomeBanner.Syncing
+        everSynced -> HomeBanner.Empty
+        else -> HomeBanner.NotSynced
     }
 
 data class HomeUi(
@@ -75,6 +80,8 @@ data class HomeUi(
     val catalogEmpty: Boolean = false,
     val server: ServerState = ServerState.Searching,
     val banner: HomeBanner? = null,
+    /** Échec de « Resynchroniser » lancé depuis l'accueil (message en français). */
+    val message: String? = null,
 )
 
 private data class Filtered(
@@ -90,7 +97,8 @@ class HomeViewModel(
     locator: ServerLocator,
     private val sync: SyncRepository,
 ) : ViewModel() {
-    private val syncState = combine(sync.syncing, sync.syncedAt) { syncing, at -> syncing to (at != null) }
+    private val message = MutableStateFlow<String?>(null)
+    private val syncState = combine(sync.syncing, sync.syncedAt, message) { syncing, at, msg -> Triple(syncing, at != null, msg) }
 
     private val filtered = filter.playableOnly.flatMapLatest { playable ->
         combine(dao.recentWorks(playable, 20), dao.collections(playable)) { recent, collections ->
@@ -104,7 +112,7 @@ class HomeViewModel(
         dao.observeWorkCount(),
         locator.state,
         syncState,
-    ) { resume, f, count, server, (syncing, everSynced) ->
+    ) { resume, f, count, server, (syncing, everSynced, msg) ->
         HomeUi(
             resume = resume.map(::toResumeItem),
             recent = f.recent,
@@ -113,6 +121,7 @@ class HomeViewModel(
             catalogEmpty = count == 0,
             server = server,
             banner = homeBanner(server, count == 0, everSynced, syncing),
+            message = msg,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
@@ -122,6 +131,10 @@ class HomeViewModel(
 
     /** « Resynchroniser » du catalogue vide : synchronisation complète. */
     fun resync() {
-        viewModelScope.launch { sync.sync(forceFull = true) }
+        message.value = null
+        viewModelScope.launch {
+            val outcome = sync.sync(forceFull = true)
+            if (outcome is SyncOutcome.Failed) message.value = outcome.error.messageFr()
+        }
     }
 }

@@ -115,7 +115,13 @@ fun WorkRow(
                 overflow = TextOverflow.Ellipsis,
             )
             note?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = RcColors.text3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    highlighted(it, highlight),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RcColors.text3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         if (!work.playable) Unavailable(work.absentVolume)

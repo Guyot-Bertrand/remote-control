@@ -169,4 +169,9 @@ class CatalogDaoTest {
         )
         assertEquals("Théâtre", dao.allWorks(false).first().single { it.id == 5L }.absentVolume)
     }
+
+    @Test fun season_qualities_only_from_present_files() = runTest {
+        db.seed(works = emptyList(), files = listOf(MediaFileEntity(99, null, 1, "HD", null, "y.mp4", "DISK2", false)))
+        assertEquals(listOf("FHD"), dao.seasonQualities(1).first())
+    }
 }

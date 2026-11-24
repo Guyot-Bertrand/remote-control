@@ -87,7 +87,7 @@ fun SettingsScreen(
                 InfoRow(
                     RcIcons.Sync,
                     Texts.lastSyncTitle,
-                    Texts.lastSync(state.syncedAt, System.currentTimeMillis(), state.workCount, state.playableCount),
+                    Texts.lastSync(state.syncedAt, state.now, state.workCount, state.playableCount),
                 )
                 Box(Modifier.padding(start = 56.dp, end = 16.dp, top = 4.dp)) {
                     PillButton(Texts.resync, RcIcons.Sync, onResync, tone = Tone.Soft, enabled = !state.busy, height = 40.dp)
@@ -102,6 +102,8 @@ fun SettingsScreen(
                 text = message,
                 action = if (state.syncFailed) Texts.retry else Texts.ok,
                 onAction = if (state.syncFailed) onResync else onDismissMessage,
+                // Après un échec : « Réessayer », mais aussi « OK » pour simplement refermer.
+                dismiss = onDismissMessage.takeIf { state.syncFailed },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = 16.dp),
             )
         }
@@ -131,7 +133,7 @@ private fun SectionTitle(text: String) {
 
 /** Ligne de 72 dp : pictogramme, titre et détail, élément facultatif à droite. */
 @Composable
-private fun InfoRow(icon: ImageVector, title: String, detail: String, trailing: @Composable () -> Unit = {}) {
+private fun InfoRow(icon: ImageVector, title: String, detail: String?, trailing: @Composable () -> Unit = {}) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -140,7 +142,7 @@ private fun InfoRow(icon: ImageVector, title: String, detail: String, trailing: 
         Icon(icon, contentDescription = null, tint = RcColors.text2)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = title16, color = RcColors.text)
-            Text(detail, style = caption13, color = RcColors.text2)
+            detail?.let { Text(it, style = caption13, color = RcColors.text2) }
         }
         trailing()
     }
@@ -150,7 +152,7 @@ private fun InfoRow(icon: ImageVector, title: String, detail: String, trailing: 
 private fun ServerRow(server: ServerState) {
     val (title, detail) = when (server) {
         is ServerState.Connected -> server.address.display to (if (server.manual) Texts.enteredByHand else Texts.detectedAuto)
-        ServerState.Searching -> Texts.searching to ""
+        ServerState.Searching -> Texts.searching to null
         ServerState.NotFound -> Texts.noServerYet to Texts.noServer
     }
     val (status, color) = when (server) {

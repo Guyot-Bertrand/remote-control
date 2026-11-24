@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -18,10 +19,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -45,8 +46,8 @@ import fr.remotecontrol.ui.common.LocalServerBaseUrl
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PrePlayRoute
 import fr.remotecontrol.ui.common.MiniPlayer
+import fr.remotecontrol.ui.common.RcSnackbar
 import fr.remotecontrol.ui.common.RcBottomBar
-import fr.remotecontrol.ui.common.miniPlayerOf
 import fr.remotecontrol.ui.common.RemoteRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import fr.remotecontrol.ui.common.ScanRoute
@@ -64,6 +65,7 @@ import fr.remotecontrol.ui.preplay.PrePlayScreen
 import fr.remotecontrol.ui.preplay.PrePlayViewModel
 import fr.remotecontrol.ui.preplay.toArgs
 import fr.remotecontrol.ui.preplay.toRoute
+import fr.remotecontrol.ui.remote.NowPlayingViewModel
 import fr.remotecontrol.ui.remote.RemoteScreen
 import fr.remotecontrol.ui.remote.RemoteViewModel
 import fr.remotecontrol.ui.scan.ScanScreen
@@ -78,7 +80,6 @@ import fr.remotecontrol.ui.theme.RcColors
 import fr.remotecontrol.ui.theme.RcTheme
 import fr.remotecontrol.ui.work.WorkScreen
 import fr.remotecontrol.ui.work.WorkViewModel
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -136,7 +137,7 @@ private fun RcScaffold(c: AppContainer) {
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
         // Lecture en cours : bandeau « Sur la télé » au-dessus de la barre (sauf sur le scanner, plein écran).
-        if (top != null && top != TopDestination.Scan) NowPlaying(c) { nav.navigate(RemoteRoute) }
+        if (top != null && top != TopDestination.Scan) NowPlaying(c) { nav.navigate(RemoteRoute) { launchSingleTop = true } }
         if (top != null) RcBottomBar(selected = shown, onSelect = {
             lastTab = it
             nav.navigateTop(it, shown)
@@ -146,11 +147,10 @@ private fun RcScaffold(c: AppContainer) {
 
 @Composable
 private fun NowPlaying(c: AppContainer, onOpen: () -> Unit) {
-    val snapshot by c.remote.snapshot.collectAsStateWithLifecycle()
-    val ui = miniPlayerOf(snapshot) ?: return
-    val info by remember(ui.workId, ui.mediaFileId) { c.catalogDao.playingInfo(ui.workId, ui.mediaFileId) }
-        .collectAsStateWithLifecycle(null)
-    MiniPlayer(ui, info?.poster, onOpen) { c.appScope.launch { c.api.pause(!ui.paused) } }
+    val vm = viewModel { NowPlayingViewModel(c.api, c.remote, c.catalogDao::playingInfo) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    state.message?.let { RcSnackbar(it, vm::clearMessage, Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
+    state.player?.let { MiniPlayer(it, onOpen, vm::togglePause) }
 }
 
 @Composable
@@ -167,7 +167,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onOpenType = { nav.navigate(BrowseRoute(type = it)) },
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onSeeAllRecent = { nav.navigate(BrowseRoute(sort = SORT_RECENT)) },
-                onRemote = { nav.navigate(RemoteRoute) },
+                onRemote = { nav.navigate(RemoteRoute) { launchSingleTop = true } },
                 onSettings = { nav.navigate(SettingsRoute) },
                 onResync = vm::resync,
             )
@@ -214,7 +214,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
-            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) }
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus) { c.locator.locate(force = true) } }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -233,7 +233,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onDismissMessage = vm::clearMessage,
-                onRetryServer = { c.appScope.launch { c.locator.locate(force = true) } },
+                onRetryServer = vm::retryServer,
                 onBack = { nav.popBackStack() },
             )
         }

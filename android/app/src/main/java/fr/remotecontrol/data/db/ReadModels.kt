@@ -83,5 +83,5 @@ data class EpisodeRow(
     val playable: Boolean,
 )
 
-/** Ce que le catalogue local sait d'une lecture en cours : affiche et année de l'œuvre, qualité du fichier. */
-data class PlayingInfo(val poster: String?, val year: Int?, val quality: String?)
+/** Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre, qualité du fichier. */
+data class PlayingInfo(val poster: String?, val year: Int?, val quality: String?, val title: String? = null)

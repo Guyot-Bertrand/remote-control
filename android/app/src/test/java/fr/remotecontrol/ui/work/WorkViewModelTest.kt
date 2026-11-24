@@ -66,6 +66,13 @@ class WorkViewModelTest {
     private suspend fun WorkViewModel.await(predicate: (WorkUi) -> Boolean = { true }) =
         withTimeout(5_000) { state.filterNotNull().first(predicate) }
 
+    @Test fun retry_server_searches_again() = runBlocking {
+        val searched = CompletableDeferred<Unit>()
+        val vm = WorkViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus) { searched.complete(Unit) }.also { vms += it }
+        vm.retryServer()
+        withTimeout(5_000) { searched.await() }
+    }
+
     @Test fun tv_label_follows_tv_and_resume_resends_after_drift() = runBlocking {
         val watcher = launch(Dispatchers.Main) { tvStatus.run() }
         while (serverEvents.subscriptionCount.value == 0) yield()

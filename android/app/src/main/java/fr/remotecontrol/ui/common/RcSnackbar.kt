@@ -24,9 +24,18 @@ import androidx.compose.ui.unit.sp
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
 
-/** Message en bas d'écran des maquettes (ivoire, texte sombre), avec une action laiton (« OK », « Réessayer »). */
+/**
+ * Message en bas d'écran des maquettes (ivoire, texte sombre), avec une action laiton (« OK », « Réessayer ») ;
+ * [dismiss] ajoute « OK » avant l'action pour refermer sans agir.
+ */
 @Composable
-fun RcSnackbar(text: String, onAction: () -> Unit, modifier: Modifier = Modifier, action: String = Texts.ok) {
+fun RcSnackbar(
+    text: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    action: String = Texts.ok,
+    dismiss: (() -> Unit)? = null,
+) {
     Row(
         modifier
             .fillMaxWidth()
@@ -39,6 +48,11 @@ fun RcSnackbar(text: String, onAction: () -> Unit, modifier: Modifier = Modifier
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(text, style = TextStyle(fontFamily = Inter, fontSize = 14.sp), color = RcColors.surface, modifier = Modifier.weight(1f))
+        dismiss?.let {
+            TextButton(onClick = it, modifier = Modifier.height(40.dp)) {
+                Text(Texts.ok, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp), color = RcColors.surface3)
+            }
+        }
         TextButton(onClick = onAction, modifier = Modifier.height(40.dp)) {
             Text(action, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp), color = RcColors.accentStrong)
         }

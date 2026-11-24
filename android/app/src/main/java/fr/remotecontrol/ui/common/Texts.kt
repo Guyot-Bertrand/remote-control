@@ -40,7 +40,7 @@ object Texts {
     const val statusConnected = "Connecté"
     const val noServerYet = "Aucun serveur"
     const val addressHint = "192.168.1.20:8765"
-    fun appVersionLabel(version: String) = "$appName $version"
+    fun appVersionLabel(version: String) = if (version.isBlank()) appName else "$appName $version"
     const val seasons = "Saisons"
     const val versions = "Versions"
     const val version = "Version"
@@ -121,6 +121,9 @@ object Texts {
     const val catalogEmptyTitle = "Catalogue vide"
     const val catalogEmptyHelp =
         "Le PC n'a encore trouvé aucune œuvre. Ajoutez des fichiers sur un disque branché, puis resynchronisez."
+    const val catalogNotSyncedTitle = "Catalogue non synchronisé"
+    const val catalogNotSyncedHelp =
+        "Le catalogue n'a pas encore pu être copié depuis le PC. Resynchronisez, ou vérifiez l'adresse du serveur."
     const val checkServerAddress = "Vérifier l'adresse du serveur"
     const val qrUnknown = "QR-code non reconnu"
     const val cameraPermission = "Autorisez l'appareil photo pour scanner les QR-codes"
