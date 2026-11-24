@@ -1,8 +1,10 @@
 package fr.remotecontrol.ui.season
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.remotecontrol.data.db.CatalogDao
+import fr.remotecontrol.data.db.EpisodeQuality
 import fr.remotecontrol.data.db.EpisodeRow
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkEntity
@@ -25,6 +27,8 @@ import fr.remotecontrol.player.sortQualities
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
+import fr.remotecontrol.ui.common.formatDuration
+import fr.remotecontrol.ui.common.remainingMinutes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -35,10 +39,14 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlin.math.roundToInt
 
 /**
  * [label] : « S01E02 », suivi de « — titre » s'il existe. [status] : « Vu », « Entamé — 5:00 » ou nul.
- * [progress] : avancement d'un épisode entamé (barre de l'épisode mis en évidence), nul sinon.
+ * [progress] : avancement d'un épisode entamé (barre de la carte), nul sinon.
+ * [highlighted] : épisode à suivre ou en cours (règle de la fiche) ; [selected] : épisode déplié en carte,
+ * par défaut celui mis en évidence, sinon celui touché dans la liste.
+ * [details] : « 24 min · reste 19 min » (durée connue, reste si entamé) ; [qualities] : qualités de ses fichiers.
  */
 data class EpisodeUi(
     val id: Long,
@@ -51,6 +59,9 @@ data class EpisodeUi(
     val progress: Float? = null,
     /** Lire, rouvrir la télécommande (cet épisode joue sur la télé), ou lecteur absent du PC. */
     val action: SheetAction = SheetAction.Play,
+    val selected: Boolean = highlighted,
+    val details: String? = null,
+    val qualities: List<String> = emptyList(),
 )
 
 /** [work] et [seasons] : en-tête de la série et sélecteur de saison des maquettes. */
@@ -77,6 +88,7 @@ private data class Catalog(
     val seasons: List<SeasonEntity>,
     val episodes: List<EpisodeRow>,
     val qualities: List<String>,
+    val episodeQualities: List<EpisodeQuality>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -90,7 +102,12 @@ class SeasonViewModel(
     live: Flow<PlayerSnapshotDto?> = flowOf(null),
     /** Le serveur connecté signale l'absence du lecteur ([fr.remotecontrol.discovery.ServerLocator.playerMissing]). */
     playerMissing: Flow<Boolean> = flowOf(false),
+    /** Garde l'épisode choisi à la rotation ; la clé porte la saison (une autre saison repart du défaut). */
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
+    private val selectionKey = "selectedEpisode:$seasonId"
+    private val selection: StateFlow<Long> = savedState.getStateFlow(selectionKey, NO_SELECTION)
+
     private val playAction = PlayAction(viewModelScope, launcher)
 
     /** Envoyée à la télé une fois à l'ouverture (hors ligne, l'échec est ignoré), puis suivie en direct. */
@@ -108,8 +125,9 @@ class SeasonViewModel(
                 dao.seasonsOfWork(season.workId),
                 dao.episodesOfSeason(seasonId),
                 dao.seasonQualities(seasonId),
-            ) { w, all, eps, q ->
-                Catalog(season, w, all, eps, sortQualities(q))
+                dao.episodeQualitiesOfSeason(seasonId),
+            ) { w, all, eps, q, eq ->
+                Catalog(season, w, all, eps, sortQualities(q), eq)
             }
         }
     }
@@ -117,15 +135,20 @@ class SeasonViewModel(
     private val current: Flow<CurrentDto?> = live.map { it.live() }.distinctUntilChanged()
 
     val state: StateFlow<SeasonUi?> = combine(
-        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(current, playerMissing, ::Pair),
-    ) { c, msg, tv, busy, (playing, missing) ->
-        c?.let { toUi(it, msg, tv).copy(launching = busy).withPlayback(playing, playerAvailable = !missing) }
+        catalog, playAction.message, tvSheet.onTv, playAction.launching, combine(current, playerMissing, selection, ::Triple),
+    ) { c, msg, tv, busy, (playing, missing, selected) ->
+        c?.let { toUi(it, msg, tv, selected).copy(launching = busy).withPlayback(playing, playerAvailable = !missing) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** La base a répondu sans cette saison. */
     val missing: StateFlow<Boolean> = dao.season(seasonId).map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+
+    /** Déplie [episodeId] en carte (actions et détails), sans lancer la lecture. */
+    fun select(episodeId: Long) {
+        savedState[selectionKey] = episodeId
+    }
 
     fun play(episodeId: Long, mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Episode, episodeId), mode)
 
@@ -136,12 +159,17 @@ class SeasonViewModel(
         playAction.message.value = null
     }
 
-    private fun toUi(c: Catalog, msg: String?, tv: Boolean): SeasonUi {
+    private fun toUi(c: Catalog, msg: String?, tv: Boolean, selected: Long): SeasonUi {
         val highlight = highlightEpisode(c.episodes)
+        // Choix disparu du catalogue (resynchronisation) : retour à l'épisode mis en évidence.
+        val chosen = selected.takeIf { id -> c.episodes.any { it.id == id } } ?: highlight
+        val qualities = c.episodeQualities.groupBy({ it.episodeId }, { it.quality }).mapValues { sortQualities(it.value) }
         return SeasonUi(
             season = c.season,
             workTitle = c.work?.titleFr.orEmpty(),
-            episodes = c.episodes.map { it.toUi(c.season.number, it.id == highlight) },
+            episodes = c.episodes.map {
+                it.toUi(c.season.number, it.id == highlight).copy(selected = it.id == chosen, qualities = qualities[it.id].orEmpty())
+            },
             message = msg,
             work = c.work,
             seasons = c.seasons,
@@ -158,9 +186,12 @@ private fun SeasonUi.withPlayback(playing: CurrentDto?, playerAvailable: Boolean
     episodes = episodes.map { it.copy(action = sheetAction(playing?.playsEpisode(it.id) == true, playerAvailable)) },
 )
 
+private const val NO_SELECTION = -1L
+
 private fun EpisodeRow.toUi(seasonNumber: Int, highlighted: Boolean): EpisodeUi {
     val seen = watched == true
     val started = !seen && (position ?: 0.0) > 0
+    val length = duration?.takeIf { it > 0 }
     return EpisodeUi(
         id = id,
         label = Texts.episodeLabel(seasonNumber, number, title),
@@ -173,6 +204,12 @@ private fun EpisodeRow.toUi(seasonNumber: Int, highlighted: Boolean): EpisodeUi 
         canResume = started,
         playable = playable,
         watched = seen,
-        progress = if (started) duration?.takeIf { it > 0 }?.let { ((position ?: 0.0) / it).coerceIn(0.0, 1.0).toFloat() } else null,
+        progress = if (started) length?.let { ((position ?: 0.0) / it).coerceIn(0.0, 1.0).toFloat() } else null,
+        details = length?.let { d ->
+            Texts.details(
+                formatDuration((d / 60.0).roundToInt()),
+                Texts.remaining(remainingMinutes(position ?: 0.0, d)).takeIf { started },
+            )
+        },
     )
 }

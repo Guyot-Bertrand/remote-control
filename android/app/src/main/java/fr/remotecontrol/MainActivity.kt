@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -256,7 +257,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
-            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing) }
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing, createSavedStateHandle()) }
             LifecycleResumeEffect(vm) {
                 vm.onScreenResumed()
                 onPauseOrDispose {}
@@ -270,6 +271,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 missing = missing,
                 server = server,
                 onPlay = vm::play,
+                onSelect = vm::select,
                 onPrePlay = { episode, mode -> nav.navigate(PrePlayArgs(PlayTarget(TargetKind.Episode, episode), mode).toRoute()) },
                 onOpenRemote = { nav.navigate(RemoteRoute) { launchSingleTop = true } },
                 // Changer de saison remplace la fiche affichée (le retour ramène à la série).

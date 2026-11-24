@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -74,9 +76,10 @@ import fr.remotecontrol.ui.theme.RcColors
 private val HEADER_KEYS = listOf("header", "selector", "summary", "message")
 
 /**
- * Maquette « Fiche saison » : en-tête de la série, sélecteur de saison, puis les épisodes ; l'épisode mis en
- * évidence (carte laiton, « Reprendre » / « Depuis le début ») est amené à l'écran à l'ouverture.
- * [onPrePlay] ouvre l'écran « Version et pistes… » pour l'épisode mis en évidence.
+ * Maquette « Fiche saison » : en-tête de la série, sélecteur de saison, puis les épisodes. L'épisode choisi
+ * (par défaut celui mis en évidence) est déplié en carte laiton (« Reprendre » / « Depuis le début », détails)
+ * et amené à l'écran ; toucher une autre ligne la choisit sans lancer la lecture ([onSelect]).
+ * [onPrePlay] ouvre l'écran « Version et pistes… » pour l'épisode choisi.
  */
 @Composable
 fun SeasonScreen(
@@ -84,6 +87,7 @@ fun SeasonScreen(
     missing: Boolean,
     server: ServerState,
     onPlay: (Long, StartMode) -> Unit,
+    onSelect: (Long) -> Unit,
     onPrePlay: (Long, StartMode) -> Unit,
     onOpenRemote: () -> Unit,
     onOpenSeason: (Long) -> Unit,
@@ -101,11 +105,17 @@ fun SeasonScreen(
         }
         if (state.playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         var scrolled by rememberSaveable(state.season.id) { mutableStateOf(false) }
-        val highlight = state.episodes.indexOfFirst { it.highlighted }
-        LaunchedEffect(state.season.id, highlight) {
-            if (!scrolled && highlight >= 0) {
-                list.scrollToItem(HEADER_KEYS.size + highlight)
+        val selected = state.episodes.indexOfFirst { it.selected }
+        LaunchedEffect(state.season.id, selected) {
+            if (selected < 0) return@LaunchedEffect
+            val index = HEADER_KEYS.size + selected
+            if (!scrolled) {
+                list.scrollToItem(index)
                 scrolled = true
+            } else {
+                // Carte dépliée après un toucher : attendre sa mise en page, puis la montrer en entier si besoin.
+                withFrameNanos {}
+                if (!list.fullyVisible(index)) list.animateScrollToItem(index)
             }
         }
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -122,15 +132,21 @@ fun SeasonScreen(
             items(state.episodes, key = { it.id }) { episode ->
                 Box(Modifier.padding(horizontal = 8.dp)) {
                     val enabled = episode.playable && !state.launching && episode.action == SheetAction.Play
-                    if (episode.highlighted) {
+                    if (episode.selected) {
                         HighlightedEpisode(episode, enabled, onPlay, onPrePlay, onOpenRemote)
                     } else {
-                        EpisodeLine(episode, enabled, onPlay, onOpenRemote)
+                        EpisodeLine(episode, enabled, onPlay, onOpenRemote) { onSelect(episode.id) }
                     }
                 }
             }
         }
     }
+}
+
+private fun LazyListState.fullyVisible(index: Int): Boolean {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return false
+    return item.offset >= info.viewportStartOffset && item.offset + item.size <= info.viewportEndOffset
 }
 
 /** Titre de la barre : celui de la série dès que son en-tête n'est plus à l'écran (ouverture sur l'épisode en cours). */
@@ -234,13 +250,23 @@ private fun Summary(state: SeasonUi) {
     }
 }
 
-/** Ligne d'épisode (64 dp, filet bas) : vu (coche), « Reprendre » si entamé, « Depuis le début ». */
+/**
+ * Ligne d'épisode (64 dp, filet bas) : vu (coche), « Reprendre » si entamé, « Depuis le début ». Toucher la ligne
+ * la choisit ([onSelect], sans lecture) ; l'épisode mis en évidence mais non choisi garde son repère.
+ */
 @Composable
-private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit, onOpenRemote: () -> Unit) {
+private fun EpisodeLine(
+    episode: EpisodeUi,
+    enabled: Boolean,
+    onPlay: (Long, StartMode) -> Unit,
+    onOpenRemote: () -> Unit,
+    onSelect: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .height(64.dp)
+            .clickable(onClickLabel = Texts.showEpisode, onClick = onSelect)
             .drawBehind {
                 val y = size.height - 0.5.dp.toPx()
                 drawLine(RcColors.line, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
@@ -251,13 +277,17 @@ private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, Sta
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(
-                episode.label,
-                style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 15.sp),
-                color = if (episode.watched) RcColors.text2 else RcColors.text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    episode.label,
+                    style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 15.sp),
+                    color = if (episode.watched) RcColors.text2 else RcColors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (episode.highlighted) EpisodeBadge(if (episode.canResume) Texts.inProgress else Texts.upNext)
+            }
             if (episode.action == SheetAction.OpenRemote) {
                 PlayingOnTv()
             } else {
@@ -286,7 +316,22 @@ private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, Sta
     }
 }
 
-/** Épisode mis en évidence : carte laiton doux, badge « En cours », barre d'avancement et boutons. */
+/** Repère laiton de l'épisode mis en évidence : « En cours » ou « À suivre ». */
+@Composable
+private fun EpisodeBadge(text: String) {
+    Text(
+        text,
+        style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 12.sp),
+        color = RcColors.onAccent,
+        maxLines = 1,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(RcColors.accent).padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+/**
+ * Épisode choisi : carte laiton doux, badge « En cours » s'il est aussi mis en évidence, détails (durée, reste,
+ * qualités), barre d'avancement et boutons.
+ */
 @Composable
 private fun HighlightedEpisode(
     episode: EpisodeUi,
@@ -315,14 +360,11 @@ private fun HighlightedEpisode(
                 )
                 episode.status?.let { Text(it, style = caption13, color = RcColors.text2) }
             }
-            if (episode.canResume) {
-                Text(
-                    Texts.inProgress,
-                    style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                    color = RcColors.onAccent,
-                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(RcColors.accent).padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
+            if (episode.highlighted && episode.canResume) EpisodeBadge(Texts.inProgress)
+        }
+        episode.details?.let { Text(it, style = caption13, color = RcColors.text2) }
+        if (episode.qualities.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { episode.qualities.forEach { QualityPill(it) } }
         }
         episode.progress?.let { p ->
             Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(RcColors.accent.copy(alpha = 0.25f))) {
