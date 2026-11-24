@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import shutil
 import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
@@ -145,7 +146,8 @@ def build_router(services: Services) -> APIRouter:
 
     @router.get("/info")
     async def info():
-        return {"name": "Remote-Control", "api": 1, "revision": current_revision(s.conn)}
+        return {"name": "Remote-Control", "api": 1, "revision": current_revision(s.conn),
+                "player_available": shutil.which(s.config.mpv_path) is not None}
 
     @router.get("/sync")
     async def sync(since: int | None = None):

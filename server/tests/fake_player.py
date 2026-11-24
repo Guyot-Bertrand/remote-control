@@ -10,6 +10,7 @@ class FakePlayer:
         self.on_state = lambda s: None
         self.calls = []
         self.fail_start = False
+        self.start_error: Exception | None = None  # levée par start (ex. mpv absent)
         self.start_gate: asyncio.Event | None = None  # start lent
         self.stop_gate: asyncio.Event | None = None  # stop lent
         self.stop_state: PlayerState | None = None  # état final émis par stop (comme mpv)
@@ -25,6 +26,8 @@ class FakePlayer:
                                          subtitle=subtitle, external_subs=external_subs)))
         if self.start_gate is not None:
             await self.start_gate.wait()
+        if self.start_error is not None:
+            raise self.start_error
         if self.fail_start:
             raise OSError("boom")
 

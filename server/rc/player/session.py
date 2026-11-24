@@ -17,6 +17,7 @@ from typing import Literal
 from rc.catalog.paths import QUALITY_ORDER
 from rc.db import current_revision, next_revision
 from rc.events import EventBus
+from rc.messages import message
 from rc.player.base import Player, PlayerState, SubSel
 from rc.probe import MediaTracks, cached_tracks, default_selection, find_external_subs
 from rc.volumes import resolve_media_path
@@ -27,7 +28,6 @@ SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
 MSG_INTERRUPTED = "Lecture interrompue : fichier inaccessible"
-MSG_PLAYER_DOWN = "Le lecteur ne répond pas"
 
 Screen = Literal["home", "work", "season", "playing", "message"]
 
@@ -84,7 +84,7 @@ class PlayRequest:
 
 class PlayError(Exception):
     def __init__(self, code: Literal["not_playable", "volume_absent", "not_found", "player",
-                              "invalid"],
+                              "player_missing", "invalid"],
                  volume_label: str | None = None) -> None:
         super().__init__(code)
         self.code = code
@@ -180,8 +180,10 @@ class PlaybackService:
     def __init__(self, conn: sqlite3.Connection, player: Player, tv: TvController,
                  bus: EventBus, indexes_getter: Callable[[], dict],
                  clock: Callable[[], float] = time.monotonic,
-                 on_catalog: Callable[[int], None] | None = None) -> None:
+                 on_catalog: Callable[[int], None] | None = None,
+                 player_available: Callable[[], bool] = lambda: True) -> None:
         self.conn, self.player, self.tv, self.bus = conn, player, tv, bus
+        self.player_available = player_available  # exécutable du lecteur présent ?
         self.indexes_getter, self.clock = indexes_getter, clock
         # Annonce d'une nouvelle révision (progression enregistrée) ; par défaut sur le bus.
         self.on_catalog = on_catalog or (
@@ -212,6 +214,8 @@ class PlaybackService:
     async def _play_locked(self, req: PlayRequest) -> None:
         mf = self._choose_version(req)
         path = self._resolve(mf)
+        if not self.player_available():
+            self._fail_start("player_missing")
         await self._stop_locked(show_tv=False)
         prog = self._progress(req.target_kind, req.target_id)
         start_at = 0.0
@@ -222,17 +226,23 @@ class PlaybackService:
         external = [e.path for e in tracks.external]
         try:
             await self.player.start(path, start_at, audio, subtitle, external)
+        except FileNotFoundError:  # exécutable du lecteur introuvable
+            log.warning("lecteur vidéo introuvable : impossible de lire %s", path)
+            self._fail_start("player_missing")
         except Exception:
             log.exception("échec du démarrage de la lecture de %s", path)
-            self._state = replace(self._state, running=False)
-            self.tv.playback_ended(MSG_PLAYER_DOWN)
-            self._publish()
-            raise PlayError("player") from None
+            self._fail_start("player")
         current = self._describe(req, mf["id"])
         self._session = _Session(current, audio, subtitle, self.clock(), tracks)
         self._state = PlayerState(position=start_at, running=True)
         self.tv.set_playing(current["work_id"])
         self._publish()
+
+    def _fail_start(self, code: Literal["player", "player_missing"]) -> None:
+        self._state = replace(self._state, running=False)
+        self.tv.playback_ended(message(code))
+        self._publish()
+        raise PlayError(code) from None
 
     def _choose_version(self, req: PlayRequest) -> sqlite3.Row:
         col = "work_id" if req.target_kind == "work" else "episode_id"
@@ -256,7 +266,7 @@ class PlaybackService:
             return resolve_version(self.conn, mf, self.indexes_getter())
         except PlayError as exc:
             if exc.code == "volume_absent" and self._session is None:
-                self.tv.playback_ended(f"Disque « {exc.volume_label} » non branché")
+                self.tv.playback_ended(message(exc.code, exc.volume_label))
             raise
 
     def _describe(self, req: PlayRequest, media_file_id: int) -> dict:

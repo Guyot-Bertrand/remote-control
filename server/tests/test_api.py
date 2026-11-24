@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.testclient import TestClient
 
-from rc.api import Services, install_api
+from rc.api import Services, install_api, routes
 from rc.assets import ingest_posters
 from rc.catalog.importer import import_catalog
 from rc.catalog.parser import parse_catalog
@@ -83,9 +83,15 @@ def media_id(conn, like):
     return conn.execute("SELECT id FROM media_file WHERE relpath LIKE ?", (like,)).fetchone()[0]
 
 
-def test_info(env):
+def test_info(env, monkeypatch):
+    env.config.mpv_path = "mpv-de-test"
+    monkeypatch.setattr(routes.shutil, "which",
+                        lambda name: "/usr/bin/mpv" if name == "mpv-de-test" else None)
     assert env.client.get("/api/info").json() == {
-        "name": "Remote-Control", "api": 1, "revision": current_revision(env.conn)}
+        "name": "Remote-Control", "api": 1, "revision": current_revision(env.conn),
+        "player_available": True}
+    env.config.mpv_path = "/introuvable/mpv"  # réévalué à chaque requête
+    assert env.client.get("/api/info").json()["player_available"] is False
 
 
 def test_sync_full_then_incremental(env):
@@ -349,6 +355,15 @@ def test_play_start_failure_409_player(env):
     assert r.json() == error_body("player", None)
 
 
+def test_play_player_missing_409(env):
+    env.player.start_error = FileNotFoundError(2, "No such file or directory", "mpv")
+    r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                           "start": "start"})
+    assert r.status_code == 409
+    assert r.json() == {"error": "player_missing", "volume_label": None,
+                        "message": "Le lecteur vidéo (mpv) n'est pas installé sur le PC."}
+
+
 def test_player_idle_409(env):
     for path, body in (("pause", {"paused": True}), ("seek", {"seconds": 1, "relative": False}),
                        ("volume", {"level": 5}), ("audio", {"index": 1}),
@@ -610,8 +625,6 @@ def test_foreign_external_subtitle_422(env, tmp_path):
 
 
 def test_unexpected_error_gives_json_500_and_logs(env, monkeypatch, caplog):
-    from rc.api import routes
-
     def boom(conn, since):
         raise RuntimeError("panne imprévue")
 

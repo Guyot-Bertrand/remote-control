@@ -147,7 +147,7 @@ async def test_volume_absent_message(env):
         await env.svc.play(PlayRequest("work", 1, "start"))
     assert (exc.value.code, exc.value.volume_label) == ("volume_absent", "DISK1")
     assert env.tv.state.screen == "message"
-    assert env.tv.state.message == "Disque « DISK1 » non branché"
+    assert env.tv.state.message == "Disque « DISK1 » non branché."
     assert env.player.starts() == []
 
 
@@ -168,9 +168,29 @@ async def test_start_failure_shows_message(env):
     with pytest.raises(PlayError) as exc:
         await env.svc.play(PlayRequest("work", 1, "start"))
     assert exc.value.code == "player"
-    assert env.tv.state.message == "Le lecteur ne répond pas"
+    assert env.tv.state.message == "Le lecteur vidéo ne répond pas."
     assert env.svc.current is None
     assert progress(env.conn) is None
+
+
+async def test_missing_executable_is_player_missing(env):
+    env.player.start_error = FileNotFoundError(2, "No such file or directory", "mpv")
+    with pytest.raises(PlayError) as exc:
+        await env.svc.play(PlayRequest("work", 1, "start"))
+    assert exc.value.code == "player_missing"
+    assert env.tv.state.screen == "message"
+    assert env.tv.state.message == "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
+    assert env.svc.current is None
+
+
+async def test_unavailable_player_refused_before_start(env):
+    svc = PlaybackService(env.conn, env.player, env.tv, env.bus, lambda: env.indexes,
+                          clock=env.clock, player_available=lambda: False)
+    with pytest.raises(PlayError) as exc:
+        await svc.play(PlayRequest("work", 1, "start"))
+    assert exc.value.code == "player_missing"
+    assert env.player.calls == []
+    assert env.tv.state.message == "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
 
 
 async def test_process_error_saves_and_shows_message(env):
