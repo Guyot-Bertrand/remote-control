@@ -120,6 +120,7 @@ class ScanViewModelTest {
     }
 
     @Test fun unknown_id_syncs_then_opens_sheet() = runBlocking {
+        api.syncResponses.add(ApiResult.Ok(RcJson.decodeFromString<SyncDto>("""{"revision":4,"full":false}""")))
         val events = collectNow(vm.events)
         vm.onDecoded("rc://w/999")
         events.items.awaitSize(1)
@@ -127,6 +128,24 @@ class ScanViewModelTest {
         // La fiche affiche elle-même « Œuvre introuvable. ».
         assertEquals(listOf<NavEvent>(NavEvent.ToWork(999)), events.items)
         assertNull(vm.state.value.message)
+        events.stop()
+    }
+
+    @Test fun sync_failure_for_unknown_id_is_shown_once_then_retried_after_ok() = runBlocking {
+        val events = collectNow(vm.events)
+        vm.onDecoded("rc://w/999") // synchronisation en échec (serveur injoignable)
+        withTimeout(5_000) { vm.state.first { it.message != null && !it.busy } }
+        assertEquals("Serveur injoignable", vm.state.value.message)
+        vm.onDecoded("rc://w/999") // image suivante : même code, pas de nouvel essai
+        kotlinx.coroutines.delay(100)
+        assertEquals(1, api.calls.count { it.startsWith("sync") })
+        assertTrue(events.items.isEmpty())
+        vm.clearMessage() // « OK » : le code est retenté
+        api.syncResponses.add(ApiResult.Ok(RcJson.decodeFromString<SyncDto>("""{"revision":4,"full":false}""")))
+        vm.onDecoded("rc://w/999")
+        events.items.awaitSize(1)
+        assertEquals(2, api.calls.count { it.startsWith("sync") })
+        assertEquals(listOf<NavEvent>(NavEvent.ToWork(999)), events.items)
         events.stop()
     }
 
