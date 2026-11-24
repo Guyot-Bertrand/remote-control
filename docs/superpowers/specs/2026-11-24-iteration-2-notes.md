@@ -40,3 +40,4 @@
 - Données serveur manquantes pour les maquettes : voir `docs/design/ecarts-maquettes-donnees-serveur.md`.
 - Plan d'installation sur le mini-PC : kiosque, systemd, `rc doctor` sur place.
 - Fiches PDF imprimables (phase 2).
+- Test instable à corriger : `BrowseViewModelTest.selection_visible_before_works_load` (liste non synchronisée collectée en `Dispatchers.Unconfined`).
