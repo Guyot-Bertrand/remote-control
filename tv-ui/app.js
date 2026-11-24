@@ -2,6 +2,9 @@
    Un écran = une fonction render<Écran>(data) qui renvoie le HTML du canevas 1920×1080. */
 'use strict';
 
+// Premier geste : retirer le message « JavaScript bloqué » affiché par défaut.
+document.getElementById('nojs')?.remove();
+
 const RECONNECT_MS = 2000;
 const CLOCK_MS = 10000;
 const HOME_ROTATE_MS = 3 * 60 * 1000; // alternance « Vu récemment » / « Dans la collection »

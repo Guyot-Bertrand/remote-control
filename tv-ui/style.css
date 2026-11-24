@@ -279,6 +279,18 @@ svg { flex-shrink: 0; display: block; }
 .playing-paused.on { opacity: 1; }
 .playing-hint { display: flex; align-items: center; gap: 14px; margin-top: 36px; font-size: var(--tv-fs-small); color: var(--rc-text-3); }
 
+/* -- JavaScript bloqué (contenu statique de index.html, retiré par app.js) -- */
+
+.nojs {
+  position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--rc-bg); color: var(--rc-text); font-family: var(--rc-font-text);
+  padding: 4vw 8vw; box-sizing: border-box;
+}
+.nojs-box { max-width: 72vw; display: flex; flex-direction: column; gap: 2.6vw; }
+.nojs .brand-name { font-size: max(24px, 2.2vw); }
+.nojs-title { font-family: var(--rc-font-display); font-weight: 500; font-size: max(32px, 3.6vw); line-height: 1.15; }
+.nojs-text { font-size: max(20px, 1.8vw); line-height: 1.5; color: var(--rc-text-2); }
+
 /* -- message ------------------------------------------------------------ */
 
 .message-brand { position: absolute; top: var(--tv-safe-y); left: var(--tv-safe-x); opacity: .7; }
