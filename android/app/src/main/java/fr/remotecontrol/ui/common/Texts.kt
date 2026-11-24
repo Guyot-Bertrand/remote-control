@@ -6,6 +6,9 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+/** Genre « épisode », pour les libellés qui dépendent du type de la cible. */
+const val EPISODE = "episode"
+
 /** Tous les textes visibles par l'utilisateur, en français. */
 object Texts {
     // Libellés d'écran
@@ -287,6 +290,25 @@ object Texts {
     fun catalogInfo(revision: Long?, count: Int) = "Révision du catalogue : ${revision ?: "—"} · $count œuvres"
     fun externalSub(lang: String?) = "${languageName(lang)} (fichier)"
     fun embeddedSub(lang: String?) = "${languageName(lang)} (intégré)"
+    const val subEmbedded = "Piste intégrée"
+    /** « Fichier à côté de la vidéo (.srt) », l'extension tirée du chemin. */
+    fun subFile(path: String): String {
+        val ext = path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)
+        return if (ext.isEmpty()) "Fichier à côté de la vidéo" else "Fichier à côté de la vidéo (.$ext)"
+    }
+    /** [kind] : type de l'œuvre, ou [EPISODE]. */
+    fun choicesRememberedFor(kind: String): String {
+        val what = when (kind) {
+            EPISODE -> "cet épisode"
+            "film" -> "ce film"
+            "tele" -> "ce téléfilm"
+            "doc" -> "ce documentaire"
+            "spectacle" -> "ce spectacle"
+            "theatre" -> "cette pièce"
+            else -> "cette œuvre"
+        }
+        return "Ces choix seront repris la prochaine fois pour $what."
+    }
     fun skipLabel(seconds: Int) = if (seconds < 0) "−${-seconds} s" else "+$seconds s"
     /** Libellé accessible des boutons de saut : « Reculer de 10 secondes ». */
     fun skipDescription(seconds: Int) =

@@ -15,10 +15,15 @@ fun trackOptions(tracks: List<TrackDto>): List<TrackOption> = tracks.map { t ->
     TrackOption(t.index, label)
 }
 
-data class SubtitleOption(val sel: SubSel, val label: String)
+/** [label] : libellé court (télécommande) ; [name] et [detail] : les deux lignes de l'écran de choix. */
+data class SubtitleOption(val sel: SubSel, val label: String, val name: String = label, val detail: String? = null)
 
 /** « Aucun », puis les fichiers externes (chemin absolu côté serveur), puis les pistes intégrées. */
 fun subtitleOptions(t: MediaTracksDto): List<SubtitleOption> =
     listOf(SubtitleOption(SubSel.None, Texts.subtitleNone)) +
-        t.external.map { SubtitleOption(SubSel.External(it.path), Texts.externalSub(it.lang)) } +
-        t.subtitles.map { SubtitleOption(SubSel.Embedded(it.index), Texts.embeddedSub(it.lang)) }
+        t.external.map {
+            SubtitleOption(SubSel.External(it.path), Texts.externalSub(it.lang), Texts.languageName(it.lang), Texts.subFile(it.path))
+        } +
+        t.subtitles.map {
+            SubtitleOption(SubSel.Embedded(it.index), Texts.embeddedSub(it.lang), Texts.languageName(it.lang), Texts.subEmbedded)
+        }

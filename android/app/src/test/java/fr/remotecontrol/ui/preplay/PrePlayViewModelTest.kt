@@ -204,6 +204,7 @@ class PrePlayViewModelTest {
         // Progression de l'œuvre 1 sans pistes mémorisées : seulement « Par défaut ».
         val ui = viewModel(TargetKind.Work, 1, StartMode.Start).await { it.canConfirm && it.title.isNotEmpty() }
         assertEquals("Ava", ui.title)
+        assertEquals("Ces choix seront repris la prochaine fois pour ce film.", ui.footer)
         assertEquals(mapOf(1L to "Par défaut"), ui.versionBadges)
         assertEquals(mapOf(2 to "Par défaut"), ui.audioBadges)
         assertEquals(mapOf<SubSel, String>(SubSel.None to "Par défaut"), ui.subtitleBadges)
@@ -215,6 +216,7 @@ class PrePlayViewModelTest {
         val ui = viewModel(TargetKind.Episode, 2, StartMode.Resume).await { it.canConfirm && it.title.isNotEmpty() }
         assertEquals("Back to Life", ui.title)
         assertEquals("S01E02", ui.details)
+        assertEquals("Ces choix seront repris la prochaine fois pour cet épisode.", ui.footer)
         assertEquals(mapOf(6L to "Dernier choix"), ui.versionBadges)
         assertEquals(mapOf(1 to "Dernier choix"), ui.audioBadges)
         assertEquals(mapOf<SubSel, String>(SubSel.None to "Par défaut"), ui.subtitleBadges)

@@ -21,6 +21,7 @@ import fr.remotecontrol.player.preferredVersion
 import fr.remotecontrol.player.sortVersions
 import fr.remotecontrol.player.subtitleOptions
 import fr.remotecontrol.player.trackOptions
+import fr.remotecontrol.ui.common.EPISODE
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.PrePlayRoute
@@ -72,6 +73,8 @@ data class PrePlayUi(
     val audioBadges: Map<Int, String> = emptyMap(),
     val subtitleBadges: Map<SubSel, String> = emptyMap(),
     val canRetry: Boolean = false,
+    /** Mention sous « Lire sur la télé » : « Ces choix seront repris la prochaine fois pour ce film. » */
+    val footer: String = Texts.choicesRemembered,
 )
 
 /**
@@ -129,6 +132,7 @@ class PrePlayViewModel(
                     w.directors.joinToString(", ").ifEmpty { null },
                     w.durationMin?.let(::formatDuration),
                 ).ifEmpty { null },
+                footer = Texts.choicesRememberedFor(w.type),
             )
         }
         TargetKind.Episode -> dao.episodeHeader(args.target.id).first()?.let { e ->
@@ -137,6 +141,7 @@ class PrePlayViewModel(
                 poster = e.poster,
                 year = e.year,
                 details = Texts.episodeCode(e.seasonNumber, e.number),
+                footer = Texts.choicesRememberedFor(EPISODE),
             )
         }
     } ?: PrePlayUi()

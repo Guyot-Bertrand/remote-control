@@ -99,7 +99,7 @@ fun PrePlayScreen(
                 Divider()
                 Section(Texts.subtitles, RcIcons.Subtitles) {
                     state.subtitles.forEach { s ->
-                        OptionRow(s.label, null, state.subtitleBadges[s.sel], s.sel == state.selectedSubtitle, true) { onSubtitle(s.sel) }
+                        OptionRow(s.name, s.detail, state.subtitleBadges[s.sel], s.sel == state.selectedSubtitle, true) { onSubtitle(s.sel) }
                     }
                 }
             }
@@ -111,7 +111,7 @@ fun PrePlayScreen(
         ) {
             PillButton(Texts.playOnTv, RcIcons.Play, onConfirm, Modifier.fillMaxWidth(), enabled = state.canConfirm)
             Text(
-                Texts.choicesRemembered,
+                state.footer,
                 style = TextStyle(fontFamily = Inter, fontSize = 12.sp),
                 color = RcColors.text3,
                 textAlign = TextAlign.Center,

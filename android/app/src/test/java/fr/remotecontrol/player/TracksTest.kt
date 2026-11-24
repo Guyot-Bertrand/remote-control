@@ -23,6 +23,9 @@ class TracksTest {
     @Test fun subtitle_options_none_then_external_then_embedded() {
         val options = subtitleOptions(tracks)
         assertEquals(listOf("Aucun", "Français (fichier)", "Anglais (intégré)"), options.map { it.label })
+        // Écran de choix (maquette) : la langue, puis l'origine de la piste sur une seconde ligne.
+        assertEquals(listOf("Aucun", "Français", "Anglais"), options.map { it.name })
+        assertEquals(listOf(null, "Fichier à côté de la vidéo (.srt)", "Piste intégrée"), options.map { it.detail })
         assertEquals(SubSel.None, options[0].sel)
         assertEquals(
             SubSel.External("/media/beber/DISK1/Films/A/Ava [2017] [1h45,1920x1038,16x9,FR,sEN].1.fr.srt"),
