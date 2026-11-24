@@ -167,8 +167,8 @@ async def test_start_failure_shows_message(env):
     env.player.fail_start = True
     with pytest.raises(PlayError) as exc:
         await env.svc.play(PlayRequest("work", 1, "start"))
-    assert exc.value.code == "not_found"
-    assert env.tv.state.message == "Lecture interrompue : fichier inaccessible"
+    assert exc.value.code == "player"
+    assert env.tv.state.message == "Le lecteur ne répond pas"
     assert env.svc.current is None
     assert progress(env.conn) is None
 

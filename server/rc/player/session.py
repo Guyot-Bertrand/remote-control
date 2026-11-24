@@ -27,6 +27,7 @@ SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
 MSG_INTERRUPTED = "Lecture interrompue : fichier inaccessible"
+MSG_PLAYER_DOWN = "Le lecteur ne répond pas"
 
 Screen = Literal["home", "work", "season", "playing", "message"]
 
@@ -82,7 +83,7 @@ class PlayRequest:
 
 
 class PlayError(Exception):
-    def __init__(self, code: Literal["not_playable", "volume_absent", "not_found"],
+    def __init__(self, code: Literal["not_playable", "volume_absent", "not_found", "player"],
                  volume_label: str | None = None) -> None:
         super().__init__(code)
         self.code = code
@@ -213,9 +214,9 @@ class PlaybackService:
         except Exception:
             log.exception("échec du démarrage de la lecture de %s", path)
             self._state = replace(self._state, running=False)
-            self.tv.playback_ended(MSG_INTERRUPTED)
+            self.tv.playback_ended(MSG_PLAYER_DOWN)
             self._publish()
-            raise PlayError("not_found") from None
+            raise PlayError("player") from None
         current = self._describe(req, mf["id"])
         self._session = _Session(current, audio, subtitle, self.clock())
         self._state = PlayerState(position=start_at, running=True)

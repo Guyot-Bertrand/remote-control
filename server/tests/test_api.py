@@ -337,6 +337,14 @@ def test_player_failure_409(env, error):
         assert r.json() == {"error": "player", "volume_label": None}
 
 
+def test_play_start_failure_409_player(env):
+    env.player.fail_start = True
+    r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                           "start": "start"})
+    assert r.status_code == 409
+    assert r.json() == {"error": "player", "volume_label": None}
+
+
 def test_player_idle_409(env):
     for path, body in (("pause", {"paused": True}), ("seek", {"seconds": 1, "relative": False}),
                        ("volume", {"level": 5}), ("audio", {"index": 1}),

@@ -411,12 +411,12 @@ Règles :
   - `@dataclass TvState(screen: Literal["home", "work", "season", "playing", "message"], work_id: int | None = None, season_id: int | None = None, message: str | None = None)`
   - `TvController(bus)` : `state`, `show(screen, work_id=None, season_id=None, force=False) -> bool` (ignoré et renvoie faux si `screen == "playing"` est actif et `force` est faux), `set_playing(work_id)`, `playback_ended(message: str | None)` (revient à la dernière fiche, ou affiche `message`). Publie `{"type": "tv", "state": asdict(state)}`.
   - `PlayRequest(target_kind: Literal["work", "episode"], target_id: int, start: Literal["start", "resume"], media_file_id: int | None = None, audio: int | None = None, subtitle: SubSel | None = None)`
-  - `class PlayError(Exception)`, avec `code: Literal["not_playable", "volume_absent", "not_found"]` et `volume_label: str | None`
+  - `class PlayError(Exception)`, avec `code: Literal["not_playable", "volume_absent", "not_found", "player"]` et `volume_label: str | None`
   - `PlaybackService(conn, player: Player, tv: TvController, bus: EventBus, indexes_getter: Callable[[], dict], clock=time.monotonic)` : `async play(req)`, `async pause(bool)`, `async seek(seconds, relative)`, `async set_volume(level)`, `async set_audio(index)`, `async set_subtitle(sel)`, `async stop()`, `state -> PlayerState`, `current -> dict | None` (cible, `media_file_id`, titre).
 
 Règles :
 - **Choix de la version** : `media_file_id` s'il est fourni, sinon la version mémorisée dans `progress` (pour `resume`), sinon la meilleure qualité présente selon `QUALITY_ORDER`.
-- **Erreurs** : aucun fichier lisible → `not_playable`. Fichier connu mais disque absent → `volume_absent` avec le libellé du disque, et la télé affiche `f"Disque « {label} » non branché"`. Chemin introuvable → `not_found`.
+- **Erreurs** : aucun fichier lisible → `not_playable`. Fichier connu mais disque absent → `volume_absent` avec le libellé du disque, et la télé affiche `f"Disque « {label} » non branché"`. Chemin introuvable → `not_found`. Échec de démarrage du lecteur → `player` (409 `{"error":"player"}`), message télé « Le lecteur ne répond pas ».
 - **Position de départ** : 0 pour `start`. Pour `resume`, la position de `progress` si `watched == 0`, sinon 0.
 - **Pistes** : celles de la requête, sinon le dernier choix de `progress`, sinon `default_selection`.
 - **Lecture déjà en cours** : elle est arrêtée (avec enregistrement de sa position) avant de démarrer la nouvelle.
