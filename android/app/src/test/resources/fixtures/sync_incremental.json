@@ -1,0 +1,8 @@
+{"revision": 5, "full": false,
+ "works": [{"id": 1, "type": "film", "key": "Ava [2017]", "title_fr": "Ava", "title_vo": null, "title_alt": "Ava la sauvage", "year": 2017, "duration_min": 99, "episode_count": null, "directors": ["Léa Mysius"], "genres": ["comédie dramatique"], "cast": ["Juan Cano", "Noée Abita", "Laure Calamy"], "synopsis": "Ava, 13 ans, est en vacances au bord de l'océan...", "imdb_id": "tt6194530", "tags": ["[FR]"], "episodic": false, "poster": "a1b2c3d4e5f60718", "rev": 5}],
+ "seasons": [], "episodes": [],
+ "media_files": [{"id": 4, "work_id": 4, "episode_id": null, "quality": "SD", "size": "700M", "relpath": "Theatre/Le prenom [2012] [1h50,720x576,4x3,FR].mp4", "volume_uuid": "DISK2", "present": true, "rev": 4}],
+ "collections": [], "work_collections": [],
+ "progress": [{"target_kind": "episode", "target_id": 2, "media_file_id": 6, "position": 0.0, "duration": 1440.0, "watched": true, "audio": null, "subtitle": null, "updated_at": 1795000500.0, "rev": 5}],
+ "volumes": [{"uuid": "DISK2", "label": "Théâtre", "mount": "/media/beber/Theatre", "present": true, "rev": 4}],
+ "deleted": {"work": [3], "season": [], "episode": [3], "media_file": [3, 7], "collection": []}}

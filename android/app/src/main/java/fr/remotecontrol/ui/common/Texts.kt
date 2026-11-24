@@ -1,0 +1,322 @@
+package fr.remotecontrol.ui.common
+
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+
+/** Genre « épisode », pour les libellés qui dépendent du type de la cible. */
+const val EPISODE = "episode"
+
+/** Tous les textes visibles par l'utilisateur, en français. */
+object Texts {
+    // Libellés d'écran
+    const val appName = "Remote-Control"
+    const val back = "Retour"
+    const val sectionRecent = "Récemment ajoutés"
+    const val sectionBrowse = "Parcourir"
+    const val sectionCollections = "Collections"
+    const val search = "Rechercher"
+    const val searchHint = "Titre, réalisateur, acteur…"
+    const val scan = "Scanner une fiche"
+    const val remote = "Télécommande"
+    const val settings = "Réglages"
+    const val notAvailable = "Non lisible"
+    const val settingsServer = "Serveur"
+    const val manualAddress = "Adresse manuelle (secours)"
+    const val save = "Enregistrer"
+    const val rediscover = "Rechercher le serveur"
+    const val resync = "Resynchroniser"
+    const val neverSynced = "Jamais synchronisé"
+    const val sectionServer = "SERVEUR"
+    const val sectionCatalog = "CATALOGUE"
+    const val sectionAbout = "À PROPOS"
+    const val enterAddress = "Saisir l'adresse manuellement"
+    const val lastSyncTitle = "Dernière synchronisation"
+    const val appVersion = "Version de l'appli"
+    const val detectedAuto = "détecté automatiquement"
+    const val enteredByHand = "saisi à la main"
+    const val statusConnected = "Connecté"
+    const val noServerYet = "Aucun serveur"
+    const val addressHint = "192.168.1.20:8765"
+    fun appVersionLabel(version: String) = if (version.isBlank()) appName else "$appName $version"
+    const val seasons = "Saisons"
+    const val versions = "Versions"
+    const val version = "Version"
+    const val audio = "Audio"
+    const val subtitles = "Sous-titres"
+    const val startPlayback = "Lancer la lecture"
+    const val play = "Lecture"
+    const val pause = "Pause"
+    const val restart = "Début"
+    const val volume = "Volume"
+    const val stop = "Arrêter"
+    const val directors = "Réalisation"
+    const val cast = "Avec"
+    const val work = "Fiche de l'œuvre"
+    const val season = "Saison"
+
+    // Parcours et recherche
+    const val allTypes = "Tout"
+    const val allWorks = "Toutes les œuvres"
+    const val sortTitle = "Titre"
+    const val sortRecent = "Ajout récent"
+    const val changeSort = "Changer le tri"
+    const val byRank = "par rang"
+    const val nothingToShow = "Aucune œuvre à afficher"
+    const val noResults = "Aucun résultat"
+    const val searchHelp = "Titres, titres originaux et alternatifs, réalisation, casting — sans tenir compte des accents."
+    const val clear = "Effacer"
+    const val openWork = "Ouvrir la fiche"
+    const val sectionPeople = "Personnes"
+    const val sectionWorks = "Œuvres"
+    const val sectionAka = "Aussi connu sous"
+    const val acting = "Interprétation"
+    const val searchPerson = "Chercher ses œuvres"
+    fun personRole(directing: Boolean, count: Int) = "${if (directing) directors else acting} · ${countOfType(null, count)}"
+    fun altTitle(original: Boolean, title: String) = "${if (original) "Titre original" else "Titre alternatif"} : $title"
+    /** Initiales d'un nom (« LM » pour « Léa Mysius »), au plus deux. */
+    fun initials(name: String) = name.split(' ', '-').filter { it.isNotBlank() }.let { if (it.size > 2) listOf(it.first(), it.last()) else it }
+        .joinToString("") { it.first().uppercase() }
+
+    // Barre de navigation
+    const val navHome = "Accueil"
+    const val navBrowse = "Parcourir"
+    const val navSearch = "Recherche"
+    const val navScan = "Scanner"
+
+    // Pastille de connexion
+    const val chipConnected = "PC connecté"
+    const val chipSearching = "Recherche…"
+    const val chipOffline = "Hors ligne"
+
+    // Messages
+    const val serverUnreachable = "Serveur injoignable"
+    const val noServer = "Aucun serveur trouvé"
+    const val searching = "Recherche du serveur…"
+    const val notPlayable = "Aucun fichier lisible pour cette œuvre"
+    const val notFound = "Fichier introuvable"
+    const val badResponse = "Réponse inattendue du serveur."
+    const val idle = "Aucune lecture en cours"
+    const val notDigitized = "Non numérisé"
+    const val playFromStart = "Lire depuis le début"
+    const val fromStart = "Depuis le début"
+    const val resume = "Reprendre"
+    const val tracksAndVersion = "Version et pistes…"
+    const val prePlayTitle = "Avant la lecture"
+    const val choicesRemembered = "Ces choix seront repris la prochaine fois."
+    const val playOnTv = "Lire sur la télé"
+    const val badgeDefault = "Par défaut"
+    const val badgeLastChoice = "Dernier choix"
+    const val close = "Fermer"
+    const val watched = "Vu"
+    const val subtitleNone = "Aucun"
+    const val playableOnly = "Œuvres lisibles"
+    const val wholeCatalogue = "Tout le catalogue"
+    const val seeAll = "Tout voir"
+    const val firstSync = "Première synchronisation…"
+    const val firstSyncHelp =
+        "Le catalogue est copié sur le téléphone pour pouvoir le parcourir même sans le PC. Les affiches suivront en arrière-plan."
+    const val catalogEmptyTitle = "Catalogue vide"
+    const val catalogEmptyHelp =
+        "Le PC n'a encore trouvé aucune œuvre. Ajoutez des fichiers sur un disque branché, puis resynchronisez."
+    const val catalogNotSyncedTitle = "Catalogue non synchronisé"
+    const val catalogNotSyncedHelp =
+        "Le catalogue n'a pas encore pu être copié depuis le PC. Resynchronisez, ou vérifiez l'adresse du serveur."
+    const val checkServerAddress = "Vérifier l'adresse du serveur"
+    const val qrUnknown = "QR-code non reconnu"
+    const val cameraPermission = "Autorisez l'appareil photo pour scanner les QR-codes"
+
+    // Scan des QR-codes
+    const val scanHint = "Visez le QR-code d'une fiche imprimée : l'œuvre ou la saison s'ouvre aussitôt."
+    const val qrUnknownDetail = "QR-code non reconnu. Ce n'est pas une fiche Remote-Control."
+    const val ok = "OK"
+    const val torch = "Lampe"
+    const val cameraView = "Vue de la caméra"
+    const val cameraDenied = "Appareil photo non autorisé"
+    const val allowCamera = "Autoriser"
+    const val openAppSettings = "Ouvrir les réglages"
+    const val cameraUnavailable = "Appareil photo indisponible"
+    const val cameraUnavailableHelp = "Aucune caméra arrière utilisable sur cet appareil."
+    const val invalidAddress = "Adresse invalide"
+    const val addressUnreachable = "Serveur injoignable à cette adresse"
+    const val nothingPlaying = "Lecture en cours"
+    const val playerNotResponding = "Le lecteur ne répond pas."
+
+    // Télécommande
+    const val onTv = "Sur la télé"
+    const val minimize = "Réduire"
+    const val seekPosition = "Position"
+    const val pausedNow = "En pause"
+    const val volumeDown = "Baisser le volume"
+    const val volumeUp = "Monter le volume"
+    const val playbackEnded = "Lecture terminée"
+    const val playbackInterrupted = "Lecture interrompue"
+    const val backToSheet = "Retour à la fiche"
+    const val unknownTrack = "—"
+
+    // Fiches œuvre et saison
+    const val shownOnTv = "Affichée sur la télé"
+    const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
+    const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
+    const val retry = "Réessayer"
+    const val workNotFound = "Œuvre introuvable."
+    const val seasonNotFound = "Saison introuvable."
+    const val dismiss = "Fermer"
+    const val inProgress = "En cours"
+    const val showMore = "Afficher plus"
+    const val change = "Modifier"
+    const val withoutSubtitles = "Sans sous-titres"
+    const val withSubtitles = "Avec sous-titres"
+    const val offlineNotice = "PC injoignable. Vous pouvez parcourir ; la lecture reviendra avec la connexion."
+    fun rank(rank: String) = "n°\u00A0$rank"
+    const val showLess = "Afficher moins"
+
+    /** Mention courte d'une œuvre non lisible : nom du disque débranché, ou « Non numérisé ». */
+    fun unavailableLabel(absentVolume: String?) = absentVolume?.ifEmpty { disk } ?: notDigitized
+    const val disk = "Disque"
+    fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
+    fun httpError(status: Int) = "Erreur du serveur ($status)"
+    /** « Reprendre à 1 h 12 » à partir d'une heure, « Reprendre à 3 min » ou « Reprendre à 45 s » avant. */
+    fun resumeAt(seconds: Double) = "Reprendre à ${formatResumePosition(seconds)}"
+    fun started(seconds: Double) = "Entamé — ${formatClock(seconds)}"
+    fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"
+    fun collectionCounts(count: Int, playable: Int) = "${workCount(count)} · $playable ${if (playable > 1) "lisibles" else "lisible"}"
+    fun remaining(minutes: Int) = "reste ${formatDuration(minutes)}"
+    /** « 2017 · 1 h 39 » : éléments connus, séparés par un point médian. */
+    fun details(vararg parts: String?) = parts.filterNotNull().joinToString(" · ")
+    fun genres(list: List<String>) = list.joinToString(", ") { g -> g.replaceFirstChar { it.titlecase(Locale.FRENCH) } }
+    /** Libellé accessible d'un bouton d'épisode : « Reprendre S01E02 ». */
+    fun episodeAction(action: String, episode: String) = "$action $episode"
+    fun directorsDescription(names: List<String>) = "$directors : ${names.joinToString(", ")}"
+    fun versionDescription(label: String, absent: String) = "$label, $absent"
+    fun alsoKnownAs(title: String) = "Aussi : $title"
+    fun seasonCount(count: Int) = if (count == 1) "1 saison" else "$count saisons"
+    fun episodesSummary(count: Int, watched: Int) =
+        "${if (count == 1) "1 épisode" else "$count épisodes"} · $watched ${if (watched > 1) "vus" else "vu"}"
+    fun synced(count: Int) = "Catalogue synchronisé ($count œuvres)"
+
+    /**
+     * « Aujourd'hui à 21:12 · 4 012 œuvres, dont 2 655 lisibles » (puis « Hier à », « Le 3 nov. 2026 à ») ;
+     * « Jamais synchronisé » sans synchronisation réussie.
+     */
+    fun lastSync(at: Long?, now: Long, count: Int, playable: Int, zone: ZoneId = ZoneId.systemDefault()): String {
+        if (at == null) return neverSynced
+        val time = Instant.ofEpochMilli(at).atZone(zone)
+        val days = ChronoUnit.DAYS.between(time.toLocalDate(), Instant.ofEpochMilli(now).atZone(zone).toLocalDate())
+        val clock = time.format(DateTimeFormatter.ofPattern("HH:mm", Locale.FRENCH))
+        val day = when (days) {
+            0L -> "Aujourd'hui"
+            1L -> "Hier"
+            else -> "Le ${time.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.FRENCH))}"
+        }
+        return "$day à $clock · ${countOfType(null, count)}, dont ${formatCount(playable)} ${if (playable > 1) "lisibles" else "lisible"}"
+    }
+
+    // Fonctions de libellé
+    fun typeLabel(type: String): String = when (type) {
+        "film" -> "Films"
+        "serie" -> "Séries"
+        "doc" -> "Documentaires"
+        "theatre" -> "Théâtre"
+        "tele" -> "Téléfilms"
+        "spectacle" -> "Spectacles"
+        else -> type
+    }
+
+    /** Type au singulier, pour la ligne de détail d'une œuvre (« 2017 · Film »). */
+    fun typeSingular(type: String): String = when (type) {
+        "film" -> "Film"
+        "serie" -> "Série"
+        "doc" -> "Documentaire"
+        "theatre" -> "Théâtre"
+        "tele" -> "Téléfilm"
+        "spectacle" -> "Spectacle"
+        else -> type
+    }
+
+    /** « 1 912 films », « 1 série », « 3 œuvres » (type nul : tous types). */
+    fun countOfType(type: String?, count: Int): String {
+        val plural = count > 1
+        val noun = when (type) {
+            "film" -> if (plural) "films" else "film"
+            "serie" -> if (plural) "séries" else "série"
+            "doc" -> if (plural) "documentaires" else "documentaire"
+            "theatre" -> if (plural) "pièces de théâtre" else "pièce de théâtre"
+            "tele" -> if (plural) "téléfilms" else "téléfilm"
+            "spectacle" -> if (plural) "spectacles" else "spectacle"
+            else -> if (plural) "œuvres" else "œuvre"
+        }
+        return "${formatCount(count)}\u00A0$noun"
+    }
+
+    fun sortLabel(recent: Boolean) = if (recent) sortRecent else sortTitle
+    fun browseSummary(type: String?, count: Int, recent: Boolean) = "${countOfType(type, count)} · ${sortLabel(recent)}"
+    fun collectionSummary(count: Int, playable: Int, ranked: Boolean) =
+        if (ranked) "${collectionCounts(count, playable)} · $byRank" else collectionCounts(count, playable)
+    fun workLine(year: Int?, type: String, directors: List<String>) =
+        listOfNotNull(year?.toString(), typeSingular(type), directors.joinToString(", ").ifEmpty { null }).joinToString(" · ")
+
+    fun languageName(code: String?): String = when (code) {
+        null -> "Langue inconnue"
+        "fr" -> "Français"
+        "en" -> "Anglais"
+        "de" -> "Allemand"
+        "es" -> "Espagnol"
+        "it" -> "Italien"
+        "ja" -> "Japonais"
+        "ru" -> "Russe"
+        "pt" -> "Portugais"
+        "nl" -> "Néerlandais"
+        else -> code.uppercase()
+    }
+
+    /** « S2 É3 » (« É3 » hors saison), dans la ligne de reprise de l'accueil. */
+    fun episodeShort(season: Int, number: Int): String = if (season == 0) "É$number" else "S$season É$number"
+
+    fun episodeCode(season: Int, number: Int): String =
+        if (season == 0) "Épisode $number" else "S%02dE%02d".format(Locale.ROOT, season, number)
+
+    /** « S01E02 », suivi de « — titre » si l'épisode a un titre. */
+    fun episodeLabel(season: Int, number: Int, title: String?): String =
+        episodeCode(season, number).let { code -> title?.let { "$code — $it" } ?: code }
+
+    fun episodeTitle(work: String, season: Int, number: Int): String =
+        if (season == 0) "$work — épisode $number" else "$work — ${episodeCode(season, number)}"
+
+    fun versionLabel(quality: String, size: String?): String =
+        if (size == null) quality else "$quality · $size"
+
+    fun serverDetected(display: String) = "$display (détecté)"
+    fun serverManual(display: String) = "$display (saisi à la main)"
+    fun catalogInfo(revision: Long?, count: Int) = "Révision du catalogue : ${revision ?: "—"} · $count œuvres"
+    fun externalSub(lang: String?) = "${languageName(lang)} (fichier)"
+    fun embeddedSub(lang: String?) = "${languageName(lang)} (intégré)"
+    const val subEmbedded = "Piste intégrée"
+    /** « Fichier à côté de la vidéo (.srt) », l'extension tirée du chemin. */
+    fun subFile(path: String): String {
+        val ext = path.substringAfterLast('/').substringAfterLast('.', "").lowercase(Locale.ROOT)
+        return if (ext.isEmpty()) "Fichier à côté de la vidéo" else "Fichier à côté de la vidéo (.$ext)"
+    }
+    /** [kind] : type de l'œuvre, ou [EPISODE]. */
+    fun choicesRememberedFor(kind: String): String {
+        val what = when (kind) {
+            EPISODE -> "cet épisode"
+            "film" -> "ce film"
+            "tele" -> "ce téléfilm"
+            "doc" -> "ce documentaire"
+            "spectacle" -> "ce spectacle"
+            "theatre" -> "cette pièce"
+            else -> "cette œuvre"
+        }
+        return "Ces choix seront repris la prochaine fois pour $what."
+    }
+    fun skipLabel(seconds: Int) = if (seconds < 0) "−${-seconds} s" else "+$seconds s"
+    /** Libellé accessible des boutons de saut : « Reculer de 10 secondes ». */
+    fun skipDescription(seconds: Int) =
+        "${if (seconds < 0) "Reculer" else "Avancer"} de ${kotlin.math.abs(seconds)} secondes"
+    /** Temps restant, précédé d'un signe moins : « −0:26:56 ». */
+    fun remainingClock(seconds: Double) = "−${formatClock(seconds)}"
+    fun volumeLevel(level: Int) = "$volume $level\u00A0%"
+}

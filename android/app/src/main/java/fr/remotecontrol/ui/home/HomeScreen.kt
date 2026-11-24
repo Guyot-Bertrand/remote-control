@@ -1,0 +1,388 @@
+package fr.remotecontrol.ui.home
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.theme.Fraunces
+import fr.remotecontrol.ui.theme.Inter
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.ui.common.ConnectionChip
+import fr.remotecontrol.ui.common.PosterThumb
+import fr.remotecontrol.ui.common.RcIcons
+import fr.remotecontrol.ui.common.Texts
+import fr.remotecontrol.ui.common.WORK_TYPES
+import fr.remotecontrol.ui.theme.RcColors
+
+@Composable
+fun HomeScreen(
+    state: HomeUi,
+    onPlayableOnly: (Boolean) -> Unit,
+    onOpenWork: (Long) -> Unit,
+    onOpenSeason: (Long) -> Unit,
+    onOpenType: (String) -> Unit,
+    onOpenCollection: (Long) -> Unit,
+    onSeeAllRecent: () -> Unit,
+    onRemote: () -> Unit,
+    onSettings: () -> Unit,
+    onResync: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(RcColors.bg)) {
+        // L'en-tête (et son accès aux réglages) reste visible dans tous les états.
+        HomeHeader(state.server, onSettings)
+        when (state.banner) {
+            HomeBanner.Searching, HomeBanner.Syncing -> {
+                FirstSync(state.server, syncing = state.banner == HomeBanner.Syncing)
+                return@Column
+            }
+            HomeBanner.Empty, HomeBanner.NotSynced -> {
+                EmptyCatalog(state.banner == HomeBanner.Empty, state.message, onResync, onSettings)
+                return@Column
+            }
+            else -> Unit
+        }
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 16.dp)) {
+            if (state.banner == HomeBanner.NoServer) {
+                item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
+            }
+            item { FilterRow(state.playableOnly, onPlayableOnly, onRemote) }
+            if (state.resume.isNotEmpty()) {
+                item { SectionTitle(Texts.resume) }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(state.resume, key = { "${it.targetKind}/${it.targetId}" }) { item ->
+                            ResumeCard(item) {
+                                if (item.seasonId != null) onOpenSeason(item.seasonId) else onOpenWork(item.workId)
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(16.dp)) }
+            }
+            if (state.recent.isNotEmpty()) {
+                item { SectionTitle(Texts.sectionRecent, Texts.seeAll, onSeeAllRecent) }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(state.recent, key = { it.id }) { work ->
+                            Column(
+                                Modifier.width(96.dp).clickable { onOpenWork(work.id) },
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                PosterThumb(
+                                    hash = work.poster,
+                                    title = work.titleFr,
+                                    year = work.year,
+                                    unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Text(
+                                    work.titleFr,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = RcColors.text2,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
+            item { SectionTitle(Texts.sectionBrowse) }
+            item { TypePills(onOpenType) }
+            if (state.collections.isNotEmpty()) {
+                item { Spacer(Modifier.height(12.dp)) }
+                item { SectionTitle(Texts.sectionCollections) }
+                items(state.collections, key = { it.id }) { c ->
+                    CollectionRow(c.name, Texts.collectionCounts(c.count, c.playableCount)) { onOpenCollection(c.id) }
+                }
+            }
+        }
+    }
+}
+
+/** Maquette « Première synchronisation » : marque, barre d'avancement, explication, serveur. */
+@Composable
+private fun FirstSync(server: ServerState, syncing: Boolean) {
+    Column(
+        Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 64.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(12.dp).clip(CircleShape).background(RcColors.accent))
+            Text(Texts.appName, style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 32.sp))
+        }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Le serveur envoie le catalogue d'un bloc : l'avancement n'est pas connu, la barre est indéterminée.
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = RcColors.accent,
+                trackColor = RcColors.surface3,
+                strokeCap = StrokeCap.Round,
+                gapSize = 0.dp,
+            )
+            Text(
+                if (syncing) Texts.firstSync else Texts.searching,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
+                color = RcColors.text2,
+            )
+        }
+        Text(Texts.firstSyncHelp, style = body15, color = RcColors.text2, textAlign = TextAlign.Center)
+        (server as? ServerState.Connected)?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(RcIcons.Server, contentDescription = null, tint = RcColors.text3, modifier = Modifier.size(18.dp))
+                Text(it.address.display, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = RcColors.text3)
+            }
+        }
+    }
+}
+
+private val body15 = TextStyle(fontFamily = Inter, fontSize = 15.sp, lineHeight = 23.sp)
+
+/** Maquette « Catalogue vide » : le serveur répond mais n'a aucune œuvre. */
+@Composable
+private fun EmptyCatalog(synced: Boolean, message: String?, onResync: () -> Unit, onSettings: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(96.dp).clip(CircleShape).background(RcColors.surface2), contentAlignment = Alignment.Center) {
+            Icon(RcIcons.Film, contentDescription = null, tint = RcColors.accent, modifier = Modifier.size(40.dp))
+        }
+        Text(
+            if (synced) Texts.catalogEmptyTitle else Texts.catalogNotSyncedTitle,
+            style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 26.sp),
+            modifier = Modifier.padding(top = 8.dp).semantics { heading() },
+        )
+        Text(
+            if (synced) Texts.catalogEmptyHelp else Texts.catalogNotSyncedHelp,
+            style = body15,
+            color = RcColors.text2,
+            textAlign = TextAlign.Center,
+        )
+        message?.let {
+            Text(it, style = body15.copy(fontWeight = FontWeight.Medium), color = RcColors.warn, textAlign = TextAlign.Center)
+        }
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton(Texts.resync, RcIcons.Sync, onResync, Modifier.fillMaxWidth())
+            TextButton(onClick = onSettings, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                Text(Texts.checkServerAddress, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 15.sp), color = RcColors.accentStrong)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeHeader(server: ServerState, onSettings: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            Modifier.weight(1f).padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(Modifier.size(9.dp).clip(CircleShape).background(RcColors.accent))
+            Text(
+                Texts.appName,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        ConnectionChip(server)
+        IconButton(onClick = onSettings) {
+            Icon(RcIcons.Settings, contentDescription = Texts.settings, tint = RcColors.text)
+        }
+    }
+}
+
+@Composable
+private fun Banner(text: String, background: Color, action: String? = null, onAction: () -> Unit = {}) {
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp)
+            .heightIn(min = 40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = RcColors.text, modifier = Modifier.weight(1f))
+        if (action != null) {
+            TextButton(onClick = onAction) {
+                Text(action, style = MaterialTheme.typography.labelLarge, color = RcColors.accentStrong)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterRow(playableOnly: Boolean, onPlayableOnly: (Boolean) -> Unit, onRemote: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RcFilterChip(Texts.playableOnly, playableOnly) { onPlayableOnly(true) }
+        RcFilterChip(Texts.wholeCatalogue, !playableOnly) { onPlayableOnly(false) }
+        Spacer(Modifier.weight(1f))
+        // Icône seule : le libellé ne tenait pas à côté des deux filtres et passait à la ligne.
+        IconButton(onClick = onRemote) {
+            Icon(RcIcons.Remote, contentDescription = Texts.remote, tint = RcColors.accentStrong)
+        }
+    }
+}
+
+@Composable
+private fun RcFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+        shape = RoundedCornerShape(16.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Color.Transparent,
+            labelColor = RcColors.text2,
+            selectedContainerColor = RcColors.accentSoft,
+            selectedLabelColor = RcColors.accentStrong,
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = RcColors.line,
+            selectedBorderColor = Color.Transparent,
+        ),
+    )
+}
+
+@Composable
+private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) {
+    Row(
+        Modifier.fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        if (action != null) {
+            TextButton(onClick = onAction) {
+                Text(action, style = MaterialTheme.typography.titleSmall, color = RcColors.accentStrong)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResumeCard(item: ResumeItem, onClick: () -> Unit) {
+    Column(Modifier.width(128.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PosterThumb(
+            hash = item.poster,
+            title = item.title,
+            progress = item.progress,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Column {
+            Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(item.label, style = MaterialTheme.typography.bodySmall, color = RcColors.text2, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun TypePills(onOpenType: (String) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        WORK_TYPES.forEach { type ->
+            Text(
+                Texts.typeLabel(type),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(RcColors.surface)
+                    .border(1.dp, RcColors.line, RoundedCornerShape(999.dp))
+                    .clickable { onOpenType(type) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CollectionRow(name: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(RcColors.surface2),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(RcIcons.Collection, contentDescription = null, tint = RcColors.accent, modifier = Modifier.size(22.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = RcColors.text2)
+        }
+        Icon(RcIcons.ChevronRight, contentDescription = null, tint = RcColors.text3, modifier = Modifier.size(20.dp))
+    }
+}

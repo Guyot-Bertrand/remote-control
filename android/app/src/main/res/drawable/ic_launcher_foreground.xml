@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pictogramme « remote » des maquettes (RcIcons.Remote, grille 24), agrandi ×2,5 au centre de la zone sûre. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.5"
+        android:scaleY="2.5"
+        android:translateX="24"
+        android:translateY="24">
+        <path
+            android:pathData="M10 2.5h4a3 3 0 0 1 3 3v13a3 3 0 0 1 -3 3h-4a3 3 0 0 1 -3 -3v-13a3 3 0 0 1 3 -3z"
+            android:strokeColor="@color/ic_launcher_glyph"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M10 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"
+            android:strokeColor="@color/ic_launcher_glyph"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M10 13h0.01M14 13h0.01M10 16.5h0.01M14 16.5h0.01"
+            android:strokeColor="@color/ic_launcher_glyph"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

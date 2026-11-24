@@ -1,0 +1,84 @@
+package fr.remotecontrol.ui.common
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.dp
+
+/** Icônes au trait des maquettes (grille 24, trait 2, bouts arrondis), recopiées de leurs SVG. */
+object RcIcons {
+    val Home = icon("Home", "M3.5 10.5 12 3.5l8.5 7", "M5.5 9v11h13V9")
+    val Browse = icon("Browse", rect(3.5f, 3.5f), rect(13.5f, 3.5f), rect(3.5f, 13.5f), rect(13.5f, 13.5f))
+    val Search = icon("Search", circle(11f, 11f, 7f), "m20 20-3.6-3.6")
+    val Scan = icon(
+        "Scan",
+        "M4 8.5V5a1 1 0 0 1 1-1h3.5M15.5 4H19a1 1 0 0 1 1 1v3.5M20 15.5V19a1 1 0 0 1-1 1h-3.5M8.5 20H5a1 1 0 0 1-1-1v-3.5",
+        "M7.5 12h9",
+    )
+    val Settings = icon(
+        "Settings",
+        "M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1",
+        circle(15f, 6f, 2f), circle(9f, 12f, 2f), circle(17f, 18f, 2f),
+    )
+    val Collection = icon("Collection", "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01")
+    val ChevronRight = icon("ChevronRight", "m9 5 7 7-7 7")
+    val Back = icon("Back", "M15 5l-7 7 7 7")
+    val Torch = icon("Torch", "M13 3 5 13.5h6L10 21l8-10.5h-6z")
+    val Check = icon("Check", "m5 12.5 4.5 4.5L19 7.5")
+    val Sort = icon("Sort", "M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5")
+    val Clear = icon("Clear", "M6 6l12 12M18 6 6 18")
+    val Play = icon("Play", fill("M7 4.5v15l12.5-7.5z"))
+    val Resume = icon("Resume", "M4 12a8 8 0 1 0 2.4-5.7", "M4 4v4.5h4.5")
+    val FromStart = icon("FromStart", "M6 5v14", fill("M18.5 5.5v13L9.5 12z"))
+    val Remote = icon("Remote", rrect(7f, 2.5f, 10f, 19f, 3f), circle(12f, 8f, 2f), "M10 13h.01M14 13h.01M10 16.5h.01M14 16.5h.01")
+    val Tv = icon("Tv", rrect(3f, 4.5f, 18f, 12.5f, 2f), "M8.5 20.5h7")
+    val Disk = icon("Disk", rrect(3f, 7f, 18f, 10f, 2f), fill(circle(7.5f, 12f, 1f)), "M11 12h6")
+    val Disc = icon("Disc", circle(12f, 12f, 8.5f), circle(12f, 12f, 2.5f))
+    val Film = icon("Film", rrect(3.5f, 3.5f, 17f, 17f, 2f), "M7.5 3.5v17M16.5 3.5v17M3.5 8h4M3.5 12h4M3.5 16h4M16.5 8h4M16.5 12h4M16.5 16h4")
+    val Audio = icon("Audio", "M4 15v-3a8 8 0 0 1 16 0v3", rrect(3f, 14f, 4f, 6f, 1.5f), rrect(17f, 14f, 4f, 6f, 1.5f))
+    val Subtitles = icon("Subtitles", rrect(3f, 5f, 18f, 14f, 2f), "M7 12h3M13 12h4M7 15.5h6M15.5 15.5h1.5")
+    val ChevronDown = icon("ChevronDown", "m5 9 7 7 7-7")
+    val Pause = icon("Pause", fill(rrect(6f, 4.5f, 4f, 15f, 1f)), fill(rrect(14f, 4.5f, 4f, 15f, 1f)))
+    val Stop = icon("Stop", fill(rrect(6f, 6f, 12f, 12f, 1.5f)))
+    val Rewind = Resume
+    val Forward = icon("Forward", "M20 12a8 8 0 1 1-2.4-5.7", "M20 4v4.5h-4.5")
+    val Server = icon("Server", rrect(3.5f, 4f, 17f, 7f, 1.5f), rrect(3.5f, 13f, 17f, 7f, 1.5f), "M7.5 7.5h.01M7.5 16.5h.01")
+    val Edit = icon("Edit", "M4 20h4L19 9l-4-4L4 16z")
+    val Sync = icon("Sync", "M19.5 10A8 8 0 0 0 5.6 7.2L4 8.8", "M4 4.5v4.3h4.3", "M4.5 14a8 8 0 0 0 13.9 2.8l1.6-1.6", "M20 19.5v-4.3h-4.3")
+    val VolumeDown = icon("VolumeDown", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5")
+    val VolumeUp = icon("VolumeUp", "M4 9.5h3.5L12 5.5v13l-4.5-4H4z", "M16 12h5M18.5 9.5v5")
+
+    /** Tracé plein (sans trait), comme les triangles « lecture » des maquettes. */
+    private fun fill(path: String) = FILL + path
+
+    private const val FILL = "fill:"
+
+    private fun circle(cx: Float, cy: Float, r: Float) =
+        "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0"
+
+    /** Carré de 7 au rayon 1,5, comme le pictogramme « Parcourir ». */
+    private fun rect(x: Float, y: Float, s: Float = 7f, r: Float = 1.5f) = rrect(x, y, s, s, r)
+
+    /** Rectangle de [w]×[h] aux coins de rayon [r]. */
+    private fun rrect(x: Float, y: Float, w: Float, h: Float, r: Float) =
+        "M${x + r} ${y}h${w - 2 * r}a$r $r 0 0 1 $r ${r}v${h - 2 * r}a$r $r 0 0 1 ${-r} ${r}" +
+            "h${-(w - 2 * r)}a$r $r 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
+
+    private fun icon(name: String, vararg paths: String): ImageVector =
+        ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
+            paths.forEach {
+                val filled = it.startsWith(FILL)
+                addPath(
+                    pathData = addPathNodes(it.removePrefix(FILL)),
+                    fill = if (filled) SolidColor(Color.Black) else null,
+                    stroke = if (filled) null else SolidColor(Color.Black),
+                    strokeLineWidth = 2f,
+                    strokeLineCap = StrokeCap.Round,
+                    strokeLineJoin = StrokeJoin.Round,
+                )
+            }
+        }.build()
+}

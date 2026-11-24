@@ -1,0 +1,34 @@
+{"revision": 3, "full": true,
+ "works": [
+  {"id": 1, "type": "film", "key": "Ava [2017]", "title_fr": "Ava", "title_vo": null, "title_alt": null, "year": 2017, "duration_min": 99, "episode_count": null, "directors": ["Léa Mysius"], "genres": ["comédie dramatique"], "cast": ["Juan Cano", "Noée Abita", "Laure Calamy"], "synopsis": "Ava, 13 ans, est en vacances au bord de l'océan...", "imdb_id": "tt6194530", "tags": ["[FR]", "[ST*]", "[RU]"], "episodic": false, "poster": "a1b2c3d4e5f60718", "rev": 1},
+  {"id": 2, "type": "film", "key": "Alien, le huitieme passager [1979]", "title_fr": "Alien, le huitième passager", "title_vo": "Alien", "title_alt": "L'Étranger", "year": 1979, "duration_min": 117, "episode_count": null, "directors": ["Ridley Scott"], "genres": ["Science-fiction", "Horreur"], "cast": [], "synopsis": null, "imdb_id": null, "tags": [], "episodic": false, "poster": null, "rev": 1},
+  {"id": 3, "type": "film", "key": "Le prenom [2012]", "title_fr": "Le Prénom", "title_vo": null, "title_alt": null, "year": 2012, "duration_min": 109, "episode_count": null, "directors": ["Alexandre de La Patellière", "Matthieu Delaporte"], "genres": ["comédie"], "cast": [], "synopsis": null, "imdb_id": null, "tags": [], "episodic": false, "poster": null, "rev": 1},
+  {"id": 4, "type": "theatre", "key": "Le prenom [2012]", "title_fr": "Le Prénom", "title_vo": null, "title_alt": null, "year": 2012, "duration_min": 110, "episode_count": null, "directors": ["Bernard Murat"], "genres": [], "cast": [], "synopsis": null, "imdb_id": null, "tags": [], "episodic": false, "poster": null, "rev": 1},
+  {"id": 5, "type": "serie", "key": "Back to Life [2019]", "title_fr": "Back to Life", "title_vo": null, "title_alt": null, "year": 2019, "duration_min": null, "episode_count": "12/12", "directors": ["Laura Solon", "Daisy Haggard"], "genres": ["comédie"], "cast": [], "synopsis": null, "imdb_id": null, "tags": ["[FR-]", "[VO]"], "episodic": true, "poster": null, "rev": 1}],
+ "seasons": [
+  {"id": 1, "work_id": 5, "number": 1, "label": "Saison 1", "rev": 1},
+  {"id": 2, "work_id": 5, "number": 2, "label": "Saison 2", "rev": 1}],
+ "episodes": [
+  {"id": 1, "season_id": 1, "number": 1, "title": null, "rev": 1},
+  {"id": 2, "season_id": 1, "number": 2, "title": null, "rev": 1},
+  {"id": 3, "season_id": 2, "number": 1, "title": null, "rev": 1}],
+ "media_files": [
+  {"id": 1, "work_id": 1, "episode_id": null, "quality": "FHD", "size": "3.8G", "relpath": "Films/A/Ava [2017] [1h45,1920x1038,16x9,FR,sEN].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2},
+  {"id": 2, "work_id": 1, "episode_id": null, "quality": "HD", "size": "1.6G", "relpath": "Films/A/Ava [2017] [1h39,1280x720,16x9,FR].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2},
+  {"id": 3, "work_id": 3, "episode_id": null, "quality": "HD", "size": "1.1G", "relpath": "Films/L/Le prenom [2012] [1h49,1280x720,16x9,FR].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2},
+  {"id": 4, "work_id": 4, "episode_id": null, "quality": "SD", "size": "700M", "relpath": "Theatre/Le prenom [2012] [1h50,720x576,4x3,FR].mp4", "volume_uuid": "DISK2", "present": false, "rev": 2},
+  {"id": 5, "work_id": null, "episode_id": 1, "quality": "FHD", "size": "383M", "relpath": "Series/Back to Life [2019]/Saison 01/S01E01 [0h27,1920x1080,16x9,EN].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2},
+  {"id": 6, "work_id": null, "episode_id": 2, "quality": "FHD", "size": "429M", "relpath": "Series/Back to Life [2019]/Saison 01/S01E02 [0h24,1920x1080,16x9,EN].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2},
+  {"id": 7, "work_id": null, "episode_id": 3, "quality": "FHD", "size": "384M", "relpath": "Series/Back to Life [2019]/Saison 02/S02E01 [0h27,1920x1080,16x9,EN].mp4", "volume_uuid": "DISK1", "present": true, "rev": 2}],
+ "collections": [
+  {"id": 1, "name": "Les 1000 plus grands films de tous les temps [2020]", "description": null, "link": null, "rev": 1},
+  {"id": 2, "name": "Alien [1979-]", "description": null, "link": "https://fr.wikipedia.org/wiki/Alien_(s%C3%A9rie_de_films)", "rev": 1}],
+ "work_collections": [
+  {"work_id": 1, "collection_id": 1, "rank": "2017"},
+  {"work_id": 2, "collection_id": 2, "rank": null}],
+ "progress": [
+  {"target_kind": "work", "target_id": 1, "media_file_id": 2, "position": 600.0, "duration": 5940.0, "watched": false, "audio": null, "subtitle": null, "updated_at": 1795000000.0, "rev": 3},
+  {"target_kind": "episode", "target_id": 2, "media_file_id": 6, "position": 300.0, "duration": 1440.0, "watched": false, "audio": 1, "subtitle": null, "updated_at": 1795000100.0, "rev": 3}],
+ "volumes": [
+  {"uuid": "DISK1", "label": "DISK1", "mount": "/media/beber/DISK1", "present": true, "rev": 2},
+  {"uuid": "DISK2", "label": "Théâtre", "mount": null, "present": false, "rev": 2}]}
