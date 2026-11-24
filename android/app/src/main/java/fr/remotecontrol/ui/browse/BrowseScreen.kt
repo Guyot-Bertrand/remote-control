@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -14,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import fr.remotecontrol.ui.common.indexLetter
 import fr.remotecontrol.ui.theme.Fraunces
@@ -173,7 +175,7 @@ private fun FastScroller(grid: LazyGridState, works: List<WorkSummary>, modifier
         val offset = track * fraction
         if (alpha > 0f) {
             Row(
-                Modifier.padding(top = offset - 2.dp, end = 4.dp).alpha(alpha),
+                Modifier.offset { IntOffset(0, offset.roundToPx()) }.padding(end = 4.dp).alpha(alpha),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
