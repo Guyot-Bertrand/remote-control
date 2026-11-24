@@ -50,9 +50,13 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.NotFound
+import fr.remotecontrol.ui.common.OpenRemoteAction
+import fr.remotecontrol.ui.common.PlayerMissingBanner
+import fr.remotecontrol.ui.common.PlayingOnTv
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
@@ -81,8 +85,10 @@ fun SeasonScreen(
     server: ServerState,
     onPlay: (Long, StartMode) -> Unit,
     onPrePlay: (Long, StartMode) -> Unit,
+    onOpenRemote: () -> Unit,
     onOpenSeason: (Long) -> Unit,
     onDismissMessage: () -> Unit,
+    onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
     val list = rememberLazyListState()
@@ -93,6 +99,7 @@ fun SeasonScreen(
             if (missing) NotFound(Texts.seasonNotFound)
             return@Column
         }
+        if (state.playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
         var scrolled by rememberSaveable(state.season.id) { mutableStateOf(false) }
         val highlight = state.episodes.indexOfFirst { it.highlighted }
         LaunchedEffect(state.season.id, highlight) {
@@ -114,8 +121,12 @@ fun SeasonScreen(
             }
             items(state.episodes, key = { it.id }) { episode ->
                 Box(Modifier.padding(horizontal = 8.dp)) {
-                    val enabled = episode.playable && !state.launching
-                    if (episode.highlighted) HighlightedEpisode(episode, enabled, onPlay, onPrePlay) else EpisodeLine(episode, enabled, onPlay)
+                    val enabled = episode.playable && !state.launching && episode.action == SheetAction.Play
+                    if (episode.highlighted) {
+                        HighlightedEpisode(episode, enabled, onPlay, onPrePlay, onOpenRemote)
+                    } else {
+                        EpisodeLine(episode, enabled, onPlay, onOpenRemote)
+                    }
                 }
             }
         }
@@ -219,13 +230,13 @@ private fun Summary(state: SeasonUi) {
             color = RcColors.text3,
             modifier = Modifier.weight(1f),
         )
-        if (state.onTv) Text(Texts.shownOnTv, style = caption13, color = RcColors.text3)
+        if (state.playingHere) PlayingOnTv() else if (state.onTv) Text(Texts.shownOnTv, style = caption13, color = RcColors.text3)
     }
 }
 
 /** Ligne d'épisode (64 dp, filet bas) : vu (coche), « Reprendre » si entamé, « Depuis le début ». */
 @Composable
-private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit) {
+private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, StartMode) -> Unit, onOpenRemote: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -247,7 +258,18 @@ private fun EpisodeLine(episode: EpisodeUi, enabled: Boolean, onPlay: (Long, Sta
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            episode.status?.let { Text(it, style = caption13, color = RcColors.text3) }
+            if (episode.action == SheetAction.OpenRemote) {
+                PlayingOnTv()
+            } else {
+                episode.status?.let { Text(it, style = caption13, color = RcColors.text3) }
+            }
+        }
+        if (episode.action == SheetAction.OpenRemote) {
+            // Épisode en cours sur la télé : rouvrir la télécommande, sans relancer la lecture.
+            IconButton(onClick = onOpenRemote) {
+                Icon(RcIcons.Remote, contentDescription = Texts.episodeAction(Texts.openRemote, episode.label), tint = RcColors.accentStrong)
+            }
+            return@Row
         }
         if (episode.watched) {
             // Décorative : le statut « Vu » est déjà lu.
@@ -271,6 +293,7 @@ private fun HighlightedEpisode(
     enabled: Boolean,
     onPlay: (Long, StartMode) -> Unit,
     onPrePlay: (Long, StartMode) -> Unit,
+    onOpenRemote: () -> Unit,
 ) {
     Column(
         Modifier
@@ -305,6 +328,10 @@ private fun HighlightedEpisode(
             Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(RcColors.accent.copy(alpha = 0.25f))) {
                 Box(Modifier.fillMaxWidth(p).fillMaxHeight().background(RcColors.accent))
             }
+        }
+        if (episode.action == SheetAction.OpenRemote) {
+            OpenRemoteAction(onOpenRemote, height = 48.dp)
+            return@Column
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (episode.canResume) {

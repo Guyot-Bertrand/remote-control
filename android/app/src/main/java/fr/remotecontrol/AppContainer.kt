@@ -20,6 +20,10 @@ import fr.remotecontrol.net.rcOkHttpClient
 import fr.remotecontrol.player.PlayLauncher
 import fr.remotecontrol.player.RemoteController
 import fr.remotecontrol.player.TvStatus
+import fr.remotecontrol.player.liveWhileConnected
+import fr.remotecontrol.net.PlayerSnapshotDto
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +56,14 @@ class AppContainer(context: Context) {
     val coordinator: SyncCoordinator = SyncCoordinator(sync, events)
     val tvStatus: TvStatus = TvStatus(events)
     val filter: CatalogFilter = CatalogFilter()
-    val playLauncher: PlayLauncher by lazy { PlayLauncher(api) }
+    val playLauncher: PlayLauncher by lazy { PlayLauncher(api, locator::reportPlayerMissing) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }
+
+    /** Lecture en cours pour les fiches : inconnue tant que le serveur n'est pas connecté. */
+    val liveForSheets: Flow<PlayerSnapshotDto?> by lazy { liveWhileConnected(remote.snapshot, locator.state) }
+
+    /** « Réessayer » du bandeau « lecteur absent » : nouvelle sonde du serveur. */
+    fun retryPlayer() {
+        appScope.launch { locator.refresh() }
+    }
 }

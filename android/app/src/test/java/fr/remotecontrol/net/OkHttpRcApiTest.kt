@@ -139,6 +139,73 @@ class OkHttpRcApiTest {
     }
 
     @Test
+    fun player_missing_409_uses_app_text() = runTest {
+        server.enqueue(MockResponse.Builder().code(409).body(Fixtures.text("error_player_missing.json")).build())
+        val err = (api.play(PlayRequestDto("work", 1, "start")) as ApiResult.Err).error
+        assertEquals("player_missing", (err as ApiError.Server).code)
+        assertEquals("Le lecteur vidéo (mpv) n'est pas installé sur le PC.", err.messageFr())
+    }
+
+    @Test
+    fun unknown_409_code_shows_server_message() = runTest {
+        server.enqueue(MockResponse.Builder().code(409).body(Fixtures.text("error_unknown_code.json")).build())
+        val err = (api.play(PlayRequestDto("work", 1, "start")) as ApiResult.Err).error
+        assertEquals("Le disque est occupé, réessayez dans un instant.", err.messageFr())
+    }
+
+    @Test
+    fun known_409_code_keeps_app_text_over_server_message() = runTest {
+        server.enqueue(MockResponse.Builder().code(409).body("""{"error":"idle","volume_label":null,"message":"Rien ne joue."}""").build())
+        assertEquals("Aucune lecture en cours", (api.pause(true) as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun internal_500_uses_app_text() = runTest {
+        server.enqueue(MockResponse.Builder().code(500).body(Fixtures.text("error_internal.json")).build())
+        val err = (api.play(PlayRequestDto("work", 1, "start")) as ApiResult.Err).error
+        assertEquals(ApiError.Http(500, code = "internal", message = "Erreur interne du serveur."), err)
+        assertEquals("Erreur interne du serveur.", err.messageFr())
+    }
+
+    @Test
+    fun not_found_404_uses_app_text() = runTest {
+        server.enqueue(MockResponse.Builder().code(404).body("""{"error":"not_found","message":"Element introuvable (serveur)."}""").build())
+        assertEquals("Élément introuvable.", (api.tracks(99) as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun unknown_5xx_code_shows_server_message() = runTest {
+        server.enqueue(MockResponse.Builder().code(503).body("""{"error":"busy","message":"Le PC est occupé."}""").build())
+        assertEquals("Le PC est occupé.", (api.stop() as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun error_body_with_message_on_422_and_403() = runTest {
+        server.enqueue(MockResponse.Builder().code(422).body("""{"error":"invalid","message":"Requête invalide : piste inconnue."}""").build())
+        assertEquals("Requête invalide : piste inconnue.", (api.audio(9) as ApiResult.Err).error.messageFr())
+        server.enqueue(MockResponse.Builder().code(403).body("""{"error":"forbidden","message":"Fichier refusé."}""").build())
+        assertEquals("Fichier refusé.", (api.subtitle(SubSel.External("/x.srt")) as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun error_without_message_falls_back_to_generic_text() = runTest {
+        server.enqueue(MockResponse.Builder().code(500).body("""{"error":"oops"}""").build())
+        assertEquals("Erreur du serveur (500)", (api.stop() as ApiResult.Err).error.messageFr())
+        server.enqueue(MockResponse.Builder().code(502).body("<html>Bad gateway</html>").build())
+        assertEquals("Erreur du serveur (502)", (api.stop() as ApiResult.Err).error.messageFr())
+        server.enqueue(MockResponse.Builder().code(409).body("""{"error":"disk_busy","volume_label":null}""").build())
+        assertEquals("Erreur du serveur (409)", (api.stop() as ApiResult.Err).error.messageFr())
+    }
+
+    @Test
+    fun info_player_available_defaults_to_true() = runTest {
+        server.enqueue(ok(Fixtures.text("info.json")))
+        assertTrue((api.info() as ApiResult.Ok).value.playerAvailable)
+        server.enqueue(ok(Fixtures.text("info_player_missing.json")))
+        assertEquals(false, api.probe(server.url("/"))?.playerAvailable)
+    }
+
+    @Test
     fun tv_show_returns_shown() = runTest {
         server.enqueue(ok("""{"shown": false}"""))
         val r = api.tvShow("work", 1)

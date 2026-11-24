@@ -8,6 +8,7 @@ import fr.remotecontrol.net.PlayRequestDto
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.player.PlayLauncher
+import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.StartMode
 import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
@@ -21,7 +22,10 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.net.PlayerStateDto
+import kotlinx.coroutines.flow.MutableStateFlow
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
 import fr.remotecontrol.player.TvStatus
@@ -82,6 +86,26 @@ class SeasonViewModelTest {
         vm.onScreenResumed()
         assertEquals(2, api.calls.count { it == "tvShow(season,1)" })
         watcher.cancel()
+    }
+
+    private val live = MutableStateFlow<PlayerSnapshotDto?>(null)
+    private val playerMissing = MutableStateFlow(false)
+
+    @Test fun episode_playing_on_tv_opens_the_remote() = runBlocking {
+        val vm = SeasonViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
+        vm.await { it.episodes.size == 2 && it.episodes.all { e -> e.action == SheetAction.Play } }
+        live.value = PlayerSnapshotDto(
+            PlayerStateDto(running = true),
+            CurrentDto("episode", 1, 5, 5, seasonId = 1),
+        )
+        val ui = vm.await { it.playingHere }
+        assertEquals(listOf(SheetAction.OpenRemote, SheetAction.Play), ui.episodes.map { it.action })
+        playerMissing.value = true
+        val missing = vm.await { it.episodes[1].action == SheetAction.PlayerMissing }
+        assertEquals(SheetAction.OpenRemote, missing.episodes[0].action)
+        live.value = null
+        vm.await { !it.playingHere && it.episodes.all { e -> e.action == SheetAction.PlayerMissing } }
+        Unit
     }
 
     @Test fun init_sends_tv_show_season() = runBlocking {

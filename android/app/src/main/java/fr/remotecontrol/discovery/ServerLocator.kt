@@ -4,7 +4,9 @@ import fr.remotecontrol.data.KeyValueStore
 import fr.remotecontrol.data.META_SERVER_HOST
 import fr.remotecontrol.data.META_SERVER_MANUAL
 import fr.remotecontrol.data.META_SERVER_PORT
+import fr.remotecontrol.net.InfoDto
 import fr.remotecontrol.net.ServerProbe
+import fr.remotecontrol.player.playerMissing
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -12,9 +14,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,15 +51,37 @@ class ServerLocator(
     /** Une seule recherche à la fois (premier plan, échecs du WebSocket, réglages). */
     private val mutex = Mutex()
 
+    private val _playerAvailable = MutableStateFlow(true)
+
+    /**
+     * Le lecteur (mpv) est installé sur le PC, d'après la dernière sonde réussie du serveur connecté (même
+     * cadence que la joignabilité). Vrai tant qu'aucun serveur n'est connecté : rien n'est signalé à tort.
+     */
+    val playerAvailable: StateFlow<Boolean> = _playerAvailable.asStateFlow()
+
+    /** Bandeau « lecteur absent » : le serveur connecté signale l'absence du lecteur (jamais hors connexion). */
+    val playerMissing: Flow<Boolean> = combine(state, playerAvailable, ::playerMissing).distinctUntilChanged()
+
+    /** Une lecture a reçu `409 player_missing` : signalé tout de suite, sans attendre la prochaine sonde. */
+    fun reportPlayerMissing() {
+        _playerAvailable.value = false
+    }
+
     fun currentBaseUrl(): HttpUrl? = (state.value as? ServerState.Connected)?.address?.baseUrl
 
     /** Une adresse inutilisable (hôte refusé par OkHttp, erreur de sonde, pas de réponse à temps) compte comme muette. */
-    private suspend fun alive(address: ServerAddress): Boolean = try {
-        withTimeoutOrNull(probeTimeoutMs) { probe.probe(address.baseUrl) } != null
+    private suspend fun info(address: ServerAddress): InfoDto? = try {
+        withTimeoutOrNull(probeTimeoutMs) { probe.probe(address.baseUrl) }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        false
+        null
+    }
+
+    /** Serveur [address] connecté, d'après sa réponse [info]. */
+    private fun connect(address: ServerAddress, manual: Boolean, info: InfoDto) {
+        _playerAvailable.value = info.playerAvailable
+        _state.value = ServerState.Connected(address, manual)
     }
 
     /**
@@ -80,7 +107,11 @@ class ServerLocator(
      */
     suspend fun refresh() = mutex.withLock {
         val connected = _state.value as? ServerState.Connected
-        if (connected != null && alive(connected.address)) return@withLock
+        val info = connected?.let { info(it.address) }
+        if (connected != null && info != null) {
+            _playerAvailable.value = info.playerAvailable
+            return@withLock
+        }
         search(skip = connected?.address)
     }
 
@@ -99,14 +130,15 @@ class ServerLocator(
             val storedManual = store.get(META_SERVER_MANUAL) == "true"
             if (host != null && port != null) {
                 val stored = ServerAddress(host, port)
-                if (stored != skip && alive(stored)) {
-                    _state.value = ServerState.Connected(stored, storedManual)
+                val info = if (stored != skip) info(stored) else null
+                if (info != null) {
+                    connect(stored, storedManual, info)
                     return
                 }
             }
             val found = try {
                 withTimeoutOrNull(discoveryTimeoutMs) {
-                    discovery.discover().firstOrNull { alive(it) }
+                    discovery.discover().mapNotNull { a -> info(a)?.let { a to it } }.firstOrNull()
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -114,20 +146,21 @@ class ServerLocator(
                 null // découverte en échec : NotFound, pas de plantage
             }
             if (found != null) {
-                remember(found, manual = false)
-                _state.value = ServerState.Connected(found, manual = false)
+                remember(found.first, manual = false)
+                connect(found.first, manual = false, found.second)
             } else {
                 _state.value = ServerState.NotFound
             }
         } finally {
             if (_state.value == ServerState.Searching) _state.value = ServerState.NotFound
+            if (_state.value == ServerState.NotFound) _playerAvailable.value = true
         }
     }
 
     suspend fun setManual(address: ServerAddress): Boolean = mutex.withLock {
-        if (!alive(address)) return@withLock false
+        val info = info(address) ?: return@withLock false
         remember(address, manual = true)
-        _state.value = ServerState.Connected(address, manual = true)
+        connect(address, manual = true, info)
         true
     }
 

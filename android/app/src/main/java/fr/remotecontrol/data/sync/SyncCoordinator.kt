@@ -23,7 +23,12 @@ class SyncCoordinator(
         }
     }
 
-    /** Une erreur (base illisible…) est journalisée : le coordinateur continue avec l'événement suivant. */
+    /**
+     * Une erreur (base illisible…) est journalisée : le coordinateur continue avec l'événement suivant.
+     * Les échecs de synchronisation en arrière-plan ([SyncRepository.sync] → `SyncOutcome.Failed`) restent
+     * silencieux ici : l'accueil affiche « Catalogue non synchronisé » et « Resynchroniser » (accueil, réglages)
+     * montre le message de l'erreur.
+     */
     private suspend fun guarded(block: suspend () -> Unit) {
         try {
             block()

@@ -3,8 +3,14 @@ package fr.remotecontrol.net
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** [playerAvailable] : le lecteur (mpv) est installé sur le PC (arbitrage 11) ; vrai pour un serveur plus ancien. */
 @Serializable
-data class InfoDto(val name: String, val api: Int, val revision: Long)
+data class InfoDto(
+    val name: String,
+    val api: Int,
+    val revision: Long,
+    @SerialName("player_available") val playerAvailable: Boolean = true,
+)
 
 @Serializable
 data class SyncDto(
@@ -213,4 +219,6 @@ data class TvShowResultDto(val shown: Boolean)
 data class ErrorDto(
     val error: String,
     @SerialName("volume_label") val volumeLabel: String? = null,
+    /** Phrase en français prête à afficher (arbitrage 9). */
+    val message: String? = null,
 )

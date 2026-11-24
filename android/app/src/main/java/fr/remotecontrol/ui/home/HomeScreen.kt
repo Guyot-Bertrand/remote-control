@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.ui.common.ConnectionChip
+import fr.remotecontrol.ui.common.PlayerMissingBanner
 import fr.remotecontrol.ui.common.PosterThumb
 import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.Texts
@@ -58,6 +59,9 @@ import fr.remotecontrol.ui.theme.RcColors
 @Composable
 fun HomeScreen(
     state: HomeUi,
+    /** Le lecteur n'est pas installé sur le PC : bandeau persistant en tête. */
+    playerMissing: Boolean,
+    onRetryPlayer: () -> Unit,
     onPlayableOnly: (Boolean) -> Unit,
     onOpenWork: (Long) -> Unit,
     onOpenSeason: (Long) -> Unit,
@@ -86,6 +90,7 @@ fun HomeScreen(
             if (state.banner == HomeBanner.NoServer) {
                 item { Banner(Texts.noServer, RcColors.warnSoft, Texts.settings, onSettings) }
             }
+            if (playerMissing) item { PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) }
             item { FilterRow(state.playableOnly, onPlayableOnly, onRemote) }
             if (state.resume.isNotEmpty()) {
                 item { SectionTitle(Texts.resume) }

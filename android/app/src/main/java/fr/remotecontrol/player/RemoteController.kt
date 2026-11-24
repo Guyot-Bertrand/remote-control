@@ -38,6 +38,8 @@ class RemoteController(api: RcApi, events: Flow<ServerEvent>, scope: CoroutineSc
                 }
             }
         }
+        // Échec silencieux voulu : l'état arrive aussi par `hello` dès que le WebSocket est connecté, et l'écran
+        // reste « en chargement » d'ici là ; l'absence de serveur est déjà signalée par la pastille de connexion.
         val initial = api.playerState()
         if (initial is ApiResult.Ok) lock.withLock { if (!fromEvents) send(initial.value) }
     }.stateIn(scope, SharingStarted.WhileSubscribed(5_000, replayExpirationMillis = 0), null)

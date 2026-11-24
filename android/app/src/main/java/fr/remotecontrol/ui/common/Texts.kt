@@ -98,6 +98,8 @@ object Texts {
     const val notPlayable = "Aucun fichier lisible pour cette œuvre"
     const val notFound = "Fichier introuvable"
     const val badResponse = "Réponse inattendue du serveur."
+    const val serverInternal = "Erreur interne du serveur."
+    const val itemNotFound = "Élément introuvable."
     const val idle = "Aucune lecture en cours"
     const val notDigitized = "Non numérisé"
     const val playFromStart = "Lire depuis le début"
@@ -143,6 +145,8 @@ object Texts {
     const val addressUnreachable = "Serveur injoignable à cette adresse"
     const val nothingPlaying = "Lecture en cours"
     const val playerNotResponding = "Le lecteur ne répond pas."
+    const val playerMissing = "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
+    const val playerUnavailable = "Le lecteur vidéo n'est pas installé sur le PC : la lecture est impossible."
 
     // Télécommande
     const val onTv = "Sur la télé"
@@ -158,6 +162,8 @@ object Texts {
 
     // Fiches œuvre et saison
     const val shownOnTv = "Affichée sur la télé"
+    const val openRemote = "Ouvrir la télécommande"
+    const val playingOnTv = "En cours sur la télé"
     const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
     const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
     const val retry = "Réessayer"

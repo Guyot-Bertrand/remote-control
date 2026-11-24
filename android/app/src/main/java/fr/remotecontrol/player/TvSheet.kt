@@ -83,6 +83,11 @@ class TvSheet(
         if (!matches(tv) && !playing) scope.launch { show() }
     }
 
+    /**
+     * Échec volontairement silencieux : afficher la fiche sur la télé n'est qu'un accompagnement de la
+     * navigation sur le téléphone (hors ligne, ou télé occupée par une lecture, ce n'est pas une erreur) ;
+     * seule la mention « Affichée sur la télé » en dépend. Les erreurs qui comptent (lecture) ont leur message.
+     */
     private suspend fun show() {
         val shown = api.tvShow(screen, id)
         _onTv.value = shown is ApiResult.Ok && shown.value
