@@ -119,14 +119,16 @@ class OkHttpRcApi(
             return ApiResult.Err(ApiError.Unreachable)
         }
         return when {
-            code == 409 -> {
+            code !in 200..299 -> {
+                // Corps d'erreur du contrat (`{"error", "volume_label", "message"}`) ; sinon le seul statut.
                 val err = withContext(decodeDispatcher) {
                     runCatching { json.decodeFromString(ErrorDto.serializer(), text) }.getOrNull()
                 }
-                if (err != null) ApiResult.Err(ApiError.Server(err.error, err.volumeLabel))
-                else ApiResult.Err(ApiError.Http(409))
+                when {
+                    code == 409 && err != null -> ApiResult.Err(ApiError.Server(err.error, err.volumeLabel, err.message?.takeIf { it.isNotBlank() }))
+                    else -> ApiResult.Err(ApiError.Http(code, err?.message?.takeIf { it.isNotBlank() }))
+                }
             }
-            code !in 200..299 -> ApiResult.Err(ApiError.Http(code))
             else -> try {
                 ApiResult.Ok(withContext(decodeDispatcher) { decode(text) })
             } catch (_: SerializationException) {

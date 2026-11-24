@@ -143,6 +143,8 @@ object Texts {
     const val addressUnreachable = "Serveur injoignable à cette adresse"
     const val nothingPlaying = "Lecture en cours"
     const val playerNotResponding = "Le lecteur ne répond pas."
+    const val playerMissing = "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
+    const val playerUnavailable = "Le lecteur vidéo n'est pas installé sur le PC : la lecture est impossible."
 
     // Télécommande
     const val onTv = "Sur la télé"

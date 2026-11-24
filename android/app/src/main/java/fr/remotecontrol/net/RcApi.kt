@@ -11,8 +11,11 @@ sealed interface ApiResult<out T> {
 sealed interface ApiError {
     data object NoServer : ApiError
     data object Unreachable : ApiError
-    data class Server(val code: String, val volumeLabel: String?) : ApiError
-    data class Http(val status: Int) : ApiError
+    /** Réponse 409 : [message] est la phrase du serveur, affichée seulement pour un [code] inconnu de l'appli. */
+    data class Server(val code: String, val volumeLabel: String?, val message: String? = null) : ApiError
+
+    /** Autre statut d'erreur ; [message] : phrase du serveur si le corps en porte une (`{"error", "message"}`). */
+    data class Http(val status: Int, val message: String? = null) : ApiError
     data object BadResponse : ApiError
 }
 
@@ -25,9 +28,10 @@ fun ApiError.messageFr(): String = when (this) {
         "not_found" -> Texts.notFound
         "idle" -> Texts.idle
         "player" -> Texts.playerNotResponding
-        else -> Texts.httpError(409)
+        "player_missing" -> Texts.playerMissing
+        else -> message ?: Texts.httpError(409)
     }
-    is ApiError.Http -> Texts.httpError(status)
+    is ApiError.Http -> message ?: Texts.httpError(status)
     ApiError.BadResponse -> Texts.badResponse
 }
 
