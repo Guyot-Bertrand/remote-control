@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI, WebSocketDisconnect
 from fastapi.testclient import TestClient
 
-from rc.api import Services, install_api
+from rc.api import Services, install_api, routes
 from rc.assets import ingest_posters
 from rc.catalog.importer import import_catalog
 from rc.catalog.parser import parse_catalog
@@ -23,6 +23,7 @@ from rc.volumes import Volume, build_index, locate_files
 
 from test_probe import fake_runner
 from fake_player import FakePlayer
+from rc.messages import error_body
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
 AVA_SYNOPSIS = "MP ; Ava, 13 ans, est en vacances au bord de l'océan..."
@@ -71,6 +72,9 @@ def env(tmp_path, monkeypatch):
     conn.close()
 
 
+NOT_FOUND = {"error": "not_found", "volume_label": None, "message": "Élément introuvable."}
+
+
 def reimport(env, text):
     import_catalog(env.conn, parse_catalog(text), {})
 
@@ -79,9 +83,15 @@ def media_id(conn, like):
     return conn.execute("SELECT id FROM media_file WHERE relpath LIKE ?", (like,)).fetchone()[0]
 
 
-def test_info(env):
+def test_info(env, monkeypatch):
+    env.config.mpv_path = "mpv-de-test"
+    monkeypatch.setattr(routes.shutil, "which",
+                        lambda name: "/usr/bin/mpv" if name == "mpv-de-test" else None)
     assert env.client.get("/api/info").json() == {
-        "name": "Remote-Control", "api": 1, "revision": current_revision(env.conn)}
+        "name": "Remote-Control", "api": 1, "revision": current_revision(env.conn),
+        "player_available": True}
+    env.config.mpv_path = "/introuvable/mpv"  # réévalué à chaque requête
+    assert env.client.get("/api/info").json()["player_available"] is False
 
 
 def test_sync_full_then_incremental(env):
@@ -162,7 +172,7 @@ def test_work_detail(env):
     serie = env.client.get("/api/works/5").json()
     assert [s["number"] for s in serie["seasons"]] == [1, 2]
     assert env.client.get("/api/works/999").status_code == 404
-    assert env.client.get("/api/works/999").json() == {"error": "not_found"}
+    assert env.client.get("/api/works/999").json() == NOT_FOUND
 
 
 def test_season_highlight(env):
@@ -248,7 +258,7 @@ def test_tracks_default_and_last_choice(env):
                      " \"index\": 7}'")
     t = env.client.get(f"/api/media/{ava}/tracks").json()
     assert t["default"] == {"audio": 2, "subtitle": {"kind": "none"}}
-    assert env.client.get("/api/media/999/tracks").json() == {"error": "not_found"}
+    assert env.client.get("/api/media/999/tracks").json() == NOT_FOUND
 
 
 def test_tracks_probe_failure_is_empty(env, monkeypatch):
@@ -284,7 +294,7 @@ def test_tracks_volume_absent_409(env):
     env.indexes.clear()
     r = env.client.get(f"/api/media/{media_id(env.conn, '%1920x1038%')}/tracks")
     assert r.status_code == 409
-    assert r.json() == {"error": "volume_absent", "volume_label": "DISK1"}
+    assert r.json() == error_body("volume_absent", "DISK1")
 
 
 def test_play_and_player_commands(env):
@@ -305,7 +315,7 @@ def test_play_and_player_commands(env):
                                     ("set_subtitle", {"kind": "none"}), ("stop",)]
     assert env.client.post("/api/player/volume", json={"level": 101}).status_code == 422
     r = env.client.post("/api/player/subtitle", json={"kind": "bogus"})
-    assert r.status_code == 422 and r.json() == {"error": "invalid", "volume_label": None}
+    assert r.status_code == 422 and r.json() == error_body("invalid", None)
 
 
 def test_play_volume_absent_409(env):
@@ -314,10 +324,10 @@ def test_play_volume_absent_409(env):
     r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
                                            "start": "resume"})
     assert r.status_code == 409
-    assert r.json() == {"error": "volume_absent", "volume_label": "DISK1"}
+    assert r.json() == error_body("volume_absent", "DISK1")
     r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 2,
                                            "start": "start"})
-    assert r.json() == {"error": "not_playable", "volume_label": None}
+    assert r.json() == error_body("not_playable", None)
 
 
 @pytest.mark.parametrize("error", ["timeout", "connection", "gone"])
@@ -334,7 +344,7 @@ def test_player_failure_409(env, error):
                        ("subtitle", {"kind": "none"})):
         r = env.client.post(f"/api/player/{path}", json=body)
         assert r.status_code == 409, path
-        assert r.json() == {"error": "player", "volume_label": None}
+        assert r.json() == error_body("player", None)
 
 
 def test_play_start_failure_409_player(env):
@@ -342,7 +352,16 @@ def test_play_start_failure_409_player(env):
     r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
                                            "start": "start"})
     assert r.status_code == 409
-    assert r.json() == {"error": "player", "volume_label": None}
+    assert r.json() == error_body("player", None)
+
+
+def test_play_player_missing_409(env):
+    env.player.start_error = FileNotFoundError(2, "No such file or directory", "mpv")
+    r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
+                                           "start": "start"})
+    assert r.status_code == 409
+    assert r.json() == {"error": "player_missing", "volume_label": None,
+                        "message": "Le lecteur vidéo (mpv) n'est pas installé sur le PC."}
 
 
 def test_player_idle_409(env):
@@ -351,7 +370,7 @@ def test_player_idle_409(env):
                        ("subtitle", {"kind": "none"}), ("stop", {})):
         r = env.client.post(f"/api/player/{path}", json=body)
         assert r.status_code == 409
-        assert r.json() == {"error": "idle", "volume_label": None}
+        assert r.json() == error_body("idle", None)
     assert env.player.calls == []
     assert env.client.get("/api/player/state").json()["current"] is None
 
@@ -363,7 +382,7 @@ def test_tv_show_and_state(env):
         "screen": "season", "work_id": 5, "season_id": 1, "message": None}
     assert env.client.post("/api/tv/show", json={"screen": "work", "id": 999}).status_code == 404
     r = env.client.post("/api/tv/show", json={"screen": "work"})
-    assert r.status_code == 422 and r.json() == {"error": "invalid", "volume_label": None}
+    assert r.status_code == 422 and r.json() == error_body("invalid", None)
     env.client.post("/api/play", json={"target_kind": "work", "target_id": 1, "start": "start"})
     assert env.client.post("/api/tv/show", json={"screen": "home"}).json() == {"shown": False}
     assert env.client.post("/api/tv/show", json={"screen": "home", "force": True}).json() == {
@@ -428,7 +447,7 @@ def test_ws_unexpected_error_is_logged_and_closes(env, caplog, monkeypatch):
     assert env.playback.bus.subscriber_count == 0
 
 
-FORBIDDEN = {"error": "forbidden", "volume_label": None}
+FORBIDDEN = error_body("forbidden", None)
 
 
 def test_post_foreign_origin_refused(env):
@@ -588,7 +607,7 @@ def test_foreign_external_subtitle_422(env, tmp_path):
     r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
                                            "start": "start", "subtitle": sel})
     assert r.status_code == 422
-    assert r.json() == {"error": "invalid", "volume_label": None}
+    assert r.json() == error_body("invalid", None)
     assert env.player.starts() == []
     r = env.client.post("/api/play", json={"target_kind": "work", "target_id": 1,
                                            "start": "start",
@@ -601,5 +620,37 @@ def test_foreign_external_subtitle_422(env, tmp_path):
                        ("audio", {"index": 9})):
         r = env.client.post(f"/api/player/{path}", json=body)
         assert r.status_code == 422, path
-        assert r.json() == {"error": "invalid", "volume_label": None}
+        assert r.json() == error_body("invalid", None)
     assert env.player.calls == []
+
+
+def test_unexpected_error_gives_json_500_and_logs(env, monkeypatch, caplog):
+    def boom(conn, since):
+        raise RuntimeError("panne imprévue")
+
+    monkeypatch.setattr(routes.serialize, "sync", boom)
+    with caplog.at_level(logging.ERROR, logger="rc.api"):
+        r = env.client.get("/api/sync")
+    assert r.status_code == 500
+    assert r.json() == {"error": "internal", "volume_label": None,
+                        "message": "Erreur interne du serveur."}
+    assert any(r.exc_info and "panne imprévue" in str(r.exc_info[1])
+               for r in caplog.records)
+
+
+def test_play_same_media_does_not_restart(env):
+    body = {"target_kind": "work", "target_id": 1, "start": "start"}
+    assert env.client.post("/api/play", json=body).json() == {"ok": True}
+    mid = env.client.get("/api/player/state").json()["current"]["media_file_id"]
+    r = env.client.post("/api/play", json={**body, "start": "resume", "media_file_id": mid})
+    assert r.json() == {"ok": True}
+    assert [c[0] for c in env.player.calls] == ["start"]
+
+
+def test_routing_errors_use_api_format(env):
+    r = env.client.get("/api/nexiste/pas")
+    assert r.status_code == 404 and r.json() == NOT_FOUND
+    r = env.client.get("/api/play")  # POST seulement
+    assert r.status_code == 405
+    assert r.json() == {"error": "invalid", "volume_label": None,
+                        "message": "Requête invalide."}

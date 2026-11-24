@@ -6,7 +6,7 @@
 2. Pour POST /api/* et les WebSocket /api/*, un en-tête Origin présent doit désigner le
    même hôte que Host, et son nom doit aussi être autorisé. Sans Origin (appli native),
    la requête passe.
-Refus : 403 {"error": "forbidden", "volume_label": null}, ou WebSocket refusé (1008).
+Refus : 403 {"error": "forbidden", "volume_label": null, "message": "..."}, ou WebSocket refusé (1008).
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from urllib.parse import urlsplit
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from rc.messages import error_body
 
 WS_POLICY_VIOLATION = 1008
 
@@ -78,8 +80,7 @@ class OriginCheckMiddleware:
             if kind == "websocket":
                 await send({"type": "websocket.close", "code": WS_POLICY_VIOLATION})
             else:
-                response = JSONResponse({"error": "forbidden", "volume_label": None},
-                                        status_code=403)
+                response = JSONResponse(error_body("forbidden"), status_code=403)
                 await response(scope, receive, send)
             return
         await self.app(scope, receive, send)

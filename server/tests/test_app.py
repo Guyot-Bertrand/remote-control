@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -480,3 +481,20 @@ def test_existing_db_not_reimported_from_copy(setup, monkeypatch):
     app = create_app(state.config, player=FakePlayer())  # base vide, pas de copie
     app.state.rc.conn.close()
     assert called == []
+
+
+def test_startup_warns_when_mpv_missing(tmp_path, caplog):
+    config = Config(data_dir=tmp_path / "data", mdns=False, mpv_path="/introuvable/mpv")
+    with caplog.at_level(logging.WARNING, logger="rc.app"):
+        app = create_app(config)
+    app.state.rc.conn.close()
+    (rec,) = [r for r in caplog.records if "mpv" in r.getMessage()]
+    assert "introuvable" in rec.getMessage() and "/introuvable/mpv" in rec.getMessage()
+
+
+def test_startup_silent_when_mpv_present(tmp_path, caplog):
+    config = Config(data_dir=tmp_path / "data", mdns=False, mpv_path=sys.executable)
+    with caplog.at_level(logging.WARNING, logger="rc.app"):
+        app = create_app(config)
+    app.state.rc.conn.close()
+    assert not [r for r in caplog.records if "mpv" in r.getMessage()]

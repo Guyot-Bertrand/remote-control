@@ -17,6 +17,7 @@ from typing import Literal
 from rc.catalog.paths import QUALITY_ORDER
 from rc.db import current_revision, next_revision
 from rc.events import EventBus
+from rc.messages import INTERRUPTED, message
 from rc.player.base import Player, PlayerState, SubSel
 from rc.probe import MediaTracks, cached_tracks, default_selection, find_external_subs
 from rc.volumes import resolve_media_path
@@ -26,8 +27,6 @@ log = logging.getLogger(__name__)
 SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
-MSG_INTERRUPTED = "Lecture interrompue : fichier inaccessible"
-MSG_PLAYER_DOWN = "Le lecteur ne répond pas"
 
 Screen = Literal["home", "work", "season", "playing", "message"]
 
@@ -84,7 +83,7 @@ class PlayRequest:
 
 class PlayError(Exception):
     def __init__(self, code: Literal["not_playable", "volume_absent", "not_found", "player",
-                              "invalid"],
+                              "player_missing", "invalid"],
                  volume_label: str | None = None) -> None:
         super().__init__(code)
         self.code = code
@@ -180,8 +179,10 @@ class PlaybackService:
     def __init__(self, conn: sqlite3.Connection, player: Player, tv: TvController,
                  bus: EventBus, indexes_getter: Callable[[], dict],
                  clock: Callable[[], float] = time.monotonic,
-                 on_catalog: Callable[[int], None] | None = None) -> None:
+                 on_catalog: Callable[[int], None] | None = None,
+                 player_available: Callable[[], bool] = lambda: True) -> None:
         self.conn, self.player, self.tv, self.bus = conn, player, tv, bus
+        self.player_available = player_available  # exécutable du lecteur présent ?
         self.indexes_getter, self.clock = indexes_getter, clock
         # Annonce d'une nouvelle révision (progression enregistrée) ; par défaut sur le bus.
         self.on_catalog = on_catalog or (
@@ -210,9 +211,20 @@ class PlaybackService:
             await self._play_locked(req)
 
     async def _play_locked(self, req: PlayRequest) -> None:
+        if self._is_current(req):
+            try:
+                if await self._rejoin(req):
+                    return
+            except PlayError:
+                raise
+            except Exception:  # lecteur figé ou parti : on relance normalement
+                log.warning("reprise de la lecture en cours impossible, relance",
+                            exc_info=True)
         mf = self._choose_version(req)
         path = self._resolve(mf)
         await self._stop_locked(show_tv=False)
+        if not self.player_available():  # après l'arrêt : aucune session périmée
+            self._fail_start("player_missing")
         prog = self._progress(req.target_kind, req.target_id)
         start_at = 0.0
         if req.start == "resume" and prog is not None:
@@ -222,17 +234,59 @@ class PlaybackService:
         external = [e.path for e in tracks.external]
         try:
             await self.player.start(path, start_at, audio, subtitle, external)
+        except FileNotFoundError:  # exécutable du lecteur introuvable
+            log.warning("lecteur vidéo introuvable : impossible de lire %s", path)
+            self._fail_start("player_missing")
         except Exception:
             log.exception("échec du démarrage de la lecture de %s", path)
-            self._state = replace(self._state, running=False)
-            self.tv.playback_ended(MSG_PLAYER_DOWN)
-            self._publish()
-            raise PlayError("player") from None
+            self._fail_start("player")
         current = self._describe(req, mf["id"])
         self._session = _Session(current, audio, subtitle, self.clock(), tracks)
         self._state = PlayerState(position=start_at, running=True)
         self.tv.set_playing(current["work_id"])
         self._publish()
+
+    def _is_current(self, req: PlayRequest) -> bool:
+        s = self._session
+        return (s is not None and s.current["target_kind"] == req.target_kind
+                and s.current["target_id"] == req.target_id
+                and req.media_file_id in (None, s.current["media_file_id"]))
+
+    async def _rejoin(self, req: PlayRequest) -> bool:
+        """Lecture demandée du média déjà en cours : pas de relance du lecteur (la télé
+        ne clignote pas). « start » revient au début, « resume » garde la position ;
+        pistes demandées appliquées (refusées si inconnues), pause levée.
+
+        Faux si la lecture s'est terminée entre-temps (fin de fichier pendant une
+        commande) : l'appelant relance alors normalement."""
+        s = self._session
+        assert s is not None
+        if req.audio is not None and not audio_valid(req.audio, s.tracks):
+            raise PlayError("invalid")
+        if req.subtitle is not None and req.subtitle != {"kind": "none"} and not sub_valid(
+                req.subtitle, s.tracks):
+            raise PlayError("invalid")
+        if req.start == "start":
+            await self.player.seek(0, False)
+        if req.audio is not None and req.audio != s.audio:
+            await self.player.set_audio(req.audio)
+            s.audio = req.audio
+        if req.subtitle is not None and req.subtitle != s.subtitle:
+            await self.player.set_subtitle(req.subtitle)
+            s.subtitle = req.subtitle
+        if self._state.paused:
+            await self.player.set_pause(False)
+        if self._session is not s:
+            return False
+        if self.tv.state.screen != "playing":
+            self.tv.set_playing(s.current["work_id"])
+        return True
+
+    def _fail_start(self, code: Literal["player", "player_missing"]) -> None:
+        self._state = replace(self._state, running=False)
+        self.tv.playback_ended(message(code))
+        self._publish()
+        raise PlayError(code) from None
 
     def _choose_version(self, req: PlayRequest) -> sqlite3.Row:
         col = "work_id" if req.target_kind == "work" else "episode_id"
@@ -256,7 +310,7 @@ class PlaybackService:
             return resolve_version(self.conn, mf, self.indexes_getter())
         except PlayError as exc:
             if exc.code == "volume_absent" and self._session is None:
-                self.tv.playback_ended(f"Disque « {exc.volume_label} » non branché")
+                self.tv.playback_ended(message(exc.code, exc.volume_label))
             raise
 
     def _describe(self, req: PlayRequest, media_file_id: int) -> dict:
@@ -325,7 +379,7 @@ class PlaybackService:
         if s is None:
             self._state = replace(state, running=False)
         elif state.error is not None:
-            self._finish(state, MSG_INTERRUPTED)
+            self._finish(state, INTERRUPTED)
             return
         elif state.ended or not state.running:
             self._finish(state, None)

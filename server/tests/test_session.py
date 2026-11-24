@@ -147,7 +147,7 @@ async def test_volume_absent_message(env):
         await env.svc.play(PlayRequest("work", 1, "start"))
     assert (exc.value.code, exc.value.volume_label) == ("volume_absent", "DISK1")
     assert env.tv.state.screen == "message"
-    assert env.tv.state.message == "Disque « DISK1 » non branché"
+    assert env.tv.state.message == "Disque « DISK1 » non branché."
     assert env.player.starts() == []
 
 
@@ -168,9 +168,29 @@ async def test_start_failure_shows_message(env):
     with pytest.raises(PlayError) as exc:
         await env.svc.play(PlayRequest("work", 1, "start"))
     assert exc.value.code == "player"
-    assert env.tv.state.message == "Le lecteur ne répond pas"
+    assert env.tv.state.message == "Le lecteur vidéo ne répond pas."
     assert env.svc.current is None
     assert progress(env.conn) is None
+
+
+async def test_missing_executable_is_player_missing(env):
+    env.player.start_error = FileNotFoundError(2, "No such file or directory", "mpv")
+    with pytest.raises(PlayError) as exc:
+        await env.svc.play(PlayRequest("work", 1, "start"))
+    assert exc.value.code == "player_missing"
+    assert env.tv.state.screen == "message"
+    assert env.tv.state.message == "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
+    assert env.svc.current is None
+
+
+async def test_unavailable_player_refused_before_start(env):
+    svc = PlaybackService(env.conn, env.player, env.tv, env.bus, lambda: env.indexes,
+                          clock=env.clock, player_available=lambda: False)
+    with pytest.raises(PlayError) as exc:
+        await svc.play(PlayRequest("work", 1, "start"))
+    assert exc.value.code == "player_missing"
+    assert env.player.calls == []
+    assert env.tv.state.message == "Le lecteur vidéo (mpv) n'est pas installé sur le PC."
 
 
 async def test_process_error_saves_and_shows_message(env):
@@ -343,8 +363,8 @@ async def test_resume_rewatch_uses_position_even_if_watched(env):
     emit(env, position=1500, duration=6000)
     row = progress(env.conn)
     assert (row["position"], row["watched"]) == (1500, 1)
-    await env.svc.play(PlayRequest("work", 1, "start"))
-    assert env.player.starts()[-1]["start_at"] == 0
+    await env.svc.play(PlayRequest("work", 1, "start"))  # même média : retour au début
+    assert env.player.calls[-1] == ("seek", 0, False)
 
 
 async def test_premature_eof_not_watched(env):
@@ -535,3 +555,89 @@ async def test_set_subtitle_accepts_known_external_and_none(env):
     assert env.player.calls[-3:] == [
         ("set_subtitle", {"kind": "external", "path": str(sub)}),
         ("set_subtitle", {"kind": "none"}), ("set_audio", None)]
+
+
+async def test_replay_same_media_resume_does_not_restart(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    mid = env.svc.current["media_file_id"]
+    env.clock.t = 3
+    emit(env, position=300, duration=6000, paused=True)
+    env.player.calls.clear()
+    await env.svc.play(PlayRequest("work", 1, "resume", media_file_id=mid))
+    assert env.player.calls == [("set_pause", False)]  # pas de stop/start, pas de saut
+    assert env.svc.current["media_file_id"] == mid
+    assert env.tv.state.screen == "playing"
+
+
+async def test_replay_same_media_start_seeks_to_zero_and_applies_tracks(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=300, duration=6000)
+    env.player.calls.clear()
+    await env.svc.play(PlayRequest("work", 1, "start", audio=2,
+                                   subtitle={"kind": "embedded", "index": 1}))
+    assert env.player.calls == [("seek", 0, False), ("set_audio", 2),
+                                ("set_subtitle", {"kind": "embedded", "index": 1})]
+    await env.svc.stop()
+    row = progress(env.conn)
+    assert row["audio"] == "2" and row["subtitle"] == '{"kind": "embedded", "index": 1}'
+
+
+async def test_replay_same_media_rejects_unknown_tracks(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.calls.clear()
+    with pytest.raises(PlayError) as exc:
+        await env.svc.play(PlayRequest("work", 1, "resume", audio=9))
+    assert exc.value.code == "invalid"
+    assert env.player.calls == []
+    assert env.svc.current is not None
+
+
+async def test_replay_same_media_brings_tv_back_to_playing(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.tv.show("work", 1, force=True)
+    await env.svc.play(PlayRequest("work", 1, "resume"))
+    assert env.tv.state.screen == "playing"
+    assert [c[0] for c in env.player.calls] == ["start"]
+
+
+async def test_replay_other_version_restarts(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    await env.svc.play(PlayRequest("work", 1, "start", media_file_id=media_id(env.conn, "HD")))
+    assert [c[0] for c in env.player.calls] == ["start", "stop", "start"]
+
+
+async def test_replay_falls_back_to_restart_when_player_frozen(env):
+    from rc.player.mpv import MpvTimeout
+
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.command_error = MpvTimeout("mpv ne répond pas")
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    assert [c[0] for c in env.player.calls] == ["start", "seek", "stop", "start"]
+    assert env.svc.current is not None
+
+
+async def test_replay_when_session_ends_meanwhile_restarts(env):
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    real_seek = env.player.seek
+
+    async def seek_then_eof(seconds, relative):
+        await real_seek(seconds, relative)
+        env.player.on_state(PlayerState(position=6000, duration=6000, running=True, ended=True))
+
+    env.player.seek = seek_then_eof
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    assert [c[0] for c in env.player.calls] == ["start", "seek", "start"]
+    assert env.svc.current is not None and env.tv.state.screen == "playing"
+
+
+async def test_player_check_skipped_while_playing(env):
+    available = [True]
+    svc = PlaybackService(env.conn, env.player, env.tv, env.bus, lambda: env.indexes,
+                          clock=env.clock, player_available=lambda: available[0])
+    await svc.play(PlayRequest("work", 1, "start"))
+    available[0] = False  # mpv désinstallé pendant la lecture
+    with pytest.raises(PlayError) as exc:
+        await svc.play(PlayRequest("work", 3, "start"))
+    assert exc.value.code == "player_missing"
+    assert svc.current is None  # session précédente arrêtée et enregistrée
+    assert [c[0] for c in env.player.calls] == ["start", "stop"]

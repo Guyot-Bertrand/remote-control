@@ -367,12 +367,19 @@ def create_app(config: Config, player: Player | None = None,
     restore_from_copy(conn, config)
     bus = EventBus()
     tv = TvController(bus)
+    player_available = lambda: True  # noqa: E731 — lecteur fourni (tests)
     if player is None:
         player = MpvPlayer(config.mpv_path, config.mpv_extra_args, _runtime_dir(config))
+        player_available = lambda: shutil.which(config.mpv_path) is not None  # noqa: E731
+        if not player_available():
+            log.warning("lecteur vidéo mpv introuvable (%s) : la lecture sera impossible."
+                        " Installer mpv (sudo apt install mpv) ou régler mpv_path.",
+                        config.mpv_path)
     state = AppState(config, conn, bus, runner, published_revision=current_revision(conn))
     indexes_getter = lambda: state.indexes  # noqa: E731
     playback = PlaybackService(conn, player, tv, bus, indexes_getter,
-                               on_catalog=lambda rev: publish_catalog(state, rev))
+                               on_catalog=lambda rev: publish_catalog(state, rev),
+                               player_available=player_available)
     state.playback = playback
     services = Services(conn, config, bus, tv, playback, indexes_getter)
 
