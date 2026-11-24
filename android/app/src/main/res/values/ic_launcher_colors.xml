@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond (rc-bg) et laiton (rc-accent) des maquettes. -->
+    <color name="ic_launcher_background">#110F0D</color>
+    <color name="ic_launcher_glyph">#D8A24A</color>
+</resources>
