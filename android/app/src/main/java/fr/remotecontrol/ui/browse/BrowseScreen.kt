@@ -200,8 +200,10 @@ private fun FastScroller(grid: LazyGridState, works: List<WorkSummary>, modifier
                     .width(20.dp)
                     .fillMaxHeight()
                     .pointerInput(grid, works) {
+                        // Même course que la poignée : le doigt au centre de la bulle désigne la position affichée.
                         fun jump(y: Float) {
-                            val f = (y / size.height).coerceIn(0f, 1f)
+                            val travel = (size.height - BUBBLE_SIZE.toPx()).coerceAtLeast(1f)
+                            val f = ((y - BUBBLE_SIZE.toPx() / 2) / travel).coerceIn(0f, 1f)
                             scope.launch { grid.scrollToItem((f * (works.size - 1)).roundToInt()) }
                         }
                         detectVerticalDragGestures(

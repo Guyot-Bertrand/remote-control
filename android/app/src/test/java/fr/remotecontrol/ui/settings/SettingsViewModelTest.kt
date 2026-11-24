@@ -19,7 +19,11 @@ import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.testDb
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -98,9 +102,19 @@ class SettingsViewModelTest {
         assertTrue(vm.state.value.syncFailed)
     }
 
-    @Test fun now_comes_from_the_clock() = runBlocking {
-        val v = SettingsViewModel(locator, SyncRepository(db, api), db.catalogDao(), clock = { 42L }).also { vms += it }
-        assertEquals(42L, withTimeout(5_000) { v.state.first { it.now == 42L } }.now)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun clock_ticks_only_while_observed() = runTest {
+        var calls = 0
+        val v = SettingsViewModel(locator, SyncRepository(db, api), db.catalogDao(), clock = { ++calls * 1_000L }).also { vms += it }
+        val watcher = launch { v.now.collect {} }
+        advanceTimeBy(120_001)
+        assertTrue("l'horloge avance pendant l'affichage", calls >= 3)
+        assertEquals(calls * 1_000L, v.now.value)
+        watcher.cancel()
+        advanceTimeBy(5_001) // délai d'arrêt de WhileSubscribed
+        val stopped = calls
+        advanceTimeBy(600_000)
+        assertEquals("l'horloge s'arrête sans abonné", stopped, calls)
     }
 
     @Test fun resync_records_time_and_playable_count() = runBlocking {

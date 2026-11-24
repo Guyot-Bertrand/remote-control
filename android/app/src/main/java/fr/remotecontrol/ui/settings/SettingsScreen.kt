@@ -61,6 +61,7 @@ import fr.remotecontrol.ui.theme.RcColors
 @Composable
 fun SettingsScreen(
     state: SettingsUi,
+    now: Long,
     onManualInput: (String) -> Unit,
     onSaveManual: () -> Unit,
     onRediscover: () -> Unit,
@@ -87,7 +88,7 @@ fun SettingsScreen(
                 InfoRow(
                     RcIcons.Sync,
                     Texts.lastSyncTitle,
-                    Texts.lastSync(state.syncedAt, state.now, state.workCount, state.playableCount),
+                    Texts.lastSync(state.syncedAt, now, state.workCount, state.playableCount),
                 )
                 Box(Modifier.padding(start = 56.dp, end = 16.dp, top = 4.dp)) {
                     PillButton(Texts.resync, RcIcons.Sync, onResync, tone = Tone.Soft, enabled = !state.busy, height = 40.dp)

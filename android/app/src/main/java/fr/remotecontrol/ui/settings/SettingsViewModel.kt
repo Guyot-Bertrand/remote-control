@@ -13,8 +13,11 @@ import fr.remotecontrol.ui.common.Texts
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -33,8 +36,6 @@ data class SettingsUi(
     val busy: Boolean = false,
     val message: String? = null,
     val syncFailed: Boolean = false,
-    /** Heure courante (rafraîchie chaque minute) : « Aujourd'hui / Hier » suit le changement de jour. */
-    val now: Long = 0L,
 )
 
 private const val CLOCK_TICK_MS = 60_000L
@@ -48,17 +49,22 @@ class SettingsViewModel(
     private val _state = MutableStateFlow(SettingsUi(serverLabel = label(locator.state.value), server = locator.state.value))
     val state: StateFlow<SettingsUi> = _state.asStateFlow()
 
+    /**
+     * Heure courante, rafraîchie chaque minute tant que l'écran l'affiche (« Aujourd'hui / Hier » suit le
+     * changement de jour) ; sans abonné depuis 5 s, l'horloge s'arrête.
+     */
+    val now: StateFlow<Long> = flow {
+        while (true) {
+            emit(clock())
+            delay(CLOCK_TICK_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), clock())
+
     private val initJob: Job
 
     init {
         viewModelScope.launch {
             locator.state.collect { s -> _state.update { it.copy(serverLabel = label(s), server = s) } }
-        }
-        viewModelScope.launch {
-            while (true) {
-                _state.update { it.copy(now = clock()) }
-                delay(CLOCK_TICK_MS)
-            }
         }
         viewModelScope.launch {
             sync.syncedAt.collect { at -> _state.update { it.copy(syncedAt = at) } }

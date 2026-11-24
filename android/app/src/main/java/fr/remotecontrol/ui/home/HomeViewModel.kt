@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -97,8 +98,13 @@ class HomeViewModel(
     locator: ServerLocator,
     private val sync: SyncRepository,
 ) : ViewModel() {
-    private val message = MutableStateFlow<String?>(null)
-    private val syncState = combine(sync.syncing, sync.syncedAt, message) { syncing, at, msg -> Triple(syncing, at != null, msg) }
+    /** Échec d'un « Resynchroniser », avec l'heure de dernière synchronisation réussie connue à ce moment. */
+    private val failure = MutableStateFlow<Pair<String, Long?>?>(null)
+
+    // Le message ne vaut que tant qu'aucune synchronisation n'a réussi depuis (automatique ou non).
+    private val syncState = combine(sync.syncing, sync.syncedAt, failure) { syncing, at, f ->
+        Triple(syncing, at != null, f?.takeIf { it.second == at }?.first)
+    }
 
     private val filtered = filter.playableOnly.flatMapLatest { playable ->
         combine(dao.recentWorks(playable, 20), dao.collections(playable)) { recent, collections ->
@@ -121,7 +127,7 @@ class HomeViewModel(
             catalogEmpty = count == 0,
             server = server,
             banner = homeBanner(server, count == 0, everSynced, syncing),
-            message = msg,
+            message = msg.takeIf { count == 0 },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
@@ -131,10 +137,10 @@ class HomeViewModel(
 
     /** « Resynchroniser » du catalogue vide : synchronisation complète. */
     fun resync() {
-        message.value = null
+        failure.value = null
         viewModelScope.launch {
             val outcome = sync.sync(forceFull = true)
-            if (outcome is SyncOutcome.Failed) message.value = outcome.error.messageFr()
+            if (outcome is SyncOutcome.Failed) failure.value = outcome.error.messageFr() to sync.syncedAt.first()
         }
     }
 }

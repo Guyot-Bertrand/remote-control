@@ -114,6 +114,10 @@ class HomeViewModelTest {
         val ui = vm.await { it.message != null }
         assertEquals("Serveur injoignable", ui.message)
         assertEquals(HomeBanner.NotSynced, ui.banner)
+        // Synchronisation automatique réussie ensuite (même vide) : le message d'échec disparaît.
+        api.syncResponses.addLast(ApiResult.Ok(empty))
+        SyncRepository(db, api).sync()
+        assertEquals(HomeBanner.Empty, vm.await { it.message == null }.banner)
     }
 
     @Test fun collections_show_total_and_playable() = runBlocking {

@@ -175,8 +175,10 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         composable<SettingsRoute> {
             val vm = viewModel { SettingsViewModel(c.locator, c.sync, c.catalogDao) }
             val state by vm.state.collectAsStateWithLifecycle()
+            val now by vm.now.collectAsStateWithLifecycle()
             SettingsScreen(
                 state = state,
+                now = now,
                 onManualInput = vm::onManualInput,
                 onSaveManual = vm::saveManual,
                 onRediscover = vm::rediscover,
