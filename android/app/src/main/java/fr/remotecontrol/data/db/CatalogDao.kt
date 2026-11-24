@@ -81,10 +81,10 @@ interface CatalogDao {
     fun work(id: Long): Flow<WorkEntity?>
 
     @Query(
-        "SELECT c.* FROM collection c JOIN work_collection wc ON wc.collectionId = c.id " +
+        "SELECT c.id, c.name, wc.rank FROM collection c JOIN work_collection wc ON wc.collectionId = c.id " +
             "WHERE wc.workId = :workId ORDER BY c.name",
     )
-    fun collectionsOfWork(workId: Long): Flow<List<CollectionEntity>>
+    fun collectionsOfWork(workId: Long): Flow<List<WorkCollectionRow>>
 
     @Query("SELECT * FROM season WHERE workId = :workId ORDER BY number")
     fun seasonsOfWork(workId: Long): Flow<List<SeasonEntity>>

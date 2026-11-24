@@ -2,6 +2,8 @@ package fr.remotecontrol.player
 
 import fr.remotecontrol.data.db.EpisodeRow
 import fr.remotecontrol.data.db.MediaFileRow
+import fr.remotecontrol.data.db.ProgressEntity
+import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.net.PlayRequestDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -82,5 +84,14 @@ class VersionsTest {
             PlayRequestDto("episode", 2, "resume"),
             playRequest(PlayTarget(TargetKind.Episode, 2), StartMode.Resume),
         )
+    }
+
+    @Test fun choice_summary_names_version_and_subtitles() {
+        assertEquals("FHD", choiceSummary(ava, null))
+        val resumed = ProgressEntity("work", 1, 2, 600.0, 5940.0, false, 0.0, subtitle = SubSel.None)
+        assertEquals("HD · Sans sous-titres", choiceSummary(ava, resumed))
+        val withSubs = resumed.copy(subtitle = SubSel.Embedded(2), position = 0.0)
+        assertEquals("FHD · Avec sous-titres", choiceSummary(ava, withSubs))
+        assertNull(choiceSummary(listOf(file(3, "SD", false)), null))
     }
 }

@@ -251,7 +251,7 @@ private fun Message(text: String, onRetry: (() -> Unit)?) {
 
 /** Lien « Version et pistes… » des fiches (48 dp, pictogramme sous-titres), qui ouvre l'écran de choix. */
 @Composable
-fun PrePlayLink(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun PrePlayLink(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, summary: String? = null) {
     Row(
         modifier
             .fillMaxWidth()
@@ -263,6 +263,12 @@ fun PrePlayLink(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(RcIcons.Subtitles, contentDescription = null, tint = RcColors.text2, modifier = Modifier.size(20.dp))
-        Text(Texts.tracksAndVersion, style = TextStyle(fontFamily = Inter, fontSize = 14.sp), color = RcColors.text2)
+        if (summary == null) {
+            Text(Texts.tracksAndVersion, style = TextStyle(fontFamily = Inter, fontSize = 14.sp), color = RcColors.text2)
+        } else {
+            // Maquette « Fiche œuvre » : le choix qui sera lu, puis « Modifier » en laiton.
+            Text(summary, style = TextStyle(fontFamily = Inter, fontSize = 14.sp), color = RcColors.text2, modifier = Modifier.weight(1f))
+            Text(Texts.change, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 14.sp), color = RcColors.accentStrong)
+        }
     }
 }

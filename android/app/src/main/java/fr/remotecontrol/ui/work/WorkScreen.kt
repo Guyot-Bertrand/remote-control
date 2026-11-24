@@ -1,5 +1,13 @@
 package fr.remotecontrol.ui.work
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,8 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import fr.remotecontrol.data.db.CollectionEntity
 import fr.remotecontrol.data.db.SeasonEntity
+import fr.remotecontrol.data.db.WorkCollectionRow
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.Availability
 import fr.remotecontrol.player.StartMode
@@ -76,6 +84,7 @@ fun WorkScreen(
     onOpenSeason: (Long) -> Unit,
     onOpenCollection: (Long) -> Unit,
     onDismissMessage: () -> Unit,
+    onRetryServer: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -84,6 +93,9 @@ fun WorkScreen(
             if (missing) NotFound(Texts.workNotFound)
             return@Column
         }
+        // Maquette « PC injoignable » : on parcourt la fiche, la lecture attend le retour du serveur.
+        val offline = server == ServerState.NotFound
+        if (offline) OfflineBanner(onRetryServer)
         Column(
             Modifier
                 .fillMaxSize()
@@ -92,7 +104,7 @@ fun WorkScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Identity(state)
-            if (!state.work.episodic) PlayActions(state, onPlayFromStart, onResume, onPrePlay)
+            if (!state.work.episodic) PlayActions(state, offline, onPlayFromStart, onResume, onPrePlay)
             state.message?.let { MessageBanner(it, onDismissMessage) }
             state.work.synopsis?.let { Synopsis(it) }
             if (state.work.episodic && state.seasons.isNotEmpty()) Seasons(state.seasons, onOpenSeason)
@@ -150,22 +162,30 @@ private fun Identity(state: WorkUi) {
 }
 
 @Composable
-private fun PlayActions(state: WorkUi, onPlayFromStart: () -> Unit, onResume: () -> Unit, onPrePlay: (StartMode) -> Unit) {
+private fun PlayActions(
+    state: WorkUi,
+    offline: Boolean,
+    onPlayFromStart: () -> Unit,
+    onResume: () -> Unit,
+    onPrePlay: (StartMode) -> Unit,
+) {
+    val ready = !state.launching && !offline
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(
             Texts.playFromStart, RcIcons.Play, onPlayFromStart, Modifier.fillMaxWidth(),
-            enabled = state.canPlay && !state.launching,
+            enabled = state.canPlay && ready,
         )
         if (state.canPlay && state.resumeLabel != null) {
             PillButton(
                 state.resumeLabel, RcIcons.Resume, onResume, Modifier.fillMaxWidth(),
-                tone = Tone.Soft, enabled = !state.launching, progress = state.resumeProgress,
+                tone = Tone.Soft, enabled = ready, progress = state.resumeProgress,
             )
         }
         if (state.canPlay) {
             PrePlayLink(
                 onClick = { onPrePlay(if (state.resumeLabel != null) StartMode.Resume else StartMode.Start) },
-                enabled = !state.launching,
+                enabled = ready,
+                summary = state.choiceSummary,
             )
         }
         when (val a = state.availability) {
@@ -220,20 +240,50 @@ private fun Seasons(seasons: List<SeasonEntity>, onOpenSeason: (Long) -> Unit) {
 }
 
 @Composable
-private fun Collections(collections: List<CollectionEntity>, onOpenCollection: (Long) -> Unit) {
+private fun Collections(collections: List<WorkCollectionRow>, onOpenCollection: (Long) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionLabel(Texts.sectionCollections)
         collections.forEach { c ->
-            Text(
-                c.name,
-                style = body14,
-                color = RcColors.text2,
-                modifier = Modifier
+            Row(
+                Modifier
                     .fillMaxWidth()
                     .heightIn(min = 40.dp)
                     .clickable(role = Role.Button) { onOpenCollection(c.id) }
                     .padding(vertical = 8.dp),
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Rang de l'œuvre dans la collection (« n° 2017 »), en laiton, comme la maquette.
+                c.rank?.let {
+                    Text(Texts.rank(it), style = body14.copy(fontWeight = FontWeight.SemiBold), color = RcColors.accent, maxLines = 1)
+                }
+                Text(c.name, style = body14, color = RcColors.text2)
+            }
+        }
+    }
+}
+
+/** Bandeau « PC injoignable » (terre cuite), avec « Réessayer » : nouvelle recherche du serveur. */
+@Composable
+private fun OfflineBanner(onRetry: () -> Unit) {
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(RcColors.warnSoft)
+            .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(RcIcons.Server, contentDescription = null, tint = RcColors.warn, modifier = Modifier.size(22.dp))
+        Text(
+            Texts.offlineNotice,
+            style = TextStyle(fontFamily = Inter, fontSize = 13.sp, lineHeight = 18.sp),
+            color = RcColors.text,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        TextButton(onClick = onRetry, modifier = Modifier.height(40.dp)) {
+            Text(Texts.retry, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp), color = RcColors.accentStrong)
         }
     }
 }

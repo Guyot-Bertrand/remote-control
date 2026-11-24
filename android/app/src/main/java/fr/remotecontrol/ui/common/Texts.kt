@@ -160,6 +160,11 @@ object Texts {
     const val dismiss = "Fermer"
     const val inProgress = "En cours"
     const val showMore = "Afficher plus"
+    const val change = "Modifier"
+    const val withoutSubtitles = "Sans sous-titres"
+    const val withSubtitles = "Avec sous-titres"
+    const val offlineNotice = "PC injoignable. Vous pouvez parcourir ; la lecture reviendra avec la connexion."
+    fun rank(rank: String) = "n°\u00A0$rank"
     const val showLess = "Afficher moins"
 
     /** Mention courte d'une œuvre non lisible : nom du disque débranché, ou « Non numérisé ». */
@@ -167,7 +172,7 @@ object Texts {
     const val disk = "Disque"
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"
-    /** « Reprendre à 01:12 » à partir d'une heure, « Reprendre à 3 min » ou « Reprendre à 45 s » avant. */
+    /** « Reprendre à 1 h 12 » à partir d'une heure, « Reprendre à 3 min » ou « Reprendre à 45 s » avant. */
     fun resumeAt(seconds: Double) = "Reprendre à ${formatResumePosition(seconds)}"
     fun started(seconds: Double) = "Entamé — ${formatClock(seconds)}"
     fun workCount(count: Int) = if (count == 1) "1 œuvre" else "$count œuvres"

@@ -75,6 +75,7 @@ import fr.remotecontrol.ui.theme.RcColors
 import fr.remotecontrol.ui.theme.RcTheme
 import fr.remotecontrol.ui.work.WorkScreen
 import fr.remotecontrol.ui.work.WorkViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -218,6 +219,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
                 onOpenSeason = { nav.navigate(SeasonRoute(it)) },
                 onOpenCollection = { nav.navigate(BrowseRoute(collectionId = it)) },
                 onDismissMessage = vm::clearMessage,
+                onRetryServer = { c.appScope.launch { c.locator.locate(force = true) } },
                 onBack = { nav.popBackStack() },
             )
         }

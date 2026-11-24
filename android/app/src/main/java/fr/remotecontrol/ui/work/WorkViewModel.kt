@@ -3,10 +3,10 @@ package fr.remotecontrol.ui.work
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.remotecontrol.data.db.CatalogDao
-import fr.remotecontrol.data.db.CollectionEntity
 import fr.remotecontrol.data.db.MediaFileRow
 import fr.remotecontrol.data.db.ProgressEntity
 import fr.remotecontrol.data.db.SeasonEntity
+import fr.remotecontrol.data.db.WorkCollectionRow
 import fr.remotecontrol.data.db.WorkEntity
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.Availability
@@ -17,6 +17,7 @@ import fr.remotecontrol.player.TargetKind
 import fr.remotecontrol.player.TvSheet
 import fr.remotecontrol.player.TvStatus
 import fr.remotecontrol.player.availabilityOf
+import fr.remotecontrol.player.choiceSummary
 import fr.remotecontrol.player.label
 import fr.remotecontrol.player.sortVersions
 import fr.remotecontrol.ui.common.NavEvent
@@ -45,7 +46,7 @@ data class WorkUi(
     val availabilityLabel: String?,
     val versions: List<VersionUi>,
     val seasons: List<SeasonEntity>,
-    val collections: List<CollectionEntity>,
+    val collections: List<WorkCollectionRow>,
     val resumeLabel: String?,
     val canPlay: Boolean,
     val message: String? = null,
@@ -53,13 +54,15 @@ data class WorkUi(
     val resumeProgress: Float? = null,
     val onTv: Boolean = false,
     val launching: Boolean = false,
+    /** Ce qui sera lu (« FHD · Sans sous-titres »), en tête du lien « Modifier » ; nul si rien n'est lisible. */
+    val choiceSummary: String? = null,
 )
 
 private data class Catalog(
     val work: WorkEntity?,
     val files: List<MediaFileRow>,
     val seasons: List<SeasonEntity>,
-    val collections: List<CollectionEntity>,
+    val collections: List<WorkCollectionRow>,
     val progress: ProgressEntity?,
 )
 
@@ -127,6 +130,7 @@ class WorkViewModel(
             availability = availability,
             resumeProgress = progress?.duration?.takeIf { it > 0 }?.let { (progress.position / it).coerceIn(0.0, 1.0).toFloat() },
             onTv = tv,
+            choiceSummary = if (work.episodic) null else choiceSummary(c.files, c.progress),
         )
     }
 }

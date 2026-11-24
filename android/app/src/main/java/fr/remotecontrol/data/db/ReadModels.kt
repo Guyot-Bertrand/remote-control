@@ -39,6 +39,9 @@ data class EpisodeHeader(
     val year: Int?,
 )
 
+/** Collection d'une œuvre, avec le rang de l'œuvre dans cette collection (nul si la collection n'est pas classée). */
+data class WorkCollectionRow(val id: Long, val name: String, val rank: String?)
+
 /** Rang (texte libre, souvent numérique) d'une œuvre dans une collection. */
 data class WorkRank(val workId: Long, val rank: String)
 

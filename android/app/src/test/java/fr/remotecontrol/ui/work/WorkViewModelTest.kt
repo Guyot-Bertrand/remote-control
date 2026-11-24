@@ -119,6 +119,9 @@ class WorkViewModelTest {
         assertNull(ui.availabilityLabel)
         assertEquals(listOf("FHD · 3.8G", "HD · 1.6G"), ui.versions.map { it.label })
         assertEquals(listOf("Les 1000 plus grands films de tous les temps [2020]"), ui.collections.map { it.name })
+        assertEquals(listOf("2017"), ui.collections.map { it.rank })
+        // Reprise sur la version HD de la progression ; pas de choix de sous-titres mémorisé.
+        assertEquals("HD", ui.choiceSummary)
     }
 
     @Test fun theatre_absent_disk() = runBlocking {

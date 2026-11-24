@@ -2,6 +2,8 @@ package fr.remotecontrol.player
 
 import fr.remotecontrol.data.db.EpisodeRow
 import fr.remotecontrol.data.db.MediaFileRow
+import fr.remotecontrol.data.db.ProgressEntity
+import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.ui.common.Texts
 
 /** Qualités lisibles, de la meilleure à la moins bonne. */
@@ -50,4 +52,19 @@ fun preferredVersion(files: List<MediaFileRow>, progressMediaFileId: Long?, star
 fun highlightEpisode(rows: List<EpisodeRow>): Long? {
     rows.filter { it.updatedAt != null }.maxByOrNull { it.updatedAt ?: 0.0 }?.let { return it.id }
     return (rows.firstOrNull { it.watched != true } ?: rows.firstOrNull())?.id
+}
+
+/**
+ * Résumé du choix qui sera lu (lien « Modifier » de la fiche) : qualité de la version proposée (celle de la
+ * reprise si l'œuvre est entamée), puis le choix de sous-titres mémorisé s'il y en a un ; nul sans version présente.
+ */
+fun choiceSummary(files: List<MediaFileRow>, progress: ProgressEntity?): String? {
+    val resume = progress != null && progress.position > 0 && !progress.watched
+    val id = preferredVersion(files, progress?.mediaFileId, if (resume) StartMode.Resume else StartMode.Start) ?: return null
+    val subtitles = when (progress?.subtitle) {
+        null -> null
+        SubSel.None -> Texts.withoutSubtitles
+        else -> Texts.withSubtitles
+    }
+    return Texts.details(files.first { it.id == id }.quality, subtitles)
 }
