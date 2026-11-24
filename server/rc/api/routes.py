@@ -21,6 +21,7 @@ from rc.assets import SIZES, asset_path
 from rc.config import Config
 from rc.db import current_revision
 from rc.events import EventBus
+from rc.messages import RESOURCE_NOT_FOUND, error_body
 from rc.player.mpv import MpvError
 from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
                                load_tracks, pick_tracks, resolve_version)
@@ -107,15 +108,16 @@ OK = {"ok": True}
 
 
 def not_found() -> JSONResponse:
-    return JSONResponse({"error": "not_found"}, status_code=404)
+    return JSONResponse({"error": "not_found", "message": RESOURCE_NOT_FOUND},
+                        status_code=404)
 
 
 def conflict(code: str, volume_label: str | None = None) -> JSONResponse:
-    return JSONResponse({"error": code, "volume_label": volume_label}, status_code=409)
+    return JSONResponse(error_body(code, volume_label), status_code=409)
 
 
 def invalid() -> JSONResponse:
-    return JSONResponse({"error": "invalid", "volume_label": None}, status_code=422)
+    return JSONResponse(error_body("invalid"), status_code=422)
 
 
 async def validation_error_handler(request: Request,
