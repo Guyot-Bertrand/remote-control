@@ -136,8 +136,10 @@ svg { flex-shrink: 0; display: block; }
   border: 1.5px solid transparent; border-radius: 9px;
   font-size: 26px; line-height: 1.1;
 }
-.pill-quality { border-color: var(--rc-text-2); font-weight: 700; letter-spacing: .06em; color: var(--rc-text); }
-.pill-lang { background: var(--rc-surface-3); font-weight: 500; color: var(--rc-text-2); }
+.pill-quality { gap: 11px; border-color: var(--rc-text-2); font-weight: 700; letter-spacing: .06em; color: var(--rc-text); white-space: nowrap; }
+.pill-sep { width: 1.5px; align-self: stretch; background: var(--rc-line); }
+.pill-res { font-size: 23px; font-weight: 400; letter-spacing: 0; color: var(--rc-text-2); font-variant-numeric: tabular-nums; }
+.pill-lang { background: var(--rc-surface-3); font-weight: 500; color: var(--rc-text-2); white-space: nowrap; }
 
 .status {
   align-self: flex-start; display: flex; align-items: center; gap: 16px;
@@ -191,6 +193,8 @@ svg { flex-shrink: 0; display: block; }
 .work { padding: var(--tv-safe-y) var(--tv-safe-x); display: flex; gap: 80px; }
 .work > .poster { width: 635px; height: 952px; }
 .work-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 30px; }
+/* Bloc titre à gauche du coin d'état (448×252) : la suite commence sous le coin. */
+.work-head { max-width: 533px; min-height: 236px; }
 .work-title { margin-top: 14px; font-family: var(--rc-font-display); font-weight: 500; font-size: var(--tv-fs-hero); line-height: 1.04; text-wrap: balance; }
 .work-title.long { font-size: 68px; }
 .work-title.very-long { font-size: 56px; }
@@ -209,52 +213,69 @@ svg { flex-shrink: 0; display: block; }
 .colls { display: flex; flex-direction: column; gap: 10px; }
 .coll { display: flex; gap: 16px; align-items: baseline; font-size: 28px; color: var(--rc-text-2); }
 .coll-rank { color: var(--rc-accent); font-weight: 600; white-space: nowrap; }
+.versions { display: flex; flex-direction: column; gap: 12px; }
 .pills { display: flex; gap: 14px; flex-wrap: wrap; }
 
-/* -- fiche saison ------------------------------------------------------- */
+/* -- fiche saison (maquette 4b) : affiche et infos à gauche, en-tête à gauche du coin
+   d'état, épisodes sur trois colonnes de huit lignes ------------------------------ */
 
-.season { padding: var(--tv-safe-y) var(--tv-safe-x); display: flex; gap: 72px; }
-.season-side { width: 420px; flex-shrink: 0; display: flex; flex-direction: column; gap: 24px; }
-.season-side .poster { width: 380px; height: 570px; }
-.season-side .noposter { --u: 380px; }
-.season-heading { display: flex; flex-direction: column; gap: 8px; }
-.season-work { font-family: var(--rc-font-display); font-weight: 500; font-size: 58px; line-height: 1.05; text-wrap: balance; }
-.season-work.long { font-size: 46px; }
+.season-side {
+  position: absolute; left: var(--tv-safe-x); top: var(--tv-safe-y); width: 420px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.season-side .poster { width: 420px; height: 630px; }
+.season-side .noposter { --u: 420px; }
 .season-meta { font-size: 28px; color: var(--rc-text-2); line-height: 1.4; }
-.season-synopsis {
-  font-size: 27px; line-height: 1.45; color: var(--rc-text-2); text-wrap: pretty;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;
+.season-head {
+  position: absolute; left: 580px; top: var(--tv-safe-y); width: 760px; height: 252px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 14px;
 }
-.season-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 28px; }
-.season-top { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
-.season-label { font-family: var(--rc-font-display); font-weight: 500; font-size: var(--tv-fs-title); line-height: 1.1; color: var(--rc-text); }
+.season-work {
+  font-family: var(--rc-font-display); font-weight: 500; font-size: 72px; line-height: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.season-work.long { font-size: 56px; }
+.season-top { display: flex; align-items: baseline; gap: 24px; }
+.season-label { font-family: var(--rc-font-display); font-weight: 500; font-size: 48px; color: var(--rc-accent-strong); white-space: nowrap; }
 .season-count { font-size: 28px; color: var(--rc-text-3); white-space: nowrap; }
-.episodes { display: grid; grid-auto-flow: column; column-gap: 32px; }
-.ep {
-  display: flex; align-items: center; gap: 24px; height: 100%; min-width: 0;
-  padding: 0 24px; border-radius: var(--r-m);
-  box-shadow: inset 0 -1px 0 var(--rc-line);
+.season-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 42px; }
+.season-mark { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.season-mark-ep { font-size: 26px; color: var(--rc-text-2); white-space: nowrap; }
+.ep-badge {
+  display: inline-flex; align-items: center; gap: 7px; line-height: 1.2;
+  font-size: 24px; font-weight: 700; color: var(--rc-on-accent); background: var(--rc-accent);
+  border-radius: 8px; padding: 3px 12px; white-space: nowrap;
 }
-.ep-num { width: 56px; font-family: var(--rc-font-display); font-size: 40px; color: var(--rc-text-3); }
-.ep-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ep-badge-selected { background: var(--rc-text); }
+.ep-badge-paused { background: var(--rc-surface-3); color: var(--rc-text); }
+.season-main { position: absolute; top: 348px; left: 580px; right: var(--tv-safe-x); bottom: var(--tv-safe-y); }
+.episodes {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: column;
+  gap: 8px 28px;
+}
+.ep {
+  position: relative; display: flex; flex-direction: column; justify-content: center; min-width: 0;
+  padding: 0 16px; border-radius: 10px; box-shadow: inset 0 -1px 0 var(--rc-line);
+}
 .ep-line { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.ep-title { font-size: 32px; font-weight: 500; color: var(--rc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ep-num { width: 44px; flex-shrink: 0; font-family: var(--rc-font-display); font-size: 30px; color: var(--rc-text-3); font-variant-numeric: tabular-nums; }
+.ep-title { flex: 1; min-width: 0; font-size: 26px; font-weight: 500; color: var(--rc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ep.seen .ep-title { color: var(--rc-text-2); }
-.ep-badge { font-size: 24px; font-weight: 700; color: var(--rc-on-accent); background: var(--rc-accent); border-radius: 8px; padding: 3px 12px; white-space: nowrap; }
-.ep-progress { display: flex; align-items: center; gap: 16px; }
-.ep-progress .bar { width: 240px; height: 6px; border-radius: 3px; background: rgba(216, 162, 74, .25); }
-.ep-left { font-size: 26px; color: var(--rc-text-2); white-space: nowrap; }
-.ep-dur { font-size: 28px; color: var(--rc-text-2); white-space: nowrap; }
-.ep-mark { width: 34px; flex-shrink: 0; color: var(--rc-seen); }
-.ep.current { background: var(--rc-accent-soft); box-shadow: none; }
-.ep.current .ep-num { color: var(--rc-accent); }
-.ep.current .ep-title { color: var(--rc-text); }
-/* Deux colonnes et plus : lignes plus basses. */
-.episodes.compact .ep-num { width: 47px; font-size: 34px; }
-.episodes.compact .ep-title { font-size: 28px; }
-.episodes.compact .ep-progress .bar { width: 160px; }
-.episodes.dense .ep { gap: 16px; padding: 0 16px; }
-.episodes.dense .ep-left, .episodes.dense .ep-dur { display: none; }
+.ep-dur { font-size: 26px; color: var(--rc-text-2); white-space: nowrap; }
+.ep-mark { flex-shrink: 0; color: var(--rc-seen); }
+.ep-mark-selected, .ep-mark-active { color: var(--rc-text); }
+.ep-mark-next { color: var(--rc-accent); }
+.ep-bar { position: absolute; left: 16px; right: 16px; bottom: 8px; height: 5px; border-radius: 3px; background: rgba(216, 162, 74, .25); }
+.ep-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--rc-accent); }
+.ep.next { background: var(--rc-accent-soft); box-shadow: none; }
+.ep.selected { background: var(--rc-surface-2); box-shadow: inset 0 0 0 3px var(--rc-text); }
+.ep.next.selected { background: var(--rc-accent-soft); }
+.ep.next .ep-num, .ep.selected .ep-num { color: var(--rc-accent); }
+.ep.next .ep-title, .ep.selected .ep-title { color: var(--rc-text); }
+/* Plus de 24 épisodes : lignes plus basses. */
+.episodes.dense .ep-num { width: 36px; font-size: 24px; }
+.episodes.dense .ep-title, .episodes.dense .ep-dur { font-size: 22px; }
+.episodes.dense .ep-bar { bottom: 3px; height: 3px; }
 
 /* -- lecture ------------------------------------------------------------ */
 
@@ -533,3 +554,22 @@ svg { flex-shrink: 0; display: block; }
 }
 .message-text { font-family: var(--rc-font-display); font-weight: 500; font-size: 64px; line-height: 1.15; text-wrap: balance; }
 .message-sub { font-size: 32px; line-height: 1.45; color: var(--rc-text-2); text-wrap: balance; }
+
+/* Version et pistes (maquette 4b) : trois colonnes de choix, rappel en bas. */
+.pp-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; }
+.pp-col { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.pp-label { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 600; letter-spacing: .14em; color: var(--rc-text-3); }
+.pp-opt { display: flex; align-items: center; gap: 22px; min-height: 104px; padding: 16px 24px; border-radius: 14px; }
+.pp-opt.on { background: var(--rc-accent-soft); }
+.pp-radio {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; border: 3px solid var(--rc-text-3);
+  display: flex; align-items: center; justify-content: center;
+}
+.pp-opt.on .pp-radio { border-color: var(--rc-accent); }
+.pp-opt.on .pp-radio::after { content: ''; width: 18px; height: 18px; border-radius: 50%; background: var(--rc-accent); }
+.pp-opt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pp-opt-label { font-size: 32px; font-weight: 400; color: var(--rc-text-2); }
+.pp-opt.on .pp-opt-label { font-weight: 600; color: var(--rc-text); }
+.pp-opt-sub { font-size: 26px; color: var(--rc-text-3); }
+.pp-note { padding: 16px 24px; font-size: 28px; color: var(--rc-text-3); }
+.pp-hint { position: absolute; left: 0; bottom: 0; display: flex; align-items: center; gap: 16px; font-size: 28px; color: var(--rc-text-3); }

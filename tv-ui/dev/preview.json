@@ -1827,5 +1827,2525 @@
    "duration": 5404.0,
    "work_id": 101
   }
+ },
+ "work": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "work",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 12,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/works/12": {
+    "id": 12,
+    "type": "film",
+    "title_fr": "Ava",
+    "title_vo": "Ava",
+    "year": 2017,
+    "duration_min": 99,
+    "genres": [
+     "comédie dramatique"
+    ],
+    "directors": [
+     "Léa Mysius"
+    ],
+    "cast": [
+     "Noée Abita",
+     "Laure Calamy",
+     "Juan Cano"
+    ],
+    "synopsis": "Ava, 13 ans, est en vacances au bord de l'océan quand elle apprend qu'elle va perdre la vue plus vite que prévu. Tandis que sa mère s'efforce de lui offrir un été léger, Ava apprend à vivre dans le noir, s'attache à un grand chien noir et à son maître en fuite.",
+    "collections": [
+     {
+      "id": 4,
+      "name": "Les 1000 plus grands films de tous les temps [2020]",
+      "rank": "2017"
+     }
+    ],
+    "media_files": [
+     {
+      "id": 7,
+      "quality": "FHD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/7.mkv",
+      "audio_langs": [
+       "fr",
+       "en"
+      ],
+      "subtitle_langs": [
+       "fr"
+      ],
+      "width": 1920,
+      "height": 1080,
+      "duration_s": 5940.0
+     },
+     {
+      "id": 8,
+      "quality": "HD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/8.mkv",
+      "audio_langs": [
+       "fr"
+      ],
+      "subtitle_langs": [],
+      "width": 1280,
+      "height": 720,
+      "duration_s": 5940.0
+     }
+    ],
+    "tags": [
+     "[FR]"
+    ],
+    "poster": null,
+    "medium": null,
+    "seasons": [],
+    "progress": {
+     "position": 4320.0,
+     "duration": 5940.0,
+     "watched": false,
+     "media_file_id": 7
+    }
+   }
+  }
+ },
+ "work-dvd": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "work",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 13,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/works/13": {
+    "id": 13,
+    "type": "film",
+    "title_fr": "Alien, le huitième passager",
+    "title_vo": "Alien",
+    "year": 1979,
+    "duration_min": 117,
+    "genres": [
+     "science-fiction",
+     "horreur"
+    ],
+    "directors": [
+     "Ridley Scott"
+    ],
+    "cast": [
+     "Tom Skerritt",
+     "Sigourney Weaver",
+     "Veronica Cartwright",
+     "Harry Dean Stanton",
+     "John Hurt",
+     "Ian Holm"
+    ],
+    "synopsis": "De retour d'une mission commerciale, l'équipage du cargo spatial Nostromo est tiré de son sommeil artificiel pour répondre à un signal venu d'une planète inconnue. L'un d'eux en rapporte, sans le savoir, un passager redoutable.",
+    "collections": [
+     {
+      "id": 4,
+      "name": "Les 1000 plus grands films de tous les temps [2020]",
+      "rank": null
+     }
+    ],
+    "media_files": [
+     {
+      "id": 20,
+      "quality": "DVD",
+      "present": false,
+      "volume_label": "Films 1",
+      "relpath": "x/20.mkv",
+      "audio_langs": null,
+      "subtitle_langs": null,
+      "width": null,
+      "height": null,
+      "duration_s": null
+     }
+    ],
+    "tags": [],
+    "poster": null,
+    "medium": "DVD",
+    "seasons": [],
+    "progress": null
+   }
+  }
+ },
+ "season-selected": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "season",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 30,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  }
+ },
+ "season-paused": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "season",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 30,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 30
+  },
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  },
+  "player": {
+   "current": {
+    "target_kind": "episode",
+    "target_id": 105,
+    "media_file_id": 305,
+    "season_id": 3,
+    "title": "Heroes — S01E05"
+   },
+   "state": {
+    "running": true,
+    "paused": true,
+    "position": 1394.0,
+    "duration": 2490.0
+   }
+  }
+ },
+ "preplay": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "preplay",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": null,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": 312,
+   "collection_id": null,
+   "audio_track": 1,
+   "subtitle_track": {
+    "kind": "embedded",
+    "index": 1
+   },
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 30
+  },
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  },
+  "player": {
+   "current": {
+    "target_kind": "episode",
+    "target_id": 105,
+    "media_file_id": 305,
+    "season_id": 3,
+    "title": "Heroes — S01E05"
+   },
+   "state": {
+    "running": true,
+    "paused": true,
+    "position": 1394.0,
+    "duration": 2490.0
+   }
+  }
  }
 }

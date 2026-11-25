@@ -2,6 +2,8 @@
    maquette « Remote-Control - 4a - Télé, vues miroir ».
    - renderView(view, pause) aiguille sur view.screen : accueil, parcourir, collection,
      recherche ; un écran inconnu se replie sur l'accueil miroir.
+   - Les fiches (œuvre, saison, version et pistes) chargent leurs données (sheetJson
+     d'app.js, gardées d'une vue à l'autre) : renderView renvoie alors une promesse.
    - Chaque vue porte le coin d'état (renderStateCorner) : horloge, ou vidéo en pause.
    Chargé après pause.js et avant app.js ; utilise esc, poster, ICON, KIND, NBSP, joinDot,
    fmtMinutes et differs d'app.js au moment du rendu. Les affiches gardent le même `src`
@@ -441,6 +443,188 @@ ${renderStateCorner(pause)}
 </div>`;
 }
 
+// -- fiches : œuvre, saison, version et pistes (maquette 4b) ------------------------------
+
+const PREPLAY_OPTIONS = 4; // choix visibles par colonne
+const NO_SUBTITLE = { kind: 'none' };
+let shownSheetKey = null; // fiche affichée (tenue à jour par app.js)
+
+const SHEET_ICON = {
+  film: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M7.5 3.5v17M16.5 3.5v17M3.5 8h4M3.5 12h4M3.5 16h4M16.5 8h4M16.5 12h4M16.5 16h4"/></svg>`,
+  audio: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg>`,
+  subtitles: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 12h3M13 12h4M7 15.5h6M15.5 15.5h1.5"/></svg>`,
+};
+
+/** Fiche montrée par une vue : même clé d'une vue à l'autre, la fiche est mise à jour
+    sur place (sans entrée animée ni rechargement). */
+function sheetKey(view) {
+  if (!view) return null;
+  if (view.screen === 'work') return `work:${view.work_id}`;
+  if (view.screen === 'season') return `season:${view.season_id}`;
+  if (view.screen === 'preplay') {
+    return view.episode_id != null ? `preplay:episode:${view.episode_id}` : `preplay:work:${view.work_id}`;
+  }
+  return null;
+}
+
+async function renderWorkView(view, pause, enter) {
+  return renderWork(await sheetJson(`/api/works/${view.work_id}`), { pause, enter });
+}
+
+async function renderSeasonView(view, pause, enter) {
+  let season;
+  let work;
+  if (view.work_id != null) {
+    [season, work] = await Promise.all([
+      sheetJson(`/api/seasons/${view.season_id}`), sheetJson(`/api/works/${view.work_id}`)]);
+  } else {
+    season = await sheetJson(`/api/seasons/${view.season_id}`);
+    work = await sheetJson(`/api/works/${season.work_id}`);
+  }
+  return renderSeason({ season, work },
+    { selectedId: view.episode_id ?? null, active: activeEpisode(), pause, enter });
+}
+
+/** Pistes choisies par défaut (copie de rc/probe.py default_selection) : audio français,
+    sinon la première piste avec des sous-titres français (fichier, puis intégrés). */
+function defaultTracks(t) {
+  if (!t.audio.length) return { audio: null, subtitle: NO_SUBTITLE };
+  const chosen = t.audio.find((a) => a.lang === 'fr') || t.audio[0];
+  if (chosen.lang === 'fr') return { audio: chosen.index, subtitle: NO_SUBTITLE };
+  const ext = t.external.find((e) => e.lang === 'fr');
+  if (ext) return { audio: chosen.index, subtitle: { kind: 'external', path: ext.path } };
+  const emb = t.subtitles.find((x) => x.lang === 'fr');
+  if (emb) return { audio: chosen.index, subtitle: { kind: 'embedded', index: emb.index } };
+  return { audio: chosen.index, subtitle: NO_SUBTITLE };
+}
+
+function sameSubtitle(a, b) {
+  const x = a || NO_SUBTITLE;
+  const y = b || NO_SUBTITLE;
+  if (x.kind !== y.kind) return false;
+  if (x.kind === 'embedded') return x.index === y.index;
+  if (x.kind === 'external') return x.path === y.path;
+  return true;
+}
+
+/** Badge d'un choix : « Par défaut », ou « Dernier choix » (choix enregistré, s'il
+    diffère du défaut). */
+function choiceBadge(isDefault, isLast) {
+  const text = isDefault ? 'Par défaut' : isLast ? 'Dernier choix' : '';
+  return text ? `<span class="ep-badge">${text}</span>` : '';
+}
+
+function preplayOption({ on, label, sub, badge }) {
+  return `<div class="pp-opt${on ? ' on' : ''}">
+<span class="pp-radio"></span>
+<span class="pp-opt-text"><span class="pp-opt-label">${esc(label)}</span>`
+    + `${sub ? `<span class="pp-opt-sub">${esc(sub)}</span>` : ''}</span>
+${badge}
+</div>`;
+}
+
+/** Colonne de choix : au plus PREPLAY_OPTIONS lignes, autour du choix retenu. */
+function preplayColumn(icon, label, options, note) {
+  const on = Math.max(0, options.findIndex((o) => o.on));
+  const start = Math.max(0, Math.min(on - 1, options.length - PREPLAY_OPTIONS));
+  const body = options.length
+    ? options.slice(start, start + PREPLAY_OPTIONS).map(preplayOption).join('')
+    : `<span class="pp-note">${esc(note)}</span>`;
+  return `<div class="pp-col">
+<span class="pp-label">${icon}${label}</span>
+${body}
+</div>`;
+}
+
+/** Cible de la vue « version et pistes » : titre, sous-titre, versions, progression. */
+async function preplayTarget(view) {
+  if (view.episode_id == null) {
+    const w = await sheetJson(`/api/works/${view.work_id}`);
+    return { title: w.title_fr, sub: [w.year, fmtMinutes(w.duration_min)], files: w.media_files, progress: w.progress };
+  }
+  // La vue d'un épisode ne porte que son identifiant : sa saison est celle de la
+  // dernière fiche de saison affichée qui le contient.
+  const seasonId = view.season_id ?? EPISODE_SEASON.get(view.episode_id);
+  if (seasonId == null) throw new Error(`épisode ${view.episode_id} : saison inconnue`);
+  const season = await sheetJson(`/api/seasons/${seasonId}`);
+  season.episodes.forEach((e) => EPISODE_SEASON.set(e.id, season.id));
+  const ep = season.episodes.find((e) => e.id === view.episode_id);
+  if (!ep) throw new Error(`épisode ${view.episode_id} absent de la saison ${seasonId}`);
+  const code = episodeCode({ season_number: season.number, number: ep.number });
+  return {
+    title: `${season.work.title_fr} · ${code}`,
+    sub: [ep.title, fmtMinutes(episodeMinutes(ep))],
+    files: ep.media_files,
+    progress: ep.progress,
+  };
+}
+
+/** Version et pistes : la version, l'audio et les sous-titres choisis sur le téléphone. */
+async function renderPreplayView(view, pause, enter) {
+  const target = await preplayTarget(view);
+  const versions = readableVersions(target.files);
+  const chosen = versions.find((m) => m.id === view.media_file_id) || versions[0] || null;
+  const tracks = chosen && chosen.present
+    ? await sheetJson(`/api/media/${chosen.id}/tracks`).catch(() => null) : null;
+  const lastVersion = target.progress ? target.progress.media_file_id : null;
+
+  const versionOpts = versions.map((m) => ({
+    on: m === chosen,
+    label: joinDot([m.quality, resolution(m)]),
+    sub: !m.present ? diskAbsentText(m.volume_label)
+      : versions.length === 1 ? 'Seule version disponible' : versionLangs(m).join(' · '),
+    badge: choiceBadge(m === versions[0], m.id === lastVersion),
+  }));
+
+  let audioOpts = [];
+  let subOpts = [];
+  if (tracks) {
+    const def = defaultTracks(tracks);
+    const last = tracks.default || {};
+    // Pistes du téléphone ; sans sous-titres envoyés, le téléphone a choisi « Aucun ».
+    const phoneSet = view.media_file_id != null || view.audio_track != null;
+    const audio = view.audio_track ?? last.audio;
+    const subtitle = view.subtitle_track || (phoneSet ? NO_SUBTITLE : last.subtitle);
+    const french = tracks.audio.some((a) => a.lang === 'fr');
+    audioOpts = tracks.audio.map((a) => ({
+      on: a.index === audio,
+      label: a.lang ? langLabel(a.lang) : `Piste ${a.index}`,
+      sub: a.lang && a.lang !== 'fr' ? 'Version originale' : a.lang === 'fr' && tracks.audio.length > 1 ? 'Version française' : '',
+      badge: choiceBadge(a.index === def.audio, a.index === last.audio && last.audio !== def.audio),
+    }));
+    const subChoice = (sel, label, sub) => ({
+      on: sameSubtitle(sel, subtitle),
+      label,
+      sub,
+      badge: choiceBadge(sameSubtitle(sel, def.subtitle),
+        sameSubtitle(sel, last.subtitle) && !sameSubtitle(last.subtitle, def.subtitle)),
+    });
+    subOpts = [
+      ...tracks.external.map((e) => subChoice({ kind: 'external', path: e.path },
+        e.lang ? langLabel(e.lang) : 'Sous-titres', 'Fichier à côté de la vidéo')),
+      ...tracks.subtitles.map((x) => subChoice({ kind: 'embedded', index: x.index },
+        x.lang ? langLabel(x.lang) : `Piste ${x.index}`, 'Piste intégrée')),
+      subChoice(NO_SUBTITLE, 'Aucun', ''),
+    ];
+  }
+  const note = !chosen ? 'Aucune version lisible'
+    : !chosen.present ? diskAbsentText(chosen.volume_label) : 'Pistes indisponibles';
+  const sub = target.sub.filter((x) => x !== null && x !== undefined && x !== '')
+    .map((x) => `<span>${esc(x)}</span>`).join('<span class="muted">·</span>');
+  return `<div class="screen view mv-preplay">
+${viewHead('VERSION ET PISTES', esc(target.title), { sub })}
+${renderStateCorner(pause)}
+<div class="mv-body${enter ? ' rc-enter' : ''}">
+<div class="pp-cols">
+${preplayColumn(SHEET_ICON.film(30), 'VERSION', versionOpts, note)}
+${preplayColumn(SHEET_ICON.audio(30), 'AUDIO', audioOpts, note)}
+${preplayColumn(SHEET_ICON.subtitles(30), 'SOUS-TITRES', subOpts, note)}
+</div>
+<div class="pp-hint">${ICON.phone(34)}Lancez la lecture depuis le téléphone</div>
+</div>
+</div>`;
+}
+
 // -- aiguillage -----------------------------------------------------------------------
 
 const VIEW_RENDERERS = {
@@ -450,8 +634,17 @@ const VIEW_RENDERERS = {
   search: renderSearchView,
 };
 
-/** Vue du téléphone ; `pause` non nul : vidéo en pause dans le coin d'état. */
+const SHEET_RENDERERS = {
+  work: renderWorkView,
+  season: renderSeasonView,
+  preplay: renderPreplayView,
+};
+
+/** Vue du téléphone ; `pause` non nul : vidéo en pause dans le coin d'état. Une fiche
+    renvoie une promesse ; elle n'est animée à l'entrée que si elle change. */
 function renderView(view, pause) {
   const v = view || {};
+  const sheet = SHEET_RENDERERS[v.screen];
+  if (sheet) return sheet(v, pause, sheetKey(v) !== shownSheetKey);
   return (VIEW_RENDERERS[v.screen] || renderHomeView)(v, pause);
 }

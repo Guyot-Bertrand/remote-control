@@ -79,6 +79,56 @@ function minutesFromPath(relpath) {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
+// Libellés de langue communs ; une autre langue s'affiche en code majuscule.
+const LANG_LABELS = {
+  fr: 'Français', en: 'Anglais', de: 'Allemand', es: 'Espagnol',
+  it: 'Italien', ja: 'Japonais', nl: 'Néerlandais', pt: 'Portugais',
+};
+
+/** « Anglais », ou « KO » pour une langue sans libellé. */
+function langLabel(code) {
+  return LANG_LABELS[code] || String(code || '').toUpperCase();
+}
+
+/** « ST français », « ST anglais », « ST KO ». */
+function subtitleLabel(code) {
+  return `ST ${LANG_LABELS[code] ? LANG_LABELS[code].toLowerCase() : String(code || '').toUpperCase()}`;
+}
+
+/** Langues audio d'une version : « Français », « FR · VO » ou « Anglais ». */
+function audioSummary(langs) {
+  if (!langs || !langs.length) return '';
+  if (langs.includes('fr')) return langs.length > 1 ? 'FR · VO' : langLabel('fr');
+  return langs.map(langLabel).join(' · ');
+}
+
+/** Sous-titres d'une version : « ST français » s'il y en a, sinon la première langue. */
+function subtitleSummary(langs) {
+  if (!langs || !langs.length) return '';
+  return subtitleLabel(langs.includes('fr') ? 'fr' : langs[0]);
+}
+
+/** Pastilles de langue d'une version analysée (audio, puis sous-titres). */
+function versionLangs(m) {
+  return [audioSummary(m.audio_langs), subtitleSummary(m.subtitle_langs)].filter(Boolean);
+}
+
+/** « 1920 × 1080 » (vide tant que le fichier n'est pas analysé). */
+function resolution(m) {
+  return m.width && m.height ? `${m.width}${NBSP}×${NBSP}${m.height}` : '';
+}
+
+/** Versions lisibles, la version jouée par défaut d'abord (copie de l'ordre de
+    rc/player/session.py _choose_version : disque branché, puis meilleure qualité). */
+function readableVersions(files) {
+  return (files || []).filter((m) => READABLE.includes(m.quality))
+    .sort((a, b) => (!a.present - !b.present) || READABLE.indexOf(a.quality) - READABLE.indexOf(b.quality));
+}
+
+function diskAbsentText(label) {
+  return label ? `Disque «${NBSP}${label}${NBSP}» non branché` : 'Disque non branché';
+}
+
 function posterUrl(hash) {
   return `/api/assets/${encodeURIComponent(hash)}/tv.jpg`;
 }
@@ -200,10 +250,32 @@ ${recent.length ? `<div class="recent"><span class="recent-head">VU RÉCEMMENT</
 </div></div></div>`;
 }
 
-/** Fiche d'une œuvre. */
-function renderWork(w) {
-  const files = w.media_files || [];
-  const readable = files.filter((m) => READABLE.includes(m.quality));
+const VERSION_ROWS = 3; // lignes de pastilles (une par version) au plus
+
+/** Pastille de qualité, avec la résolution quand le fichier est analysé. */
+function qualityPill(m) {
+  const res = resolution(m);
+  return `<span class="pill pill-quality">${esc(m.quality)}`
+    + (res ? `<span class="pill-sep"></span><span class="pill-res">${res}</span>` : '') + '</span>';
+}
+
+/** Une ligne de pastilles par version : qualité et résolution, langues audio, sous-titres.
+    Sans langue connue par l'analyse, elles viennent des étiquettes [FR]/[VO] de l'œuvre. */
+function versionPills(w, readable) {
+  const langPill = (l) => `<span class="pill pill-lang">${esc(l)}</span>`;
+  const analysed = readable.some((m) => (m.audio_langs || []).length);
+  const tagLangs = analysed ? [] : [...new Set((w.tags || []).map((t) => LANG_TAGS[t]).filter(Boolean))];
+  const rows = readable.map((m, i) => qualityPill(m)
+    + versionLangs(m).map(langPill).join('') + (i === 0 ? tagLangs.map(langPill).join('') : ''));
+  if (!rows.length) rows.push(tagLangs.map(langPill).join(''));
+  return [...new Set(rows.filter(Boolean))].slice(0, VERSION_ROWS)
+    .map((r) => `<div class="pills">${r}</div>`).join('');
+}
+
+/** Fiche d'une œuvre ; `pause` : vidéo en pause dans le coin d'état ; `enter` : entrée
+    animée (pas lors d'une mise à jour de la même fiche). */
+function renderWork(w, { pause = null, enter = true } = {}) {
+  const readable = readableVersions(w.media_files);
   const title = w.title_fr;
   const titleCls = title.length > 50 ? 'very-long' : title.length > 22 ? 'long' : '';
   const genres = (w.genres || []).map(capitalize).join(', ');
@@ -211,11 +283,11 @@ function renderWork(w) {
 
   let status = '';
   if (!readable.length) {
-    status = `<div class="status status-off">${ICON.disc(38)}Non numérisé</div>`;
+    const text = joinDot(['Non numérisé', w.medium]);
+    status = `<div class="status status-off">${ICON.disc(38)}${esc(text)}</div>`;
   } else if (!readable.some((m) => m.present)) {
     const label = (readable.find((m) => m.volume_label) || {}).volume_label;
-    const text = label ? `Disque «${NBSP}${label}${NBSP}» non branché` : 'Disque non branché';
-    status = `<div class="status status-warn">${ICON.drive(38)}${esc(text)}</div>`;
+    status = `<div class="status status-warn">${ICON.drive(38)}${esc(diskAbsentText(label))}</div>`;
   }
 
   let progress = '';
@@ -232,16 +304,14 @@ function renderWork(w) {
   const colls = (w.collections || []).slice(0, 3).map((c) => (
     `<div class="coll"><span class="coll-rank">${c.rank ? `n°${NBSP}${esc(c.rank)}` : '—'}</span>`
     + `<span>${esc(c.name)}</span></div>`)).join('');
-  const qualities = READABLE.filter((q) => readable.some((m) => m.quality === q));
-  const langs = (w.tags || []).map((t) => LANG_TAGS[t]).filter(Boolean);
-  const pills = qualities.map((q) => `<span class="pill pill-quality">${q}</span>`).join('')
-    + [...new Set(langs)].map((l) => `<span class="pill pill-lang">${esc(l)}</span>`).join('');
+  const pills = versionPills(w, readable);
   const directors = (w.directors || []).join(', ');
 
   return `<div class="screen work">
 ${poster(w.poster, title, w.year)}
-<div class="work-info rc-enter">
-<div>
+${renderStateCorner(pause)}
+<div class="work-info${enter ? ' rc-enter' : ''}">
+<div class="work-head">
 <span class="overline">${esc((KIND[w.type] || w.type || '').toUpperCase())}</span>
 <h1 class="work-title ${titleCls}">${esc(title)}</h1>
 ${differs(w.title_vo, title) ? `<div class="work-vo">${esc(w.title_vo)}</div>` : ''}
@@ -255,71 +325,126 @@ ${w.synopsis ? `<p class="synopsis">${esc(w.synopsis)}</p>` : ''}
 ${cast.length ? `<div class="cast"><span class="muted">Avec </span>${esc(cast.join(', '))}</div>` : ''}
 <div class="work-foot">
 ${colls ? `<div class="colls">${colls}</div>` : ''}
-${pills ? `<div class="pills">${pills}</div>` : ''}
+${pills ? `<div class="versions">${pills}</div>` : ''}
 </div></div></div>`;
 }
 
-/** Disposition de la liste d'épisodes : colonnes et hauteur de ligne selon leur nombre. */
+// Saison (maquette 4b) : trois colonnes de huit lignes sous l'en-tête et le coin d'état.
+const EPISODE_COLS = 3;
+const EPISODE_ROW_H = 76;
+const EPISODE_GAP = 8;
+const EPISODE_ROOM = 1080 - 348 - 64;
+const EPISODE_SEASON = new Map(); // épisode -> saison, pour la vue « version et pistes »
+
+/** Hauteur des lignes : 76 px jusqu'à 24 épisodes, plus basses au-delà. */
 function episodeLayout(n) {
-  const cols = n <= 7 ? 1 : n <= 16 ? 2 : 3;
-  const rows = Math.max(1, Math.ceil(n / cols));
-  const gap = cols === 1 ? 10 : 8;
-  const avail = 1080 - 2 * 64 - 70 - 28; // sous l'en-tête « Saison n » (70 px) et son écart
-  const height = Math.min(cols === 1 ? 116 : 100, Math.floor((avail - (rows - 1) * gap) / rows));
-  return { cols, rows, gap, height };
+  const rows = Math.max(1, Math.ceil(n / EPISODE_COLS));
+  const height = Math.min(EPISODE_ROW_H, Math.floor((EPISODE_ROOM - (rows - 1) * EPISODE_GAP) / rows));
+  return { rows, height };
 }
 
-/** Fiche d'une saison : data = { season, work } (/api/seasons/{id} et /api/works/{id}). */
-function renderSeason({ season, work }) {
+/** Durée d'un épisode en minutes : analyse, sinon progression, sinon nom du fichier. */
+function episodeMinutes(e) {
+  if (e.duration_min != null) return e.duration_min;
+  const p = e.progress;
+  if (p && p.duration) return p.duration / 60;
+  return minutesFromPath(((e.media_files || [])[0] || {}).relpath);
+}
+
+/** « À suivre » : l'épisode mis en avant par le serveur ; le suivant s'il est déjà vu
+    ou s'il est celui en cours de lecture. */
+function nextEpisodeId(eps, highlightId, activeId) {
+  const i = eps.findIndex((e) => e.id === highlightId);
+  if (i < 0) return null;
+  const e = eps[i];
+  const done = (e.progress && e.progress.watched) || e.id === activeId;
+  if (!done) return e.id;
+  return i + 1 < eps.length ? eps[i + 1].id : null;
+}
+
+/** Marque d'épisode (pastille). */
+function episodeBadge(kind) {
+  if (kind === 'selected') return `<span class="ep-badge ep-badge-selected">${ICON.phone(22)}Sélectionné</span>`;
+  if (kind === 'next') return `<span class="ep-badge">${ICON.play(20)}À suivre</span>`;
+  if (kind === 'paused') return `<span class="ep-badge ep-badge-paused">${pauseIcon(20)}En pause</span>`;
+  return '<span class="ep-badge">En cours</span>';
+}
+
+/** Langues des fichiers de la saison : « Anglais · ST français ». */
+function seasonLangs(eps) {
+  const audio = [];
+  const subs = [];
+  for (const e of eps) {
+    for (const m of e.media_files || []) {
+      (m.audio_langs || []).forEach((l) => { if (!audio.includes(l)) audio.push(l); });
+      (m.subtitle_langs || []).forEach((l) => { if (!subs.includes(l)) subs.push(l); });
+    }
+  }
+  return joinDot([audioSummary(audio), subtitleSummary(subs)]);
+}
+
+/** Fiche d'une saison : data = { season, work } (/api/seasons/{id} et /api/works/{id}).
+    Marques : `selectedId` (épisode montré par le téléphone), « À suivre », et l'épisode
+    en lecture ou en pause (`active` : { id, paused }). */
+function renderSeason({ season, work }, { selectedId = null, active = null, pause = null, enter = true } = {}) {
   const eps = season.episodes || [];
+  eps.forEach((e) => EPISODE_SEASON.set(e.id, season.id));
+  const activeId = active ? active.id : null;
+  const nextId = nextEpisodeId(eps, season.highlight_episode_id, activeId);
   const seenCount = eps.filter((e) => e.progress && e.progress.watched).length;
   const L = episodeLayout(eps.length);
-  const cls = [L.cols > 1 ? 'compact' : '', L.cols > 2 || L.height < 84 ? 'dense' : ''].join(' ');
+  const cls = L.height < 60 ? ' dense' : '';
   const rows = eps.map((e) => {
     const p = e.progress;
     const seen = !!(p && p.watched);
     const started = isResumable(p);
-    const isCurrent = e.id === season.highlight_episode_id;
-    const file = (e.media_files || [])[0];
-    const minutes = p && p.duration ? p.duration / 60 : minutesFromPath(file && file.relpath);
-    let badge = '';
-    if (isCurrent && started) badge = '<span class="ep-badge">En cours</span>';
-    else if (isCurrent && !p) badge = '<span class="ep-badge">À suivre</span>';
-    let bar = '';
-    if (started) {
-      const pct = p.duration ? Math.min(100, Math.round((p.position / p.duration) * 100)) : 0;
-      const left = p.duration ? `<span class="ep-left">reste ${fmtPosition(p.duration - p.position)}</span>` : '';
-      bar = `<div class="ep-progress"><span class="bar"><span style="width:${pct}%"></span></span>${left}</div>`;
-    }
-    return `<div class="ep${seen ? ' seen' : ''}${isCurrent ? ' current' : ''}">`
+    const flags = { selected: e.id === selectedId, next: e.id === nextId, active: e.id === activeId };
+    let dur = fmtMinutes(episodeMinutes(e));
+    if (started && p.duration) dur = joinDot([dur, `reste ${Math.max(0, Math.round((p.duration - p.position) / 60))}`]);
+    let mark = '';
+    if (flags.selected) mark = `<span class="ep-mark ep-mark-selected">${ICON.phone(30)}</span>`;
+    else if (flags.active) mark = `<span class="ep-mark ep-mark-active">${active.paused ? pauseIcon(28) : ICON.play(28)}</span>`;
+    else if (flags.next) mark = `<span class="ep-mark ep-mark-next">${ICON.play(28)}</span>`;
+    else if (seen) mark = `<span class="ep-mark">${ICON.check(28)}</span>`;
+    const pct = started && p.duration ? Math.min(100, Math.round((p.position / p.duration) * 100)) : 0;
+    const rowCls = ['ep', seen && 'seen', flags.next && 'next', flags.selected && 'selected'].filter(Boolean).join(' ');
+    return `<div class="${rowCls}"><div class="ep-line">`
       + `<span class="ep-num">${e.number}</span>`
-      + `<div class="ep-body"><div class="ep-line"><span class="ep-title">${esc(e.title || `Épisode ${e.number}`)}</span>${badge}</div>${bar}</div>`
-      + `<span class="ep-dur">${fmtMinutes(minutes)}</span>`
-      + `<span class="ep-mark">${seen ? ICON.check(34) : ''}</span></div>`;
+      + `<span class="ep-title">${esc(e.title || `Épisode ${e.number}`)}</span>`
+      + (dur ? `<span class="ep-dur">${esc(dur)}</span>` : '') + mark + '</div>'
+      + (pct ? `<span class="ep-bar"><span style="width:${pct}%"></span></span>` : '') + '</div>';
   }).join('');
+
+  const byId = (id) => eps.find((e) => e.id === id);
+  const markLine = (kind, e) => (e ? `<span class="season-mark">${episodeBadge(kind)}`
+    + `<span class="season-mark-ep">${esc(`${e.number} · ${e.title || `Épisode ${e.number}`}`)}</span></span>` : '');
+  const marks = markLine(active && active.paused ? 'paused' : 'playing', byId(activeId))
+    + markLine('next', byId(nextId)) + markLine('selected', byId(selectedId));
+
   const w = work;
-  const titleCls = w.title_fr.length > 24 ? 'long' : '';
+  const plural = (n, word) => `${n}${NBSP}${word}${n > 1 ? 's' : ''}`;
   const sideMeta = [
     joinDot([w.year, (w.genres || []).map(capitalize).join(', ')]),
     (w.directors || []).join(', '),
+    seasonLangs(eps),
   ].filter(Boolean).map(esc).join('<br>');
-  const plural = (n, word) => `${n}${NBSP}${word}${n > 1 ? 's' : ''}`;
   return `<div class="screen season">
 <div class="season-side">
 ${poster(w.poster, w.title_fr, w.year)}
-<div class="season-heading">
 <span class="overline">${esc((KIND[w.type] || w.type || '').toUpperCase())}</span>
-<h1 class="season-work ${titleCls}">${esc(w.title_fr)}</h1>
-</div>
 ${sideMeta ? `<span class="season-meta">${sideMeta}</span>` : ''}
-${w.synopsis ? `<p class="season-synopsis">${esc(w.synopsis)}</p>` : ''}
 </div>
-<div class="season-main rc-enter">
+<div class="season-head">
+<h1 class="season-work${w.title_fr.length > 24 ? ' long' : ''}">${esc(w.title_fr)}</h1>
 <div class="season-top">
 <h2 class="season-label">${esc(season.label)}</h2>
 <span class="season-count">${plural(eps.length, 'épisode')} · ${plural(seenCount, 'vu')}</span>
 </div>
-<div class="episodes ${cls}" style="grid-template-columns:repeat(${L.cols},minmax(0,1fr));grid-template-rows:repeat(${L.rows},${L.height}px);row-gap:${L.gap}px">${rows}</div>
+${marks ? `<div class="season-marks">${marks}</div>` : ''}
+</div>
+${renderStateCorner(pause)}
+<div class="season-main${enter ? ' rc-enter' : ''}">
+<div class="episodes${cls}" style="grid-template-rows:repeat(${L.rows},${L.height}px)">${rows}</div>
 </div></div>`;
 }
 
@@ -399,10 +524,33 @@ function renderMessage({ message }) {
 
 // -- chargement et affichage ----------------------------------------------------
 
+let fetchOverride = null; // aperçu : données de fiche lues dans dev/preview.json
+
 async function getJson(url) {
+  if (fetchOverride) return fetchOverride(url);
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`${url} : ${r.status}`);
   return r.json();
+}
+
+// Fiches des vues du téléphone, gardées d'une vue à l'autre (épisode sélectionné, pistes) :
+// pas de rechargement ; vidées dès que la télé quitte les vues et à chaque import.
+const sheetCache = new Map();
+
+function sheetJson(url) {
+  if (!sheetCache.has(url)) {
+    const p = getJson(url);
+    sheetCache.set(url, p);
+    p.catch(() => sheetCache.delete(url));
+  }
+  return sheetCache.get(url);
+}
+
+/** Épisode en lecture ou en pause : { id, paused }, sinon null. */
+function activeEpisode() {
+  const cur = current;
+  if (!cur || cur.target_kind !== 'episode' || !playerState || !playerState.running) return null;
+  return { id: cur.target_id, paused: !!playerState.paused };
 }
 
 function mount(html) {
@@ -479,7 +627,7 @@ async function load(state) {
     case 'season': {
       const [season, work] = await Promise.all([
         getJson(`/api/seasons/${state.season_id}`), getJson(`/api/works/${state.work_id}`)]);
-      return renderSeason({ season, work });
+      return renderSeason({ season, work }, { active: activeEpisode() });
     }
     case 'playing': {
       const cur = current;
@@ -492,7 +640,7 @@ async function load(state) {
     case 'message':
       return renderMessage({ message: state.message });
     case 'view':
-      return renderView(state.view, state.pause);
+      return await renderView(state.view, state.pause);
     case 'paused':
       if (state.pause) return renderPausedFull(state.pause);
     // falls through : plein écran sans pause, on retombe sur la veille
@@ -509,12 +657,15 @@ async function load(state) {
 async function show(state) {
   const my = ++seq;
   clearTimeout(homeTimer);
+  if (state.screen !== 'view') sheetCache.clear();
   let html;
+  let failed = false;
   try {
     html = await load(state);
   } catch (err) {
     console.warn('écran télé :', err);
     html = renderMessage({ message: MSG_SHEET_UNAVAILABLE });
+    failed = true;
   }
   if (my !== seq) return;
   if (state.screen === 'paused' && shown === 'paused' && refreshPausedFull(stage, state.pause)) {
@@ -522,6 +673,7 @@ async function show(state) {
   } else if (state.screen === shown && FADE_SCREENS.has(shown)) mountFade(html);
   else mount(html);
   shown = state.screen;
+  shownSheetKey = state.screen === 'view' && !failed ? sheetKey(state.view) : null;
   if (state.screen === 'playing') updateProgress(true);
   if (state.screen === 'home') {
     homeTimer = setTimeout(() => { homeTurn += 1; show(tv); }, HOME_ROTATE_MS);
@@ -559,6 +711,7 @@ function connect() {
         updatePause(stage, playerState);
       }
     } else if (msg.type === 'catalog' && tv.screen !== 'playing') {
+      sheetCache.clear();
       show(tv); // fiches rechargées après chaque import
     }
   };
@@ -567,10 +720,26 @@ function connect() {
 
 // -- aperçu de développement : ?preview=<nom> (dev/preview.json), sans WebSocket ----
 
+/** Un aperçu est un état télé, avec en plus, facultatifs : `fetch` (réponses de l'API
+    par adresse, à la place du serveur) et `player` ({ current, state }). */
 async function preview(name) {
-  window.rcShow = (state) => { tv = state; show(tv); };
+  window.rcShow = (state) => {
+    const { fetch: answers, player, ...rest } = state;
+    if (answers) {
+      fetchOverride = async (url) => {
+        if (!(url in answers)) throw new Error(`${url} : absent de l'aperçu`);
+        return structuredClone(answers[url]);
+      };
+    }
+    if (player) {
+      current = player.current;
+      playerState = player.state;
+    }
+    tv = rest;
+    show(tv);
+  };
   try {
-    const states = await getJson('dev/preview.json');
+    const states = await (await fetch('dev/preview.json', { cache: 'no-store' })).json();
     if (!states[name]) throw new Error(`aperçu inconnu : ${name}`);
     window.rcShow(states[name]);
   } catch (err) {
