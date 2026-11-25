@@ -21,12 +21,14 @@ const STAGED = new Set(['theatre', 'spectacle']); // « Mise en scène » plutô
 const LANG_TAGS = { '[FR]': 'Français', '[VO]': 'VO' };
 
 const stage = document.getElementById('stage');
-let tv = { screen: 'home', work_id: null, season_id: null, message: null };
+let tv = { screen: 'home', work_id: null, season_id: null, message: null, view: null, pause: null };
 let current = null; // lecture en cours (player.current), pour le titre de l'écran « playing »
 let playerState = null; // dernier état du lecteur (position, durée, pause)
 let seq = 0; // jeton de rendu : une réponse arrivée après un changement d'écran est ignorée
 let homeTurn = 0;
 let homeTimer = null;
+let shown = null; // écran actuellement monté (state.screen)
+const FADE_SCREENS = new Set(['view', 'paused']); // même écran : fondu, affiches conservées
 
 // -- mise à l'échelle du canevas ------------------------------------------
 
@@ -408,6 +410,41 @@ function mount(html) {
   guardPosters(stage);
 }
 
+/** Reprend dans `next` les images déjà chargées de l'écran affiché (même adresse) :
+    les affiches et l'image de pause ne sont ni rechargées ni redessinées. */
+function keepImages(next) {
+  const old = new Map();
+  stage.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src');
+    if (src && !old.has(src)) old.set(src, img);
+  });
+  next.querySelectorAll('img').forEach((img) => {
+    const prev = old.get(img.getAttribute('src'));
+    if (!prev) return;
+    old.delete(img.getAttribute('src'));
+    for (const { name, value } of [...img.attributes]) {
+      if (name !== 'src') prev.setAttribute(name, value);
+    }
+    img.replaceWith(prev);
+  });
+}
+
+/** Remplace l'écran par un fondu d'opacité (200 ms) au-dessus de l'ancien. */
+function mountFade(html) {
+  const tpl = document.createElement('template'); // contenu inerte : aucune image chargée
+  tpl.innerHTML = html.trim();
+  const next = tpl.content.firstElementChild;
+  guardPosters(next);
+  keepImages(next);
+  next.classList.add('screen-fade');
+  next.addEventListener('animationend', (ev) => {
+    if (ev.target !== next) return;
+    next.classList.remove('screen-fade');
+    while (next.previousElementSibling) next.previousElementSibling.remove(); // pas un écran plus récent
+  });
+  stage.appendChild(next);
+}
+
 async function load(state) {
   switch (state.screen) {
     case 'work':
@@ -427,6 +464,11 @@ async function load(state) {
     }
     case 'message':
       return renderMessage({ message: state.message });
+    case 'view':
+      return renderView(state.view, state.pause);
+    case 'paused':
+      if (state.pause) return renderPausedFull(state.pause);
+    // falls through : plein écran sans pause, on retombe sur la veille
     default: {
       const home = await getJson('/api/tv/home').catch(() => ({ recent: [], showcase: null }));
       const both = home.recent.length && home.showcase;
@@ -448,7 +490,9 @@ async function show(state) {
     html = renderMessage({ message: MSG_SHEET_UNAVAILABLE });
   }
   if (my !== seq) return;
-  mount(html);
+  if (state.screen === shown && FADE_SCREENS.has(shown)) mountFade(html);
+  else mount(html);
+  shown = state.screen;
   if (state.screen === 'playing') updateProgress(true);
   if (state.screen === 'home') {
     homeTimer = setTimeout(() => { homeTurn += 1; show(tv); }, HOME_ROTATE_MS);
@@ -482,6 +526,8 @@ function connect() {
         show(tv);
       } else if (tv.screen === 'playing') {
         updateProgress(false);
+      } else if (tv.pause) {
+        updatePause(stage, playerState);
       }
     } else if (msg.type === 'catalog' && tv.screen !== 'playing') {
       show(tv); // fiches rechargées après chaque import
@@ -490,5 +536,21 @@ function connect() {
   ws.onclose = () => setTimeout(connect, RECONNECT_MS);
 }
 
+// -- aperçu de développement : ?preview=<nom> (dev/preview.json), sans WebSocket ----
+
+async function preview(name) {
+  window.rcShow = (state) => { tv = state; show(tv); };
+  try {
+    const states = await getJson('dev/preview.json');
+    if (!states[name]) throw new Error(`aperçu inconnu : ${name}`);
+    window.rcShow(states[name]);
+  } catch (err) {
+    console.warn('aperçu télé :', err);
+    mount(renderMessage({ message: `Aperçu «${NBSP}${name}${NBSP}» introuvable` }));
+  }
+}
+
 mount(renderHome({ recent: [], showcase: null, variant: 'recent' }));
-connect();
+const previewName = new URLSearchParams(location.search).get('preview');
+if (previewName) preview(previewName);
+else connect();

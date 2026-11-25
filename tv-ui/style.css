@@ -279,6 +279,85 @@ svg { flex-shrink: 0; display: block; }
 .playing-paused.on { opacity: 1; }
 .playing-hint { display: flex; align-items: center; gap: 14px; margin-top: 36px; font-size: var(--tv-fs-small); color: var(--rc-text-3); }
 
+/* -- transition entre deux états du même écran ------------------------- */
+
+@keyframes rc-fade { from { opacity: 0; } to { opacity: 1; } }
+.screen-fade { position: absolute; top: 0; left: 0; animation: rc-fade 200ms ease-out both; }
+
+/* -- coin d'état : horloge, ou vidéo en pause (448×252, en haut à droite) -- */
+
+.state-corner {
+  position: absolute; top: var(--tv-safe-y); right: var(--tv-safe-x); width: 448px; height: 252px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2);
+}
+.corner-clock { font-family: var(--rc-font-display); font-weight: 300; font-size: 96px; line-height: 1; }
+.corner-date, .corner-ready { font-size: 28px; color: var(--rc-text-2); }
+.corner-ready { display: flex; align-items: center; gap: var(--sp-3); }
+.corner-ready .ready-dot { width: 14px; height: 14px; }
+.corner-paused { display: block; border-radius: var(--r-m); overflow: hidden; background: var(--rc-black); }
+.corner-art { position: absolute; inset: 0; }
+.corner-art img, .paused-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.corner-info {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 18px;
+  display: flex; align-items: center; gap: 15px; background: rgba(10, 9, 8, .88);
+}
+.corner-badge {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--rc-accent); color: var(--rc-on-accent);
+}
+.corner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 26px; }
+.corner-title { font-weight: 600; color: var(--rc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.corner-time { color: var(--rc-text-2); font-variant-numeric: tabular-nums; }
+.corner-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(216, 162, 74, .25); }
+.corner-bar > span, .paused-bar > span {
+  display: block; height: 100%; background: var(--rc-accent); transform-origin: 0 50%;
+}
+
+/* -- plein écran en pause (télécommande ouverte) --------------------------- */
+
+/* Dérive très lente de l'image, 120 s aller-retour, pour ne pas marquer l'écran. */
+@keyframes rc-pause-drift {
+  from { transform: translate(-16px, -10px); }
+  to { transform: translate(16px, 10px); }
+}
+.paused-full { background: var(--rc-black); }
+.paused-art {
+  position: absolute; inset: -24px; opacity: .78;
+  animation: rc-pause-drift 60s ease-in-out infinite alternate;
+}
+.paused-shade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 520px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, .92) 0%, rgba(0, 0, 0, .6) 55%, rgba(0, 0, 0, 0) 100%);
+}
+.paused-info {
+  position: absolute; left: var(--tv-safe-x); right: var(--tv-safe-x); bottom: var(--tv-safe-y);
+  display: flex; flex-direction: column; gap: 30px;
+}
+.paused-row { display: flex; align-items: center; gap: 36px; }
+.paused-badge {
+  width: 128px; height: 128px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--rc-accent); color: var(--rc-on-accent);
+}
+.paused-text { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.paused-head { font-size: 28px; font-weight: 600; letter-spacing: .16em; color: var(--rc-accent-strong); }
+.paused-title {
+  font-family: var(--rc-font-display); font-weight: 500; font-size: 76px; line-height: 1.02; text-wrap: balance;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.paused-time {
+  margin-left: auto; align-self: flex-end; white-space: nowrap;
+  font-size: 44px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--rc-text);
+}
+.paused-bar { display: block; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(243, 236, 223, .18); }
+
+/* -- vue du téléphone (socle) ---------------------------------------------- */
+
+.view-head { position: absolute; left: var(--tv-safe-x); top: var(--tv-safe-y); right: 600px; display: flex; flex-direction: column; gap: var(--sp-4); }
+.view-title { font-family: var(--rc-font-display); font-weight: 500; font-size: var(--tv-fs-hero); line-height: 1.05; }
+.view-sub { font-size: var(--tv-fs-meta); color: var(--rc-text-2); }
+
 /* -- JavaScript bloqué (contenu statique de index.html, retiré par app.js) -- */
 
 .nojs {
