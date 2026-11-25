@@ -1,12 +1,10 @@
 package fr.remotecontrol.player
 
-import fr.remotecontrol.net.ApiError
-import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.PlayerStateDto
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
-import fr.remotecontrol.testing.FakeRcApi
+import fr.remotecontrol.net.TvViewStateDto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,83 +20,71 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TvSheetTest {
-    private val api = FakeRcApi()
     private val events = MutableSharedFlow<ServerEvent>()
     private val status = TvStatus(events)
 
-    private fun shows() = api.calls.count { it == "tvShow(work,1)" }
-
     private fun idle(running: Boolean = false) = PlayerSnapshotDto(PlayerStateDto(running = running))
 
-    /** Fiche de l'œuvre 1, avec l'état de la télé suivi comme au premier plan. */
-    private fun TestScope.sheet(): TvSheet {
+    /** Fiche [screen] d'identifiant [id], avec l'état de la télé suivi comme au premier plan. */
+    private fun TestScope.sheet(screen: String = "work", id: Long = 12): TvSheet {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         backgroundScope.launch(dispatcher) { status.run() }
-        return TvSheet(CoroutineScope(backgroundScope.coroutineContext + dispatcher), api, status, "work", 1)
+        return TvSheet(CoroutineScope(backgroundScope.coroutineContext + dispatcher), status, screen, id)
     }
 
-    @Test fun shown_once_on_open() = runTest {
+    private fun viewState(screen: String, workId: Long? = null, seasonId: Long? = null) =
+        TvStateDto("view", view = TvViewStateDto(screen, workId = workId, seasonId = seasonId))
+
+    @Test fun on_tv_follows_view_state() = runTest {
         val s = sheet()
-        assertEquals(1, shows())
+        assertFalse(s.onTv.value)
+        events.emit(ServerEvent.Tv(viewState("work", workId = 12)))
+        assertTrue(s.onTv.value)
+        events.emit(ServerEvent.Tv(viewState("work", workId = 13)))
+        assertFalse(s.onTv.value)
+        events.emit(ServerEvent.Tv(viewState("browse")))
+        assertFalse(s.onTv.value)
+        // La fiche de saison montre aussi l'œuvre 12 : ce n'est pas cette fiche-ci.
+        events.emit(ServerEvent.Tv(viewState("season", workId = 12, seasonId = 4)))
+        assertFalse(s.onTv.value)
+        events.emit(ServerEvent.Tv(TvStateDto("playing")))
+        assertFalse(s.onTv.value)
+    }
+
+    @Test fun on_tv_for_season_matches_season_id() = runTest {
+        val s = sheet("season", 4)
+        events.emit(ServerEvent.Tv(viewState("season", workId = 12, seasonId = 4)))
+        assertTrue(s.onTv.value)
+        events.emit(ServerEvent.Tv(viewState("season", workId = 12, seasonId = 5)))
+        assertFalse(s.onTv.value)
+    }
+
+    @Test fun on_tv_supports_iteration1_state() = runTest {
+        val s = sheet()
+        events.emit(ServerEvent.Tv(TvStateDto("work", workId = 12)))
+        assertTrue(s.onTv.value)
+        events.emit(ServerEvent.Tv(TvStateDto("season", seasonId = 12)))
+        assertFalse(s.onTv.value)
+        events.emit(ServerEvent.Tv(TvStateDto("message", message = "panne")))
+        assertFalse(s.onTv.value)
+    }
+
+    @Test fun state_known_at_opening_counts() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        backgroundScope.launch(dispatcher) { status.run() }
+        events.emit(ServerEvent.Hello(3, viewState("work", workId = 12), idle()))
+        val s = TvSheet(CoroutineScope(backgroundScope.coroutineContext + dispatcher), status, "work", 12)
         assertTrue(s.onTv.value)
     }
 
-    @Test fun live_tv_events_drive_the_label() = runTest {
-        val s = sheet()
-        events.emit(ServerEvent.Tv(TvStateDto("season", seasonId = 4)))
-        assertFalse(s.onTv.value)
-        events.emit(ServerEvent.Tv(TvStateDto("work", workId = 1)))
+    @Test fun offline_is_not_on_tv() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val job = launch(dispatcher) { status.run() }
+        val s = TvSheet(CoroutineScope(backgroundScope.coroutineContext + dispatcher), status, "work", 12)
+        events.emit(ServerEvent.Tv(viewState("work", workId = 12)))
         assertTrue(s.onTv.value)
-        events.emit(ServerEvent.Tv(TvStateDto("error", message = "panne")))
+        job.cancel()
         assertFalse(s.onTv.value)
-        events.emit(ServerEvent.Tv(TvStateDto("work", workId = 2)))
-        assertFalse(s.onTv.value)
-    }
-
-    @Test fun offline_open_then_hello_matches() = runTest {
-        api.tvShowResult = ApiResult.Err(ApiError.Unreachable)
-        val s = sheet()
-        assertFalse(s.onTv.value)
-        events.emit(ServerEvent.Hello(3, TvStateDto("work", workId = 1), idle()))
-        assertTrue(s.onTv.value)
-    }
-
-    @Test fun first_resume_does_not_resend() = runTest {
-        val s = sheet()
-        s.onScreenResumed()
-        assertEquals(1, shows())
-    }
-
-    @Test fun resume_resends_once_when_tv_drifted_and_idle() = runTest {
-        val s = sheet()
-        s.onScreenResumed()
-        events.emit(ServerEvent.Hello(3, TvStateDto("season", seasonId = 4), idle()))
-        assertFalse(s.onTv.value)
-        s.onScreenResumed()
-        assertEquals(2, shows())
-        assertTrue(s.onTv.value)
-        // Sans nouvel écart signalé, pas de nouvel envoi au retour suivant tant que la télé suit.
-        events.emit(ServerEvent.Tv(TvStateDto("work", workId = 1)))
-        s.onScreenResumed()
-        assertEquals(2, shows())
-    }
-
-    @Test fun resume_does_not_resend_while_playing() = runTest {
-        val s = sheet()
-        s.onScreenResumed()
-        events.emit(ServerEvent.Hello(3, TvStateDto("player"), idle(running = true)))
-        s.onScreenResumed()
-        assertEquals(1, shows())
-        events.emit(ServerEvent.Player(idle(running = false)))
-        s.onScreenResumed()
-        assertEquals(2, shows())
-    }
-
-    @Test fun resume_does_nothing_when_tv_state_unknown() = runTest {
-        val s = sheet()
-        s.onScreenResumed()
-        s.onScreenResumed()
-        assertEquals(1, shows())
     }
 
     @Test fun status_forgotten_when_stopped() = runTest {
@@ -108,6 +94,5 @@ class TvSheetTest {
         assertEquals(TvStateDto("home"), status.tv.value)
         job.cancel()
         assertNull(status.tv.value)
-        assertNull(status.playing.value)
     }
 }

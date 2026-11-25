@@ -20,7 +20,11 @@ class SyncWriter(
     private val db: AppDatabase,
     private val afterUpserts: suspend () -> Unit = {},
 ) {
-    suspend fun apply(dto: SyncDto) {
+    /**
+     * Les œuvres sont écrites par paquets de [WORK_BATCH], dans la même transaction ; [onProgress] reçoit le
+     * nombre d'œuvres écrites et le total (`total_works`, sinon le nombre d'œuvres de la réponse).
+     */
+    suspend fun apply(dto: SyncDto, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }) {
         val dao = db.syncDao()
         db.withTransaction {
             if (dto.full) dao.clearCatalog()
@@ -32,13 +36,17 @@ class SyncWriter(
             dao.deleteMediaFiles(d.mediaFile)
             dao.deleteCollections(d.collection)
 
-            dao.upsertWorks(dto.works.map { it.toEntity() })
-            dao.upsertFts(dto.works.map { WorkFtsEntity(it.id, ftsText(it)) })
+            val total = dto.totalWorks ?: dto.works.size
+            dto.works.chunked(WORK_BATCH).forEachIndexed { i, batch ->
+                dao.upsertWorks(batch.map { it.toEntity() })
+                dao.upsertFts(batch.map { WorkFtsEntity(it.id, ftsText(it)) })
+                onProgress(minOf((i + 1) * WORK_BATCH, dto.works.size), total)
+            }
             dao.upsertSeasons(dto.seasons.map { SeasonEntity(it.id, it.workId, it.number, it.label) })
-            dao.upsertEpisodes(dto.episodes.map { EpisodeEntity(it.id, it.seasonId, it.number, it.title) })
+            dao.upsertEpisodes(dto.episodes.map { EpisodeEntity(it.id, it.seasonId, it.number, it.title, it.durationMin) })
             dao.upsertMediaFiles(
                 dto.mediaFiles.map {
-                    MediaFileEntity(it.id, it.workId, it.episodeId, it.quality, it.size, it.relpath, it.volumeUuid, it.present)
+                    MediaFileEntity(it.id, it.workId, it.episodeId, it.quality, it.size, it.relpath, it.volumeUuid, it.present, it.audioLangs, it.subtitleLangs, it.width, it.height, it.durationS)
                 },
             )
             dao.upsertVolumes(dto.volumes.map { VolumeEntity(it.uuid, it.label, it.present) })
@@ -64,3 +72,5 @@ class SyncWriter(
         }
     }
 }
+
+private const val WORK_BATCH = 500

@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.EpisodeQuality
 import fr.remotecontrol.data.db.EpisodeRow
+import fr.remotecontrol.data.db.FileLanguages
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkEntity
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
-import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.live
 import fr.remotecontrol.player.playsEpisode
@@ -27,7 +27,8 @@ import fr.remotecontrol.player.sortQualities
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
-import fr.remotecontrol.ui.common.formatDuration
+import fr.remotecontrol.ui.common.episodeDurationLine
+import fr.remotecontrol.ui.common.languagePills
 import fr.remotecontrol.ui.common.remainingMinutes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -46,7 +47,7 @@ import kotlin.math.roundToInt
  * [progress] : avancement d'un épisode entamé (barre de la carte), nul sinon.
  * [highlighted] : épisode à suivre ou en cours (règle de la fiche) ; [selected] : épisode déplié en carte,
  * par défaut celui mis en évidence, sinon celui touché dans la liste.
- * [details] : « 24 min · reste 19 min » (durée connue, reste si entamé) ; [qualities] : qualités de ses fichiers.
+ * [durationLine] : « 41 min · reste 18 min » (durée connue, reste si entamé) ; [qualities] : qualités de ses fichiers.
  */
 data class EpisodeUi(
     val id: Long,
@@ -60,7 +61,7 @@ data class EpisodeUi(
     /** Lire, rouvrir la télécommande (cet épisode joue sur la télé), ou lecteur absent du PC. */
     val action: SheetAction = SheetAction.Play,
     val selected: Boolean = highlighted,
-    val details: String? = null,
+    val durationLine: String? = null,
     val qualities: List<String> = emptyList(),
 )
 
@@ -80,6 +81,8 @@ data class SeasonUi(
     val playingHere: Boolean = false,
     /** Le lecteur n'est pas installé sur le PC (bandeau ; lecture impossible). */
     val playerMissing: Boolean = false,
+    /** Pastilles de langue de la saison (« Anglais », « ST français »), d'après ses fichiers présents. */
+    val languages: List<String> = emptyList(),
 )
 
 private data class Catalog(
@@ -89,13 +92,13 @@ private data class Catalog(
     val episodes: List<EpisodeRow>,
     val qualities: List<String>,
     val episodeQualities: List<EpisodeQuality>,
+    val languages: List<FileLanguages>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SeasonViewModel(
     private val seasonId: Long,
     dao: CatalogDao,
-    api: RcApi,
     launcher: PlayLauncher,
     tvStatus: TvStatus,
     /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
@@ -110,8 +113,8 @@ class SeasonViewModel(
 
     private val playAction = PlayAction(viewModelScope, launcher)
 
-    /** Envoyée à la télé une fois à l'ouverture (hors ligne, l'échec est ignoré), puis suivie en direct. */
-    private val tvSheet = TvSheet(viewModelScope, api, tvStatus, "season", seasonId)
+    /** Mention « Affichée sur la télé », suivie en direct ; l'écran publie lui-même sa vue. */
+    private val tvSheet = TvSheet(viewModelScope, tvStatus, "season", seasonId)
 
     /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
     val events: Flow<NavEvent> = playAction.events
@@ -121,13 +124,13 @@ class SeasonViewModel(
             flowOf(null)
         } else {
             combine(
-                dao.work(season.workId),
-                dao.seasonsOfWork(season.workId),
+                combine(dao.work(season.workId), dao.seasonsOfWork(season.workId), ::Pair),
                 dao.episodesOfSeason(seasonId),
                 dao.seasonQualities(seasonId),
                 dao.episodeQualitiesOfSeason(seasonId),
-            ) { w, all, eps, q, eq ->
-                Catalog(season, w, all, eps, sortQualities(q), eq)
+                dao.seasonLanguages(seasonId),
+            ) { (w, all), eps, q, eq, langs ->
+                Catalog(season, w, all, eps, sortQualities(q), eq, langs)
             }
         }
     }
@@ -144,16 +147,12 @@ class SeasonViewModel(
     val missing: StateFlow<Boolean> = dao.season(seasonId).map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-
     /** Déplie [episodeId] en carte (actions et détails), sans lancer la lecture. */
     fun select(episodeId: Long) {
         savedState[selectionKey] = episodeId
     }
 
     fun play(episodeId: Long, mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Episode, episodeId), mode)
-
-    /** Retour sur l'écran : renvoie la fiche à la télé si elle montre autre chose et que rien n'est en lecture. */
-    fun onScreenResumed() = tvSheet.onScreenResumed()
 
     fun clearMessage() {
         playAction.message.value = null
@@ -175,6 +174,10 @@ class SeasonViewModel(
             seasons = c.seasons,
             onTv = tv,
             qualities = c.qualities,
+            languages = languagePills(
+                c.languages.flatMap { it.audioLangs.orEmpty() }.distinct(),
+                c.languages.flatMap { it.subtitleLangs.orEmpty() }.distinct(),
+            ),
         )
     }
 }
@@ -205,11 +208,10 @@ private fun EpisodeRow.toUi(seasonNumber: Int, highlighted: Boolean): EpisodeUi 
         playable = playable,
         watched = seen,
         progress = if (started) length?.let { ((position ?: 0.0) / it).coerceIn(0.0, 1.0).toFloat() } else null,
-        details = length?.let { d ->
-            Texts.details(
-                formatDuration((d / 60.0).roundToInt()),
-                Texts.remaining(remainingMinutes(position ?: 0.0, d)).takeIf { started },
-            )
-        },
+        // Durée du catalogue, sinon celle du fichier lu ; le reste se compte sur le fichier lu s'il est connu.
+        durationLine = episodeDurationLine(
+            durationMin ?: length?.let { (it / 60.0).roundToInt() },
+            if (started) (length ?: durationMin?.let { it * 60.0 })?.let { remainingMinutes(position ?: 0.0, it) } else null,
+        ),
     )
 }

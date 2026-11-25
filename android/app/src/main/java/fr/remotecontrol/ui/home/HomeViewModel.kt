@@ -8,6 +8,7 @@ import fr.remotecontrol.data.db.CollectionSummary
 import fr.remotecontrol.data.db.ResumeRow
 import fr.remotecontrol.data.db.WorkSummary
 import fr.remotecontrol.data.sync.SyncOutcome
+import fr.remotecontrol.data.sync.SyncProgress
 import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.discovery.ServerLocator
 import fr.remotecontrol.discovery.ServerState
@@ -15,6 +16,7 @@ import fr.remotecontrol.net.messageFr
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.remainingMinutes
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -83,7 +85,26 @@ data class HomeUi(
     val banner: HomeBanner? = null,
     /** Échec de « Resynchroniser » lancé depuis l'accueil (message en français). */
     val message: String? = null,
+    /** Étape de la synchro complète en cours (« Téléchargement du catalogue… ») ; nulle hors synchro complète. */
+    val syncLabel: String? = null,
+    /** « 1 250 / 3 992 œuvres » pendant l'écriture ; nul sinon. */
+    val syncCount: String? = null,
+    /** Avancement de l'écriture (0 à 1) ; nul quand il n'est pas connu (barre indéterminée). */
+    val syncFraction: Float? = null,
+    /** La base a répondu (l'état initial, vide, n'est pas publié sur la télé). */
+    val loaded: Boolean = false,
 )
+
+/** Libellé, compte et avancement de la barre de la première synchronisation. */
+private fun HomeUi.withProgress(p: SyncProgress): HomeUi = when (p) {
+    SyncProgress.Idle -> this
+    SyncProgress.Downloading -> copy(syncLabel = Texts.firstSyncDownloading)
+    is SyncProgress.Writing -> copy(
+        syncLabel = Texts.firstSyncSaving,
+        syncCount = Texts.firstSyncWriting(p.done, p.total),
+        syncFraction = if (p.total > 0) (p.done.toFloat() / p.total).coerceIn(0f, 1f) else null,
+    )
+}
 
 private data class Filtered(
     val playableOnly: Boolean,
@@ -91,19 +112,23 @@ private data class Filtered(
     val collections: List<CollectionSummary>,
 )
 
+private data class SyncState(val syncing: Boolean, val everSynced: Boolean, val message: String?, val progress: SyncProgress)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     dao: CatalogDao,
     private val filter: CatalogFilter,
     locator: ServerLocator,
     private val sync: SyncRepository,
+    /** Avancement de la synchro complète ([SyncRepository.progress]). */
+    progress: Flow<SyncProgress> = sync.progress,
 ) : ViewModel() {
     /** Échec d'un « Resynchroniser », avec l'heure de dernière synchronisation réussie connue à ce moment. */
     private val failure = MutableStateFlow<Pair<String, Long?>?>(null)
 
     // Le message ne vaut que tant qu'aucune synchronisation n'a réussi depuis (automatique ou non).
-    private val syncState = combine(sync.syncing, sync.syncedAt, failure) { syncing, at, f ->
-        Triple(syncing, at != null, f?.takeIf { it.second == at }?.first)
+    private val syncState = combine(sync.syncing, sync.syncedAt, failure, progress) { syncing, at, f, p ->
+        SyncState(syncing, at != null, f?.takeIf { it.second == at }?.first, p)
     }
 
     private val filtered = filter.playableOnly.flatMapLatest { playable ->
@@ -118,7 +143,7 @@ class HomeViewModel(
         dao.observeWorkCount(),
         locator.state,
         syncState,
-    ) { resume, f, count, server, (syncing, everSynced, msg) ->
+    ) { resume, f, count, server, (syncing, everSynced, msg, progress) ->
         HomeUi(
             resume = resume.map(::toResumeItem),
             recent = f.recent,
@@ -128,7 +153,8 @@ class HomeViewModel(
             server = server,
             banner = homeBanner(server, count == 0, everSynced, syncing),
             message = msg.takeIf { count == 0 },
-        )
+            loaded = true,
+        ).withProgress(progress)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
     fun setPlayableOnly(value: Boolean) {

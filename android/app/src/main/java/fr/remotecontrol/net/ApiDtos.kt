@@ -25,6 +25,8 @@ data class SyncDto(
     val progress: List<ProgressDto> = emptyList(),
     val volumes: List<VolumeDto> = emptyList(),
     val deleted: DeletedDto = DeletedDto(),
+    /** Réponse complète seulement : nombre d'œuvres de la réponse (progression de la première synchro). */
+    @SerialName("total_works") val totalWorks: Int? = null,
 )
 
 @Serializable
@@ -55,6 +57,8 @@ data class WorkDto(
     val tags: List<String> = emptyList(),
     val episodic: Boolean = false,
     val poster: String? = null,
+    /** Support d'origine quand l'œuvre n'a pas de fichier lisible (arbitrage 13) ; nul sinon. */
+    val medium: String? = null,
 )
 
 @Serializable
@@ -71,6 +75,7 @@ data class EpisodeDto(
     @SerialName("season_id") val seasonId: Long,
     val number: Int,
     val title: String? = null,
+    @SerialName("duration_min") val durationMin: Int? = null,
 )
 
 @Serializable
@@ -83,6 +88,12 @@ data class MediaFileDto(
     val relpath: String,
     @SerialName("volume_uuid") val volumeUuid: String? = null,
     val present: Boolean = false,
+    /** Analyse du fichier (arbitrage 13) ; nuls tant que le fichier n'a pas été analysé. */
+    @SerialName("audio_langs") val audioLangs: List<String>? = null,
+    @SerialName("subtitle_langs") val subtitleLangs: List<String>? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_s") val durationS: Double? = null,
 )
 
 @Serializable
@@ -191,12 +202,37 @@ data class PlayerSnapshotDto(
     val current: CurrentDto? = null,
 )
 
+/**
+ * État de la télé (arbitrage 15) : `screen` ∈ home, work, season, view, playing, paused, message. [view] : la vue
+ * du téléphone reproduite (`screen` `view`) ; [pause] : la vidéo en pause mise de côté. Un serveur de l'itération 1
+ * n'envoie que `screen`, `work_id`, `season_id` et `message`.
+ */
 @Serializable
 data class TvStateDto(
     val screen: String,
     @SerialName("work_id") val workId: Long? = null,
     @SerialName("season_id") val seasonId: Long? = null,
     val message: String? = null,
+    val view: TvViewStateDto? = null,
+    val pause: PauseDto? = null,
+)
+
+/** Vue reproduite par la télé, telle que renvoyée par le serveur ; seuls l'écran et la fiche montrée servent ici. */
+@Serializable
+data class TvViewStateDto(
+    val screen: String,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("season_id") val seasonId: Long? = null,
+)
+
+/** Vidéo en pause mise de côté ; [image] est nulle si la capture a échoué. */
+@Serializable
+data class PauseDto(
+    val image: String? = null,
+    val title: String? = null,
+    val position: Double? = null,
+    val duration: Double? = null,
+    @SerialName("work_id") val workId: Long? = null,
 )
 
 @Serializable
@@ -210,10 +246,46 @@ data class PlayRequestDto(
 )
 
 @Serializable
-data class TvShowRequestDto(val screen: String, val id: Long? = null)
+data class ItemRefDto(val kind: String, val id: Long)
 
 @Serializable
-data class TvShowResultDto(val shown: Boolean)
+data class PersonDto(val name: String, val role: String? = null, val count: Int = 1)
+
+@Serializable
+data class SectionDto(
+    val label: String,
+    val people: List<PersonDto> = emptyList(),
+    val items: List<ItemRefDto> = emptyList(),
+)
+
+@Serializable
+data class PositionDto(val letter: String, val index: Int, val total: Int)
+
+/** Vue affichée par le téléphone (arbitrage 14) ; `phoneId` et `seq` sont posés par `TvMirror`. */
+@Serializable
+data class TvViewDto(
+    @SerialName("phone_id") val phoneId: String = "",
+    val seq: Long = 0,
+    val screen: String,
+    val title: String? = null,
+    val subtitle: String? = null,
+    val filter: String? = null,
+    val query: String? = null,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("season_id") val seasonId: Long? = null,
+    @SerialName("episode_id") val episodeId: Long? = null,
+    @SerialName("media_file_id") val mediaFileId: Long? = null,
+    @SerialName("collection_id") val collectionId: Long? = null,
+    @SerialName("audio_track") val audioTrack: Int? = null,
+    @SerialName("subtitle_track") val subtitleTrack: SubSel? = null,
+    val items: List<ItemRefDto> = emptyList(),
+    val anchor: Long? = null,
+    val position: PositionDto? = null,
+    val sections: List<SectionDto> = emptyList(),
+)
+
+@Serializable
+data class TvViewResultDto(val accepted: Boolean)
 
 @Serializable
 data class ErrorDto(

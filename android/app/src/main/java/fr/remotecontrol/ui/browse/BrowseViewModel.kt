@@ -6,6 +6,9 @@ import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.CatalogDao
 import fr.remotecontrol.data.db.CollectionSummary
 import fr.remotecontrol.data.db.WorkSummary
+import fr.remotecontrol.mirror.browseView
+import fr.remotecontrol.mirror.collectionView
+import fr.remotecontrol.net.TvViewDto
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import fr.remotecontrol.ui.common.Texts
@@ -41,6 +44,12 @@ private data class Selection(val type: String?, val recent: Boolean)
 
 private data class Answer(val selection: Selection, val playableOnly: Boolean, val works: List<WorkSummary>)
 
+/** Ancre de la vue publiée : [index] de la première œuvre visible, relevé pour la liste de clé [key] ([BrowseUi.anchorKey]). */
+private data class Anchor(val key: Any?, val index: Int)
+
+/** Liste à laquelle se rapporte une ancre : type, tri et filtre ; une collection garde sa position quel que soit le filtre. */
+private fun BrowseUi.anchorKey(): Any = collectionId ?: Triple(type, recent, playableOnly)
+
 private fun typeTitle(type: String?) = type?.let(Texts::typeLabel) ?: Texts.allWorks
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,6 +69,19 @@ class BrowseViewModel(
 
     val state: StateFlow<BrowseUi> = (if (collectionId != null) collectionState(collectionId) else typeState())
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
+
+    /** Première œuvre visible dans la liste (ancre de la vue publiée sur la télé), avec la liste où elle a été relevée. */
+    private val anchor = MutableStateFlow(Anchor(null, 0))
+
+    /**
+     * Vue à publier sur la télé : la liste affichée autour de la première œuvre visible. Nulle tant que la liste
+     * n'est pas chargée ; inchangée (pas de nouvel envoi) tant que l'ancre ne bouge pas. Une ancre relevée pour une
+     * autre liste ne compte pas (la nouvelle liste part du haut) : un nouveau choix ne republie jamais l'ancienne
+     * liste remise en haut, la télé ne saute qu'une fois.
+     */
+    val tvView: StateFlow<TvViewDto?> = combine(state, anchor) { ui, a ->
+        ui.tvView(if (a.key == ui.anchorKey()) a.index else 0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Le type, le tri et le filtre choisis passent tout de suite dans l'état ; la liste n'y entre que lorsqu'elle
@@ -101,15 +123,39 @@ class BrowseViewModel(
         }
     }
 
+    /** Index de la première œuvre visible, relevé au défilement. */
+    fun onFirstVisible(index: Int) {
+        anchor.value = Anchor(state.value.anchorKey(), index)
+    }
+
+    // Un nouveau choix fait repartir la grille du haut (la liste d'une collection, elle, garde sa position) :
+    // l'ancre, relevée pour l'ancienne liste, ne s'applique plus.
     fun setPlayableOnly(value: Boolean) {
+        forgetAnchorOf(state.value.copy(playableOnly = value))
         filter.playableOnly.value = value
     }
 
     fun setType(type: String?) {
+        forgetAnchorOf(state.value.copy(type = type))
         selection.value = selection.value.copy(type = type)
     }
 
     fun toggleSort() {
+        forgetAnchorOf(state.value.copy(recent = !selection.value.recent))
         selection.value = selection.value.copy(recent = !selection.value.recent)
     }
+
+    /** Une ancre gardée d'un passage précédent sur la liste [next] serait périmée : la grille y repart du haut. */
+    private fun forgetAnchorOf(next: BrowseUi) {
+        if (collectionId == null && anchor.value.key == next.anchorKey()) anchor.value = Anchor(null, 0)
+    }
+}
+
+private fun BrowseUi.tvView(first: Int): TvViewDto? = when {
+    !loaded -> null
+    // Collection encore inconnue (nom pas encore lu) : rien à publier.
+    collectionId != null -> collection?.let { c ->
+        collectionView(collectionId, c.name, Texts.collectionSummary(c.count, c.playableCount, ranks.isNotEmpty()), works, first)
+    }
+    else -> browseView(title, Texts.browseSummary(type, works.size, recent), playableOnly, works, first)
 }

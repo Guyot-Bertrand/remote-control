@@ -174,4 +174,34 @@ class CatalogDaoTest {
         db.seed(works = emptyList(), files = listOf(MediaFileEntity(99, null, 1, "HD", null, "y.mp4", "DISK2", false)))
         assertEquals(listOf("FHD"), dao.seasonQualities(1).first())
     }
+
+    @Test fun read_models_carry_medium_languages_resolution_and_duration() = runTest {
+        db.seed(
+            works = listOf(sync.works.first { it.id == 2L }.toEntity().copy(medium = "DVD")),
+            episodes = listOf(EpisodeEntity(1, 1, 1, null, durationMin = 27)),
+            files = listOf(
+                MediaFileEntity(1, 1, null, "FHD", "3.8G", "a.mp4", "DISK1", true, listOf("fr"), listOf("en"), 1920, 1038),
+                MediaFileEntity(5, null, 1, "FHD", "383M", "e1.mp4", "DISK1", true, listOf("en"), listOf("fr"), 1920, 1080),
+                // Fichier absent : ses langues ne comptent pas dans l'en-tête de la saison.
+                MediaFileEntity(98, null, 2, "SD", null, "e2.mp4", "DISK2", false, listOf("de"), listOf("de")),
+            ),
+        )
+        assertEquals("DVD", dao.allWorks(false).first().single { it.id == 2L }.medium)
+        val film = dao.mediaFilesOfWork(1).first().single { it.id == 1L }
+        assertEquals(listOf("fr"), film.audioLangs)
+        assertEquals(listOf("en"), film.subtitleLangs)
+        assertEquals(1920 to 1038, film.width to film.height)
+        val episode = dao.mediaFilesOfEpisode(1).first().single()
+        assertEquals(listOf("en") to listOf("fr"), episode.audioLangs to episode.subtitleLangs)
+        assertEquals(listOf(27, null), dao.episodesOfSeason(1).first().map { it.durationMin })
+        assertEquals(
+            listOf(FileLanguages(listOf("en"), listOf("fr")), FileLanguages(null, null)),
+            dao.seasonLanguages(1).first(),
+        )
+        val playing = dao.playingInfo(1, 1).first()!!
+        assertEquals(listOf("fr") to listOf("en"), playing.audioLangs to playing.subtitleLangs)
+        assertEquals(Triple("FHD", 1920, 1038), Triple(playing.quality, playing.width, playing.height))
+        // Fichier inconnu : l'œuvre reste décrite, sans qualité.
+        assertEquals(null, dao.playingInfo(1, 999).first()?.quality)
+    }
 }

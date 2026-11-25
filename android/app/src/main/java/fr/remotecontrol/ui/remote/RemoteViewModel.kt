@@ -17,6 +17,9 @@ import fr.remotecontrol.player.TrackOption
 import fr.remotecontrol.player.subtitleOptions
 import fr.remotecontrol.player.trackOptions
 import fr.remotecontrol.ui.common.Texts
+import fr.remotecontrol.ui.common.FilePills
+import fr.remotecontrol.ui.common.languagePills
+import fr.remotecontrol.ui.common.resolutionLabel
 import fr.remotecontrol.ui.common.formatClock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -70,6 +73,8 @@ data class RemoteUi(
     val poster: String? = null,
     /** « 2017 · FHD · Français » : année, qualité du fichier, langue de la piste audio choisie (éléments connus). */
     val details: String = "",
+    /** Pastilles du fichier lu (maquette 4c) : qualité, résolution, langues ; nulles si sa qualité est inconnue. */
+    val pills: FilePills? = null,
 )
 
 /** Saisie en cours : position ou volume tenus par le doigt (ou envoyés et pas encore confirmés). */
@@ -259,7 +264,12 @@ private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, 
         details = Texts.details(
             info?.year?.toString(),
             info?.quality,
-            media?.audio?.firstOrNull { it.index == st.audio }?.lang?.let(Texts::languageName),
+            // Piste choisie inconnue (pistes non lues, langue non étiquetée) : première langue audio du fichier.
+            media?.audio?.firstOrNull { it.index == st.audio }?.lang?.let(Texts::languageName)
+                ?: info?.audioLangs?.firstOrNull()?.let(Texts::languageName),
         ),
+        pills = info?.quality?.let {
+            FilePills(it, resolutionLabel(info.width, info.height), languagePills(info.audioLangs, info.subtitleLangs))
+        },
     )
 }

@@ -1,6 +1,7 @@
 package fr.remotecontrol.ui.work
 
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.MediaFileEntity
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
@@ -27,6 +28,7 @@ import fr.remotecontrol.net.PlayerStateDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
+import fr.remotecontrol.net.TvViewStateDto
 import fr.remotecontrol.player.TvStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -64,7 +66,7 @@ class WorkViewModelTest {
     }
 
     private fun viewModel(id: Long) =
-        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus).also { vms += it }
+        WorkViewModel(id, db.catalogDao(), PlayLauncher(api), tvStatus).also { vms += it }
 
     // Room répond hors du dispatcher de test : on attend l'état voulu.
     private suspend fun WorkViewModel.await(predicate: (WorkUi) -> Boolean = { true }) =
@@ -74,7 +76,7 @@ class WorkViewModelTest {
     private val playerMissing = MutableStateFlow(false)
 
     private fun liveViewModel(id: Long) =
-        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
+        WorkViewModel(id, db.catalogDao(), PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
 
     private fun playing(current: CurrentDto, ended: Boolean = false) =
         PlayerSnapshotDto(PlayerStateDto(running = true, ended = ended), current)
@@ -110,53 +112,23 @@ class WorkViewModelTest {
 
     @Test fun retry_server_searches_again() = runBlocking {
         val searched = CompletableDeferred<Unit>()
-        val vm = WorkViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus) { searched.complete(Unit) }.also { vms += it }
+        val vm = WorkViewModel(1, db.catalogDao(), PlayLauncher(api), tvStatus) { searched.complete(Unit) }.also { vms += it }
         vm.retryServer()
         withTimeout(5_000) { searched.await() }
     }
 
-    @Test fun tv_label_follows_tv_and_resume_resends_after_drift() = runBlocking {
+    @Test fun tv_label_follows_tv_view_state() = runBlocking {
         val watcher = launch(Dispatchers.Main) { tvStatus.run() }
         while (serverEvents.subscriptionCount.value == 0) yield()
         val vm = viewModel(1)
-        vm.onScreenResumed() // ouverture : déjà envoyée
+        assertFalse(vm.await().onTv)
+        serverEvents.emit(ServerEvent.Tv(TvStateDto("view", view = TvViewStateDto("work", workId = 1))))
         vm.await { it.onTv }
         serverEvents.emit(ServerEvent.Tv(TvStateDto("home")))
         vm.await { !it.onTv }
-        serverEvents.emit(ServerEvent.Player(PlayerSnapshotDto()))
-        vm.onScreenResumed()
-        vm.await { it.onTv }
-        assertEquals(2, api.calls.count { it == "tvShow(work,1)" })
         serverEvents.emit(ServerEvent.Tv(TvStateDto("work", workId = 1)))
-        vm.onScreenResumed()
-        assertEquals(2, api.calls.count { it == "tvShow(work,1)" })
+        vm.await { it.onTv }
         watcher.cancel()
-    }
-
-    @Test fun init_sends_tv_show_once() = runBlocking {
-        val vm = viewModel(1)
-        vm.await()
-        vm.await()
-        assertEquals(1, api.calls.count { it == "tvShow(work,1)" })
-    }
-
-    @Test fun tv_show_failure_is_silent() = runBlocking {
-        api.tvShowResult = ApiResult.Err(ApiError.Unreachable)
-        val ui = viewModel(1).await()
-        assertNull(ui.message)
-        assertEquals("Ava", ui.work.titleFr)
-        assertFalse(ui.onTv)
-    }
-
-    @Test fun tv_show_not_shown_during_playback_is_not_an_error() = runBlocking {
-        api.tvShowResult = ApiResult.Ok(false)
-        val ui = viewModel(1).await()
-        assertNull(ui.message)
-        assertFalse(ui.onTv)
-    }
-
-    @Test fun tv_shown_is_flagged() = runBlocking {
-        assertTrue(viewModel(1).await { it.onTv }.onTv)
     }
 
     @Test fun ava_state() = runBlocking {
@@ -186,6 +158,35 @@ class WorkViewModelTest {
         assertEquals("Non numérisé", ui.availabilityLabel)
         assertFalse(ui.canPlay)
         assertNull(ui.resumeLabel)
+    }
+
+    @Test fun work_versions_carry_language_pills_and_resolution() = runBlocking {
+        db.syncDao().upsertMediaFiles(
+            listOf(MediaFileEntity(2, 1, null, "HD", "1.6G", "Films/A/Ava.mp4", "DISK1", true, listOf("en"), listOf("fr"), 624, 352)),
+        )
+        val ui = viewModel(1).await { u -> u.versions.any { it.resolution != null } }
+        val hd = ui.versions.single { it.mediaFileId == 2L }
+        assertEquals(listOf("Anglais", "ST français"), hd.languages)
+        assertEquals("624\u202F×\u202F352", hd.resolution)
+        // Fichier sans langues ni dimensions connues : ni pastille, ni résolution.
+        val fhd = ui.versions.single { it.mediaFileId == 1L }
+        assertEquals(emptyList<String>(), fhd.languages)
+        assertNull(fhd.resolution)
+    }
+
+    @Test fun not_digitized_work_shows_medium() = runBlocking {
+        val dao = db.catalogDao()
+        db.syncDao().upsertWorks(listOf(dao.work(2).first()!!.copy(medium = "DVD"), dao.work(1).first()!!.copy(medium = "DVD")))
+        assertEquals("DVD", viewModel(2).await { it.medium != null }.medium)
+        // Œuvre numérisée : son support d'origine n'est pas mis en avant.
+        assertNull(viewModel(1).await { it.work.medium == "DVD" }.medium)
+    }
+
+    @Test fun not_digitized_series_shows_medium() = runBlocking {
+        val dao = db.catalogDao()
+        // Série qui n'existe qu'en DVD : le serveur ne renseigne `medium` que sans fichier lisible.
+        db.syncDao().upsertWorks(listOf(dao.work(5).first()!!.copy(medium = "DVD")))
+        assertEquals("DVD", viewModel(5).await { it.work.medium == "DVD" }.medium)
     }
 
     @Test fun play_success_navigates_to_remote() = runBlocking {

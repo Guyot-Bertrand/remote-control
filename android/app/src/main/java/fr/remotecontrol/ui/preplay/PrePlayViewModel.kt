@@ -22,6 +22,7 @@ import fr.remotecontrol.player.sortVersions
 import fr.remotecontrol.player.subtitleOptions
 import fr.remotecontrol.player.trackOptions
 import fr.remotecontrol.ui.common.EPISODE
+import fr.remotecontrol.ui.common.FilePills
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.PrePlayRoute
@@ -66,6 +67,9 @@ data class PrePlayUi(
     val message: String? = null,
     val canConfirm: Boolean = false,
     val title: String = "",
+    /** Œuvre (ou série de l'épisode) et saison de l'épisode : pour la vue publiée sur la télé. */
+    val workId: Long? = null,
+    val seasonId: Long? = null,
     val poster: String? = null,
     val year: Int? = null,
     val details: String? = null,
@@ -75,7 +79,12 @@ data class PrePlayUi(
     val canRetry: Boolean = false,
     /** Mention sous « Lire sur la télé » : « Ces choix seront repris la prochaine fois pour ce film. » */
     val footer: String = Texts.choicesRemembered,
-)
+) {
+    /** Pastilles de l'en-tête (maquette 4c) : qualité, résolution et langues de la version choisie. */
+    val pills: FilePills?
+        get() = versions.firstOrNull { it.mediaFileId == selectedMediaFileId }
+            ?.let { FilePills(it.quality, it.resolution, it.languages) }
+}
 
 /**
  * Écran « Version et pistes… » (un ViewModel par entrée de navigation) : versions de la cible (les absentes sont listées, pas sélectionnables),
@@ -125,6 +134,7 @@ class PrePlayViewModel(
         TargetKind.Work -> dao.work(args.target.id).first()?.let { w ->
             PrePlayUi(
                 title = w.titleFr,
+                workId = w.id,
                 poster = w.poster,
                 year = w.year,
                 details = Texts.details(
@@ -138,6 +148,8 @@ class PrePlayViewModel(
         TargetKind.Episode -> dao.episodeHeader(args.target.id).first()?.let { e ->
             PrePlayUi(
                 title = e.workTitle,
+                workId = e.workId,
+                seasonId = e.seasonId,
                 poster = e.poster,
                 year = e.year,
                 details = Texts.episodeCode(e.seasonNumber, e.number),
