@@ -47,7 +47,6 @@ private fun listView(
 }
 
 fun browseView(
-    type: String?,
     titleText: String,
     subtitleText: String,
     playableOnly: Boolean,
@@ -102,9 +101,14 @@ fun workView(workId: Long) = TvViewDto(screen = "work", workId = workId)
 fun seasonView(seasonId: Long, workId: Long, selectedEpisodeId: Long?) =
     TvViewDto(screen = "season", seasonId = seasonId, workId = workId, episodeId = selectedEpisodeId)
 
-fun preplayView(target: PlayTarget, mediaFileId: Long?, audio: Int?, subtitle: SubSel) = TvViewDto(
+/**
+ * Choix avant lecture : [workId] toujours (l'œuvre, ou la série d'un épisode), et pour un épisode sa saison
+ * [seasonId] et l'épisode lui-même ; la télé en a besoin pour afficher la fiche.
+ */
+fun preplayView(target: PlayTarget, workId: Long?, seasonId: Long?, mediaFileId: Long?, audio: Int?, subtitle: SubSel) = TvViewDto(
     screen = "preplay",
-    workId = target.id.takeIf { target.kind == TargetKind.Work },
+    workId = if (target.kind == TargetKind.Work) target.id else workId,
+    seasonId = seasonId.takeIf { target.kind == TargetKind.Episode },
     episodeId = target.id.takeIf { target.kind == TargetKind.Episode },
     mediaFileId = mediaFileId,
     audioTrack = audio,

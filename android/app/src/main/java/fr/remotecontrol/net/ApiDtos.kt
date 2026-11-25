@@ -246,12 +246,6 @@ data class PlayRequestDto(
 )
 
 @Serializable
-data class TvShowRequestDto(val screen: String, val id: Long? = null)
-
-@Serializable
-data class TvShowResultDto(val shown: Boolean)
-
-@Serializable
 data class ItemRefDto(val kind: String, val id: Long)
 
 @Serializable

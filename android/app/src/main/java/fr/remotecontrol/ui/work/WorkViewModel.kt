@@ -174,7 +174,8 @@ class WorkViewModel(
             resumeProgress = progress?.duration?.takeIf { it > 0 }?.let { (progress.position / it).coerceIn(0.0, 1.0).toFloat() },
             onTv = tv,
             choiceSummary = if (work.episodic) null else choiceSummary(c.files, c.progress),
-            medium = work.medium?.takeIf { availability == Availability.NotDigitized },
+            // Série : pas de disponibilité propre ; le serveur ne renseigne `medium` que sans fichier lisible.
+            medium = work.medium?.takeIf { work.episodic || availability == Availability.NotDigitized },
         )
     }
 }

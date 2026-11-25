@@ -48,14 +48,6 @@ class OkHttpRcApi(
     override suspend fun tracks(mediaFileId: Long) =
         get("api/media/$mediaFileId/tracks", MediaTracksDto.serializer())
 
-    override suspend fun tvShow(screen: String, id: Long?): ApiResult<Boolean> {
-        val body = json.encodeToString(TvShowRequestDto.serializer(), TvShowRequestDto(screen, id))
-        return when (val r = post("api/tv/show", body, TvShowResultDto.serializer())) {
-            is ApiResult.Ok -> ApiResult.Ok(r.value.shown)
-            is ApiResult.Err -> r
-        }
-    }
-
     override suspend fun tvView(view: TvViewDto): ApiResult<Boolean> {
         val body = json.encodeToString(TvViewDto.serializer(), view)
         return when (val r = post("api/tv/view", body, TvViewResultDto.serializer())) {

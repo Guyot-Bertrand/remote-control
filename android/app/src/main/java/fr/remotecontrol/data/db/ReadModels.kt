@@ -36,6 +36,8 @@ data class EpisodeHeader(
     val number: Int,
     val title: String?,
     val seasonNumber: Int,
+    val seasonId: Long,
+    val workId: Long,
     val workTitle: String,
     val poster: String?,
     val year: Int?,

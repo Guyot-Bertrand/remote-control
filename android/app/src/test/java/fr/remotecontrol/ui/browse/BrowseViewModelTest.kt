@@ -174,6 +174,35 @@ class BrowseViewModelTest {
         assertEquals(listOf(2L, 1L, 5L, 3L, 4L), last.items.map { it.id })
     }
 
+    @Test fun new_choice_never_republishes_the_old_list() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 3 }
+        vm.onFirstVisible(1)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 1L } }
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.setType("theatre")
+        withTimeout(5_000) { vm.tvView.first { it?.title == "Théâtre" } }
+        seen.stop()
+        // La vue de départ (films), puis seulement le théâtre : la télé ne saute pas en haut des films.
+        assertEquals("Films", seen.items.first().title)
+        assertTrue(seen.items.drop(1).all { it.title == "Théâtre" && it.items.map { i -> i.id } == listOf(4L) })
+    }
+
+    @Test fun new_filter_never_republishes_the_old_list() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 3 }
+        vm.onFirstVisible(1)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 1L } }
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.setPlayableOnly(true)
+        withTimeout(5_000) { vm.tvView.first { it?.filter == "playable" } }
+        seen.stop()
+        assertEquals("all", seen.items.first().filter)
+        assertTrue(seen.items.drop(1).all { it.filter == "playable" && it.anchor == 1L })
+    }
+
     @Test fun collection_view_follows_first_visible() = runBlocking {
         filter.playableOnly.value = false
         val vm = viewModel(BrowseRoute(collectionId = 2))

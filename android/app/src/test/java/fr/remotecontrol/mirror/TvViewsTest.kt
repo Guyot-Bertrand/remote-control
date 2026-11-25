@@ -34,7 +34,7 @@ class TvViewsTest {
 
     @Test fun browse_view_has_anchor_and_position() {
         val works = (1L..2552L).map { work(it, if (it == 1241L) "Mélodie" else "Alpha $it") }
-        val v = browseView("film", "Films", "2 552 films · Titre", true, works, firstVisible = 1240)
+        val v = browseView("Films", "2 552 films · Titre", true, works, firstVisible = 1240)
         assertEquals("browse", v.screen)
         assertEquals("Films", v.title)
         assertEquals("playable", v.filter)
@@ -42,7 +42,7 @@ class TvViewsTest {
         assertEquals(PositionDto("M", 1241, 2552), v.position)
         assertEquals(40, v.items.size)
         assertEquals(ItemRefDto("work", 1231), v.items.first())
-        assertEquals("all", browseView(null, "Tout", "", false, works, 0).filter)
+        assertEquals("all", browseView("Tout", "", false, works, 0).filter)
     }
 
     @Test fun collection_view_carries_collection() {
@@ -107,16 +107,19 @@ class TvViewsTest {
     }
 
     @Test fun preplay_view_carries_tracks() {
-        val w = preplayView(PlayTarget(TargetKind.Work, 12), 7, 1, SubSel.External("/s.srt"))
+        val w = preplayView(PlayTarget(TargetKind.Work, 12), workId = 12, seasonId = null, 7, 1, SubSel.External("/s.srt"))
         assertEquals("preplay", w.screen)
         assertEquals(12L, w.workId)
+        assertNull(w.seasonId)
         assertNull(w.episodeId)
         assertEquals(7L, w.mediaFileId)
         assertEquals(1, w.audioTrack)
         assertEquals(SubSel.External("/s.srt"), w.subtitleTrack)
-        val e = preplayView(PlayTarget(TargetKind.Episode, 45), null, null, SubSel.None)
+        // Épisode : la télé a besoin de la série et de la saison pour afficher la fiche, même après un rechargement.
+        val e = preplayView(PlayTarget(TargetKind.Episode, 45), workId = 5, seasonId = 9, null, null, SubSel.None)
         assertEquals(45L, e.episodeId)
-        assertNull(e.workId)
+        assertEquals(5L, e.workId)
+        assertEquals(9L, e.seasonId)
         assertNull(e.subtitleTrack)
     }
 }

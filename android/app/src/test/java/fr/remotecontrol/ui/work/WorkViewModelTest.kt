@@ -128,8 +128,6 @@ class WorkViewModelTest {
         vm.await { !it.onTv }
         serverEvents.emit(ServerEvent.Tv(TvStateDto("work", workId = 1)))
         vm.await { it.onTv }
-        // La fiche n'est plus envoyée par `tv/show` : c'est l'écran qui publie sa vue.
-        assertEquals(0, api.calls.count { it.startsWith("tvShow") })
         watcher.cancel()
     }
 
@@ -182,6 +180,13 @@ class WorkViewModelTest {
         assertEquals("DVD", viewModel(2).await { it.medium != null }.medium)
         // Œuvre numérisée : son support d'origine n'est pas mis en avant.
         assertNull(viewModel(1).await { it.work.medium == "DVD" }.medium)
+    }
+
+    @Test fun not_digitized_series_shows_medium() = runBlocking {
+        val dao = db.catalogDao()
+        // Série qui n'existe qu'en DVD : le serveur ne renseigne `medium` que sans fichier lisible.
+        db.syncDao().upsertWorks(listOf(dao.work(5).first()!!.copy(medium = "DVD")))
+        assertEquals("DVD", viewModel(5).await { it.work.medium == "DVD" }.medium)
     }
 
     @Test fun play_success_navigates_to_remote() = runBlocking {

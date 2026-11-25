@@ -47,7 +47,6 @@ interface RcApi {
     suspend fun info(): ApiResult<InfoDto>
     suspend fun sync(since: Long?): ApiResult<SyncDto>
     suspend fun tracks(mediaFileId: Long): ApiResult<MediaTracksDto>
-    suspend fun tvShow(screen: String, id: Long?): ApiResult<Boolean>
     suspend fun tvView(view: TvViewDto): ApiResult<Boolean>
     suspend fun play(request: PlayRequestDto): ApiResult<Unit>
     suspend fun pause(paused: Boolean): ApiResult<Unit>

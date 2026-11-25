@@ -206,16 +206,6 @@ class OkHttpRcApiTest {
     }
 
     @Test
-    fun tv_show_returns_shown() = runTest {
-        server.enqueue(ok("""{"shown": false}"""))
-        val r = api.tvShow("work", 1)
-        val req = server.takeRequest()
-        assertEquals("/api/tv/show", req.url.encodedPath)
-        assertEquals("""{"screen":"work","id":1}""", req.body!!.utf8())
-        assertEquals(ApiResult.Ok(false), r)
-    }
-
-    @Test
     fun tv_view_posts_snake_case_body_and_returns_accepted() = runTest {
         server.enqueue(ok("""{"accepted": false}"""))
         val view = TvViewDto(

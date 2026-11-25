@@ -87,7 +87,6 @@ class SeasonViewModelTest {
         vm.await { !it.onTv }
         serverEvents.emit(ServerEvent.Tv(TvStateDto("season", seasonId = 1)))
         vm.await { it.onTv }
-        assertEquals(0, api.calls.count { it.startsWith("tvShow") })
         watcher.cancel()
     }
 

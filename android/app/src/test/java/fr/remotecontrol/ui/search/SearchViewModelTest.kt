@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -65,6 +66,7 @@ class SearchViewModelTest {
         }
         val vm = SearchViewModel(spy, filter).also { vms += it }
         backgroundScope.launch { vm.state.collect {} }
+        backgroundScope.launch { vm.tvView.collect {} }
         return vm
     }
 
@@ -127,6 +129,25 @@ class SearchViewModelTest {
         assertEquals("ava", vm.state.value.query)
         assertEquals(emptyList<WorkSummary>(), vm.state.value.results)
         assertEquals(emptyList<String>(), matches.toList())
+    }
+
+    @Test fun tv_view_waits_for_end_of_typing() = runTest {
+        val vm = viewModel()
+        // Vues publiées, avec l'heure (virtuelle) de publication.
+        val published = Collections.synchronizedList(mutableListOf<Pair<Long, String?>>())
+        backgroundScope.launch { vm.tvView.collect { v -> if (v != null) published += testScheduler.currentTime to v.query } }
+        vm.onQuery("a")
+        advanceTimeBy(200)
+        vm.onQuery("av")
+        advanceTimeBy(200)
+        vm.onQuery("ava")
+        val typed = testScheduler.currentTime
+        val v = withContext(Dispatchers.Default) { withTimeout(5_000) { vm.tvView.first { it?.query == "ava" } } }!!
+        assertEquals("search", v.screen)
+        assertEquals(listOf(1L), v.sections.flatMap { it.items }.map { it.id }.distinct())
+        // Rien pendant la frappe (pauses de 200 ms) ; la saisie finale, 300 ms après la dernière touche.
+        assertEquals(listOf("ava"), published.map { it.second })
+        assertTrue(published.single().first >= typed + TV_SEARCH_DEBOUNCE_MS)
     }
 
     @Test fun people_and_alternative_titles_sections() = runTest {

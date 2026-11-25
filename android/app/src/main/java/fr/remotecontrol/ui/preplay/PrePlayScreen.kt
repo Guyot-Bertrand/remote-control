@@ -77,7 +77,10 @@ fun PrePlayScreen(
     onConfirm: () -> Unit,
     onClose: () -> Unit,
 ) {
-    PublishTvView(if (state.loading) null else preplayView(target, state.selectedMediaFileId, state.selectedAudio, state.selectedSubtitle))
+    PublishTvView(
+        if (state.loading) null
+        else preplayView(target, state.workId, state.seasonId, state.selectedMediaFileId, state.selectedAudio, state.selectedSubtitle),
+    )
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.prePlayTitle, server, onBack = onClose, backIcon = RcIcons.Clear, backLabel = Texts.close)
         if (playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))

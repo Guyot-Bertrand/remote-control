@@ -33,7 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import fr.remotecontrol.mirror.PublishTvView
-import fr.remotecontrol.mirror.searchView
+import fr.remotecontrol.net.TvViewDto
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +70,8 @@ import fr.remotecontrol.ui.theme.RcColors
 @Composable
 fun SearchScreen(
     state: SearchUi,
+    /** Vue publiée sur la télé ([SearchViewModel.tvView]), en fin de frappe. */
+    tvView: TvViewDto?,
     server: ServerState,
     onQuery: (String) -> Unit,
     onPlayableOnly: (Boolean) -> Unit,
@@ -81,8 +83,7 @@ fun SearchScreen(
         text = it
         onQuery(it)
     }
-    // La saisie et les sections auxquelles elle a déjà répondu, sans suivre la frappe en avance.
-    PublishTvView(state.resultsFor?.let { searchView(it, state.sections) })
+    PublishTvView(tvView)
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
         ScreenHeader(Texts.navSearch, server)
         SearchField(text, state.query, setText, onQuery)

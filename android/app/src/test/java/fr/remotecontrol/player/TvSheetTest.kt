@@ -94,6 +94,5 @@ class TvSheetTest {
         assertEquals(TvStateDto("home"), status.tv.value)
         job.cancel()
         assertNull(status.tv.value)
-        assertNull(status.playing.value)
     }
 }

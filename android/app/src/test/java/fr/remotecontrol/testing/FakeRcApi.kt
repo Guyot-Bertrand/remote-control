@@ -12,14 +12,13 @@ import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.net.TvViewDto
 import kotlinx.coroutines.CompletableDeferred
 
-/** Scriptable [RcApi]; every call is recorded in [calls] (e.g. `"sync(null)"`, `"tvShow(work,1)"`). */
+/** Scriptable [RcApi]; every call is recorded in [calls] (e.g. `"sync(null)"`, `"tvView(browse,1)"`). */
 class FakeRcApi : RcApi {
     val calls = mutableListOf<String>()
 
     var infoResult: ApiResult<InfoDto> = ApiResult.Err(ApiError.Unreachable)
     var syncResponses: ArrayDeque<ApiResult<SyncDto>> = ArrayDeque()
     var tracksResult: ApiResult<MediaTracksDto> = ApiResult.Ok(MediaTracksDto())
-    var tvShowResult: ApiResult<Boolean> = ApiResult.Ok(true)
     var playResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var pauseResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var seekResult: ApiResult<Unit> = ApiResult.Ok(Unit)
@@ -47,7 +46,6 @@ class FakeRcApi : RcApi {
         calls += "tracks($mediaFileId)"
         return tracksByFile[mediaFileId] ?: tracksResult
     }
-    override suspend fun tvShow(screen: String, id: Long?) = tvShowResult.also { calls += "tvShow($screen,$id)" }
 
     /** Vues reçues par tvView(), dans l'ordre. */
     val views = mutableListOf<TvViewDto>()

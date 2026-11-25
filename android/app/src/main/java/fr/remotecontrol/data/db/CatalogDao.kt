@@ -132,7 +132,8 @@ interface CatalogDao {
     fun episodeQualitiesOfSeason(seasonId: Long): Flow<List<EpisodeQuality>>
 
     @Query(
-        "SELECT e.number AS number, e.title AS title, s.number AS seasonNumber, w.titleFr AS workTitle, " +
+        "SELECT e.number AS number, e.title AS title, s.number AS seasonNumber, s.id AS seasonId, w.id AS workId, " +
+            "w.titleFr AS workTitle, " +
             "w.poster AS poster, w.year AS year FROM episode e JOIN season s ON s.id = e.seasonId " +
             "JOIN work w ON w.id = s.workId WHERE e.id = :id",
     )

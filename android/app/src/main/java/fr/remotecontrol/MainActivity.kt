@@ -225,9 +225,11 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         composable<SearchRoute> {
             val vm = viewModel { SearchViewModel(c.catalogDao, c.filter) }
             val state by vm.state.collectAsStateWithLifecycle()
+            val tvView by vm.tvView.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
             SearchScreen(
                 state = state,
+                tvView = tvView,
                 server = server,
                 onQuery = vm::onQuery,
                 onPlayableOnly = vm::setPlayableOnly,

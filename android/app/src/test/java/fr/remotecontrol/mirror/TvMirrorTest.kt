@@ -6,6 +6,7 @@ import fr.remotecontrol.net.TvViewDto
 import fr.remotecontrol.testing.FakeKeyValueStore
 import fr.remotecontrol.testing.FakeRcApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -107,6 +108,59 @@ class TvMirrorTest {
         advanceTimeBy(600)
         assertEquals(listOf("a", "b"), api.views.map { it.title })
         assertTrue(job.isActive)
+        job.cancel()
+    }
+
+    @Test
+    fun view_published_offline_is_sent_once_on_connection() = runTest {
+        val connected = MutableStateFlow(false)
+        val mirror = TvMirror(api, store, clock = { testScheduler.currentTime }, connected = connected)
+        val job = launch { mirror.run() }
+        runCurrent()
+        mirror.publish(view("a"))
+        advanceTimeBy(2_000)
+        assertTrue(api.views.isEmpty())
+        connected.value = true
+        advanceTimeBy(2_000)
+        assertEquals(listOf("a"), api.views.map { it.title })
+        // Coupure (Wi-Fi, redémarrage du serveur) : la vue est renvoyée une fois au retour de la connexion.
+        connected.value = false
+        advanceTimeBy(2_000)
+        connected.value = true
+        advanceTimeBy(2_000)
+        assertEquals(listOf("a", "a"), api.views.map { it.title })
+        job.cancel()
+    }
+
+    @Test
+    fun same_view_is_not_sent_twice_within_one_run() = runTest {
+        val mirror = TvMirror(api, store, clock = { testScheduler.currentTime })
+        val job = launch { mirror.run() }
+        runCurrent()
+        mirror.publish(view("a"))
+        advanceTimeBy(600)
+        mirror.publish(view("a")) // retour au premier plan : l'écran republie la même vue
+        advanceTimeBy(600)
+        mirror.publish(view("b"))
+        advanceTimeBy(600)
+        mirror.publish(view("a"))
+        advanceTimeBy(600)
+        assertEquals(listOf("a", "b", "a"), api.views.map { it.title })
+        job.cancel()
+    }
+
+    @Test
+    fun failed_send_is_not_remembered_as_sent() = runTest {
+        api.tvViewResult = ApiResult.Err(ApiError.Unreachable)
+        val mirror = TvMirror(api, store, clock = { testScheduler.currentTime })
+        val job = launch { mirror.run() }
+        runCurrent()
+        mirror.publish(view("a"))
+        advanceTimeBy(600)
+        api.tvViewResult = ApiResult.Ok(true)
+        mirror.publish(view("a"))
+        advanceTimeBy(600)
+        assertEquals(listOf("a", "a"), api.views.map { it.title })
         job.cancel()
     }
 }

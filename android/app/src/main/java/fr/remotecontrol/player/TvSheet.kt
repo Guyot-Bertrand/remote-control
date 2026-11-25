@@ -1,6 +1,5 @@
 package fr.remotecontrol.player
 
-import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
 import kotlinx.coroutines.CoroutineScope
@@ -13,38 +12,27 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * Dernier état connu de la télé et du lecteur, d'après les événements du serveur. [run] tourne au premier
+ * Dernier état connu de la télé, d'après les événements du serveur. [run] tourne au premier
  * plan ; à l'arrêt, l'état est oublié (`null` : inconnu) plutôt que gardé périmé.
  */
 class TvStatus(private val events: Flow<ServerEvent>) {
     private val _tv = MutableStateFlow<TvStateDto?>(null)
-    private val _playing = MutableStateFlow<Boolean?>(null)
     val tv: StateFlow<TvStateDto?> = _tv.asStateFlow()
-
-    /** Une lecture est en cours (lecteur lancé, pas arrivé à la fin). */
-    val playing: StateFlow<Boolean?> = _playing.asStateFlow()
 
     suspend fun run() {
         try {
             events.collect { e ->
                 when (e) {
-                    is ServerEvent.Hello -> {
-                        _tv.value = e.tv
-                        _playing.value = e.player.isPlaying()
-                    }
+                    is ServerEvent.Hello -> _tv.value = e.tv
                     is ServerEvent.Tv -> _tv.value = e.state
-                    is ServerEvent.Player -> _playing.value = e.snapshot.isPlaying()
-                    is ServerEvent.Catalog -> Unit
+                    is ServerEvent.Player, is ServerEvent.Catalog -> Unit
                 }
             }
         } finally {
             _tv.value = null
-            _playing.value = null
         }
     }
 }
-
-private fun PlayerSnapshotDto.isPlaying() = state.running && !state.ended
 
 /**
  * Mention « Affichée sur la télé » d'une fiche ([screen] `work` ou `season`, d'identifiant [id]) : [onTv] suit

@@ -231,6 +231,7 @@ class PrePlayViewModelTest {
         val ui = viewModel(TargetKind.Episode, 2, StartMode.Resume).await { it.canConfirm && it.title.isNotEmpty() }
         assertEquals("Back to Life", ui.title)
         assertEquals("S01E02", ui.details)
+        assertEquals(5L to 1L, ui.workId to ui.seasonId) // série et saison de l'épisode, pour la vue de la télé
         assertEquals("Ces choix seront repris la prochaine fois pour cet épisode.", ui.footer)
         assertEquals(mapOf(6L to "Dernier choix"), ui.versionBadges)
         assertEquals(mapOf(1 to "Dernier choix"), ui.audioBadges)
