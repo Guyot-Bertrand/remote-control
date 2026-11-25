@@ -59,6 +59,7 @@ fun languageName(code: String): String = when (code) {
     "ja" -> "Japonais"
     "nl" -> "Néerlandais"
     "pt" -> "Portugais"
+    "ru" -> "Russe"
     else -> code.uppercase(Locale.ROOT)
 }
 

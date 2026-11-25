@@ -130,6 +130,8 @@ class FormatTest {
         assertEquals("Français", languageName("fr"))
         assertEquals("Anglais", languageName("en"))
         assertEquals("XX", languageName("xx"))
+        assertEquals("Russe", languageName("ru"))
+        assertEquals(listOf("ST russe"), languagePills(null, listOf("ru")))
     }
 
     @Test
