@@ -107,7 +107,7 @@ def test_pending_files(conn, tmp_path, monkeypatch):
 
 # -- boucle ----------------------------------------------------------------
 
-class Stop(Exception):
+class Stop(BaseException):  # n'est pas avalée par la boucle
     pass
 
 
@@ -209,3 +209,38 @@ async def test_loop_rechecks_after_new_full_index(state, monkeypatch):
     with pytest.raises(Stop):
         await analysis_loop(state, sleep=sleep)
     assert seen == [True, False, True]
+
+
+async def test_loop_survives_transient_errors(state, monkeypatch, caplog):
+    analyzed = patch_loop(monkeypatch, state, 3.0)
+    real_pending = analysis.pending_files
+    fail = {"pending": True}
+
+    def flaky_pending(conn, ix, recheck):
+        if fail.pop("pending", False):
+            raise RuntimeError("liste indisponible")
+        return real_pending(conn, ix, recheck)
+
+    monkeypatch.setattr(analysis, "pending_files", flaky_pending)
+    import rc.app
+    real_publish = rc.app.publish_catalog
+    boom = {"once": True}
+
+    def flaky_publish(st, rev):
+        if boom.pop("once", False):
+            raise sqlite3.OperationalError("database is locked")
+        real_publish(st, rev)
+
+    monkeypatch.setattr(rc.app, "publish_catalog", flaky_publish)
+    sleeps = []
+
+    async def sleep(s):
+        sleeps.append(s)
+        if len(sleeps) == 3:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert analyzed == [1, 2, 3]  # la boucle a continué après les deux erreurs
+    assert sleeps[:2] == [7.0, 7.0]
+    assert "tour d'analyse en échec" in caplog.text

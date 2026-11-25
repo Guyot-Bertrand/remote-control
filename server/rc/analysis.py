@@ -129,27 +129,29 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
     handled_index: float | None = None
     last_announce = state.clock()
     while True:
-        if state.playback is not None and state.playback.current is not None:
-            await sleep(poll)
-            continue
-        if not queue:
-            recheck = state.last_full_index is not None and state.last_full_index != handled_index
-            if recheck:
-                handled_index = state.last_full_index
-            try:
-                queue = pending_files(state.conn, state.indexes, recheck)
-            except sqlite3.Error:
-                log.exception("liste des fichiers à analyser indisponible")
-            if not queue:
-                publish_catalog(state, current_revision(state.conn))
-                last_announce = state.clock()
+        try:
+            if state.playback is not None and state.playback.current is not None:
                 await sleep(poll)
                 continue
-        media_file_id, path = queue.pop(0)
-        try:
-            await asyncio.to_thread(_analyze_in_thread, db_file, media_file_id, path)
-        except Exception:
-            log.exception("échec de l'analyse de %s", path)
-        if not queue or state.clock() - last_announce >= ANNOUNCE_EVERY:
-            publish_catalog(state, current_revision(state.conn))
-            last_announce = state.clock()
+            if not queue:
+                full = state.last_full_index
+                recheck = full is not None and full != handled_index
+                queue = pending_files(state.conn, state.indexes, recheck)
+                if recheck:
+                    handled_index = full  # seulement une fois la liste obtenue
+                if not queue:
+                    publish_catalog(state, current_revision(state.conn))
+                    last_announce = state.clock()
+                    await sleep(poll)
+                    continue
+            media_file_id, path = queue.pop(0)
+            try:
+                await asyncio.to_thread(_analyze_in_thread, db_file, media_file_id, path)
+            except Exception:
+                log.exception("échec de l'analyse de %s", path)
+            if not queue or state.clock() - last_announce >= ANNOUNCE_EVERY:
+                publish_catalog(state, current_revision(state.conn))
+                last_announce = state.clock()
+        except Exception:  # CancelledError n'en hérite pas : l'annulation passe
+            log.exception("tour d'analyse en échec, nouvel essai au prochain tour")
+            await sleep(poll)
