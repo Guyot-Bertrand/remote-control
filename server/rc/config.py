@@ -35,6 +35,8 @@ class Config:
     dev_dir_volumes: bool = False
     mdns: bool = True
     tv_ui_dir: Path | None = None  # None : tv-ui/ à la racine du dépôt
+    # Vidéo en pause mise de côté : "restart" (mpv arrêté puis relancé) ou "minimize".
+    pause_background: str = "restart"
 
 
 def load_config(path: Path | None = None) -> Config:
