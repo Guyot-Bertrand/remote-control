@@ -9,6 +9,7 @@ import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.net.SyncDto
+import fr.remotecontrol.net.TvViewDto
 import kotlinx.coroutines.CompletableDeferred
 
 /** Scriptable [RcApi]; every call is recorded in [calls] (e.g. `"sync(null)"`, `"tvShow(work,1)"`). */
@@ -47,6 +48,17 @@ class FakeRcApi : RcApi {
         return tracksByFile[mediaFileId] ?: tracksResult
     }
     override suspend fun tvShow(screen: String, id: Long?) = tvShowResult.also { calls += "tvShow($screen,$id)" }
+
+    /** Vues reçues par tvView(), dans l'ordre. */
+    val views = mutableListOf<TvViewDto>()
+    var tvViewResult: ApiResult<Boolean> = ApiResult.Ok(true)
+
+    override suspend fun tvView(view: TvViewDto): ApiResult<Boolean> {
+        views += view
+        calls += "tvView(${view.screen},${view.seq})"
+        return tvViewResult
+    }
+
     /** When set, play() records its call, then waits for this gate before answering. */
     var playGate: CompletableDeferred<Unit>? = null
 

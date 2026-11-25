@@ -227,6 +227,48 @@ data class TvShowRequestDto(val screen: String, val id: Long? = null)
 data class TvShowResultDto(val shown: Boolean)
 
 @Serializable
+data class ItemRefDto(val kind: String, val id: Long)
+
+@Serializable
+data class PersonDto(val name: String, val role: String? = null, val count: Int = 1)
+
+@Serializable
+data class SectionDto(
+    val label: String,
+    val people: List<PersonDto> = emptyList(),
+    val items: List<ItemRefDto> = emptyList(),
+)
+
+@Serializable
+data class PositionDto(val letter: String, val index: Int, val total: Int)
+
+/** Vue affichée par le téléphone (arbitrage 14) ; `phoneId` et `seq` sont posés par `TvMirror`. */
+@Serializable
+data class TvViewDto(
+    @SerialName("phone_id") val phoneId: String = "",
+    val seq: Long = 0,
+    val screen: String,
+    val title: String? = null,
+    val subtitle: String? = null,
+    val filter: String? = null,
+    val query: String? = null,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("season_id") val seasonId: Long? = null,
+    @SerialName("episode_id") val episodeId: Long? = null,
+    @SerialName("media_file_id") val mediaFileId: Long? = null,
+    @SerialName("collection_id") val collectionId: Long? = null,
+    @SerialName("audio_track") val audioTrack: Int? = null,
+    @SerialName("subtitle_track") val subtitleTrack: SubSel? = null,
+    val items: List<ItemRefDto> = emptyList(),
+    val anchor: Long? = null,
+    val position: PositionDto? = null,
+    val sections: List<SectionDto> = emptyList(),
+)
+
+@Serializable
+data class TvViewResultDto(val accepted: Boolean)
+
+@Serializable
 data class ErrorDto(
     val error: String,
     @SerialName("volume_label") val volumeLabel: String? = null,

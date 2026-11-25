@@ -28,6 +28,7 @@ class RcApp : Application(), SingletonImageLoader.Factory {
             ProcessLifecycleOwner.get().repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { container.coordinator.run() }
                 launch { container.tvStatus.run() }
+                launch { container.tvMirror.run() }
                 container.locator.monitor(container.eventsClient.failures)
             }
         }

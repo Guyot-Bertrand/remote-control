@@ -56,6 +56,14 @@ class OkHttpRcApi(
         }
     }
 
+    override suspend fun tvView(view: TvViewDto): ApiResult<Boolean> {
+        val body = json.encodeToString(TvViewDto.serializer(), view)
+        return when (val r = post("api/tv/view", body, TvViewResultDto.serializer())) {
+            is ApiResult.Ok -> ApiResult.Ok(r.value.accepted)
+            is ApiResult.Err -> r
+        }
+    }
+
     override suspend fun play(request: PlayRequestDto) =
         postUnit("api/play", json.encodeToString(PlayRequestDto.serializer(), request))
 

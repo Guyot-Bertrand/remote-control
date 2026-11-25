@@ -13,6 +13,7 @@ import fr.remotecontrol.data.sync.SyncCoordinator
 import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.discovery.NsdServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
+import fr.remotecontrol.mirror.TvMirror
 import fr.remotecontrol.net.EventsClient
 import fr.remotecontrol.net.OkHttpRcApi
 import fr.remotecontrol.net.ServerEvent
@@ -55,6 +56,7 @@ class AppContainer(context: Context) {
     val sync: SyncRepository = SyncRepository(db, api)
     val coordinator: SyncCoordinator = SyncCoordinator(sync, events)
     val tvStatus: TvStatus = TvStatus(events)
+    val tvMirror: TvMirror by lazy { TvMirror(api, store) }
     val filter: CatalogFilter = CatalogFilter()
     val playLauncher: PlayLauncher by lazy { PlayLauncher(api, locator::reportPlayerMissing) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }

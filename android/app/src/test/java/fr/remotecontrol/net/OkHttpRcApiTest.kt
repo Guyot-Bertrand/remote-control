@@ -216,6 +216,33 @@ class OkHttpRcApiTest {
     }
 
     @Test
+    fun tv_view_posts_snake_case_body_and_returns_accepted() = runTest {
+        server.enqueue(ok("""{"accepted": false}"""))
+        val view = TvViewDto(
+            phoneId = "p1", seq = 5, screen = "browse", workId = 3,
+            subtitleTrack = SubSel.External("a.srt"),
+            items = listOf(ItemRefDto("work", 101)),
+            position = PositionDto("M", 1240, 2552),
+            sections = listOf(SectionDto("Personnes", people = listOf(PersonDto("P", "Réalisation", 1)))),
+        )
+        val r = api.tvView(view)
+        val req = server.takeRequest()
+        assertEquals("/api/tv/view", req.url.encodedPath)
+        val body = Json.parseToJsonElement(req.body!!.utf8()).jsonObject
+        assertEquals("p1", body["phone_id"]!!.jsonPrimitive.content)
+        assertEquals("5", body["seq"]!!.jsonPrimitive.content)
+        assertEquals("3", body["work_id"]!!.jsonPrimitive.content)
+        assertEquals("""{"kind":"external","path":"a.srt"}""", body["subtitle_track"].toString())
+        assertEquals("""[{"kind":"work","id":101}]""", body["items"].toString())
+        assertEquals("""{"letter":"M","index":1240,"total":2552}""", body["position"].toString())
+        assertEquals(
+            """[{"label":"Personnes","people":[{"name":"P","role":"Réalisation","count":1}],"items":[]}]""",
+            body["sections"].toString(),
+        )
+        assertEquals(ApiResult.Ok(false), r)
+    }
+
+    @Test
     fun no_server_no_request() = runTest {
         val noServer = OkHttpRcApi(rcOkHttpClient(), { null })
         assertEquals(ApiResult.Err(ApiError.NoServer), noServer.info())
