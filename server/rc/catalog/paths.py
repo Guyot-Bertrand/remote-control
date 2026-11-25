@@ -5,9 +5,24 @@ from __future__ import annotations
 import re
 
 QUALITY_ORDER = ["UHD", "2HD", "FHD", "HD", "SD", "BD"]
+# Supports physiques non numérisés ; l'ordre donne la priorité.
+MEDIUM_LABELS = {
+    "BR": "Blu-ray", "DVD": "DVD", "DVR": "DVD (copie)",
+    "DVT": "DVD (TNT)", "DVS": "DVD (satellite)",
+}
 
 _SEASON = re.compile(r"Saison\s*0*(\d+)")
 _EPISODE = re.compile(r"S(\d{2})E(\d{2,3})(?: - (.+?))?\s*\[")
+
+
+def medium_of(codes: list[str], playable: bool) -> str | None:
+    """Libellé du support physique d'une œuvre non lisible, sinon None."""
+    if playable:
+        return None
+    for code, label in MEDIUM_LABELS.items():
+        if code in codes:
+            return label
+    return None
 
 
 def resolve_dir(name: str, work_key: str | None) -> str:

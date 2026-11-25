@@ -68,6 +68,7 @@ class ParsedWork:
     episodes: list[ParsedEpisode]
     episodic: bool
     line_no: int
+    media: list[str] = field(default_factory=list)
 
 
 @dataclass

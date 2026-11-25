@@ -29,11 +29,13 @@ def row(r: sqlite3.Row) -> dict:
         elif k in _HIDDEN:
             continue
         elif k.endswith(_JSON_SUFFIX):
-            d[k[: -len(_JSON_SUFFIX)]] = json.loads(v)
+            d[k[: -len(_JSON_SUFFIX)]] = None if v is None else json.loads(v)
         elif k in _BOOLS:
             d[k] = bool(v)
         else:
             d[k] = v
+    if d.get("width") == 0:  # marqueur « analysé » sans résolution : rien à afficher
+        d["width"] = d["height"] = None
     return d
 
 
@@ -89,7 +91,9 @@ def sync(conn: sqlite3.Connection, since: int | None) -> dict:
             "progress": [progress(r) for r in changed("progress")],
             "volumes": [row(r) for r in conn.execute("SELECT * FROM volume ORDER BY uuid")],
         }
-        if not full:
+        if full:
+            out["total_works"] = len(works)
+        else:
             deleted: dict[str, list[int]] = {k: [] for k in DELETED_KINDS}
             for r in conn.execute("SELECT kind, id FROM tombstone WHERE rev > ?"
                                   " ORDER BY kind, id", (rev,)):
@@ -159,12 +163,23 @@ def _highlight(episodes: list[dict]) -> int | None:
 RECENT_MAX = 8
 
 
+def _ratio(position: float | None, duration: float | None, watched: bool) -> float | None:
+    if not watched and position and duration:
+        return min(position / duration, 1.0)
+    return None
+
+
+def _remaining_min(position: float | None, duration: float | None,
+                   watched: bool) -> int | None:
+    if watched or not duration:
+        return None
+    return max(0, round((duration - (position or 0.0)) / 60))
+
+
 def _tv_summary(w: sqlite3.Row, position: float | None, duration: float | None,
                 watched: bool) -> dict:
     """Résumé d'œuvre pour l'écran télé, avec la progression de sa dernière lecture."""
-    ratio = None
-    if not watched and position and duration:
-        ratio = min(position / duration, 1.0)
+    ratio = _ratio(position, duration, watched)
     return {"id": w["id"], "title_fr": w["title_fr"], "year": w["year"],
             "poster": w["poster_asset"], "progress_ratio": ratio, "watched": watched}
 
@@ -210,3 +225,122 @@ def _showcase(conn: sqlite3.Connection, rng: random.Random) -> dict | None:
     d.update(title_vo=w["title_vo"], directors=json.loads(w["directors_json"]),
              duration_min=w["duration_min"], collection_name=c and c["name"])
     return d
+
+
+def _marks(n: int) -> str:
+    return ",".join("?" * n)
+
+
+def _availability(conn: sqlite3.Connection, work_ids: list[int]) -> dict[int, tuple[bool, str | None]]:
+    """Par œuvre : (jouable, libellé du premier disque absent qui porte ses fichiers)."""
+    out: dict[int, tuple[bool, str | None]] = {w: (False, None) for w in work_ids}
+    if not work_ids:
+        return out
+    rows = conn.execute(
+        "SELECT COALESCE(mf.work_id, s.work_id) AS wid, mf.present, v.label, v.present AS vp"
+        " FROM media_file mf LEFT JOIN episode e ON e.id = mf.episode_id"
+        " LEFT JOIN season s ON s.id = e.season_id"
+        " LEFT JOIN volume v ON v.uuid = mf.volume_uuid"
+        f" WHERE COALESCE(mf.work_id, s.work_id) IN ({_marks(len(work_ids))})"
+        " ORDER BY mf.id", work_ids).fetchall()
+    playable = {r["wid"] for r in rows if r["present"]}
+    absent: dict[int, str | None] = {}
+    for r in rows:
+        if r["wid"] not in playable and r["vp"] == 0 and r["wid"] not in absent:
+            absent[r["wid"]] = r["label"]
+    for w in work_ids:
+        out[w] = (w in playable, None if w in playable else absent.get(w))
+    return out
+
+
+def _latest_progress(conn: sqlite3.Connection, work_ids: list[int]) -> dict[int, sqlite3.Row]:
+    """Par œuvre : la progression la plus récente (la sienne ou celle d'un épisode)."""
+    rows = conn.execute(
+        "SELECT p.*, CASE p.target_kind WHEN 'work' THEN p.target_id ELSE s.work_id END"
+        " AS wid FROM progress p LEFT JOIN episode e ON p.target_kind = 'episode'"
+        " AND e.id = p.target_id LEFT JOIN season s ON s.id = e.season_id"
+        f" WHERE wid IN ({_marks(len(work_ids))})"
+        " ORDER BY p.updated_at IS NOT NULL, p.updated_at", work_ids).fetchall()
+    return {r["wid"]: r for r in rows}  # le plus récent écrase
+
+
+def _enrich_works(conn: sqlite3.Connection, ids: list[int],
+                  collection_id: int | None) -> dict[int, dict]:
+    works = conn.execute(f"SELECT * FROM work WHERE id IN ({_marks(len(ids))})", ids).fetchall()
+    wids = [w["id"] for w in works]
+    avail = _availability(conn, wids)
+    prog = _latest_progress(conn, wids) if wids else {}
+    ranks: dict[int, str | None] = {}
+    if collection_id is not None and wids:
+        ranks = {r["work_id"]: r["rank"] for r in conn.execute(
+            "SELECT work_id, rank FROM work_collection WHERE collection_id = ?"
+            f" AND work_id IN ({_marks(len(wids))})", [collection_id, *wids])}
+    out: dict[int, dict] = {}
+    for w in works:
+        p = prog.get(w["id"])
+        pos, dur, watched = (p["position"], p["duration"], bool(p["watched"])) if p \
+            else (None, None, False)
+        playable, absent = avail[w["id"]]
+        out[w["id"]] = {
+            "kind": "work", "id": w["id"], "type": w["type"], "title_fr": w["title_fr"],
+            "title_vo": w["title_vo"], "title_alt": w["title_alt"],
+            "directors": json.loads(w["directors_json"]), "year": w["year"],
+            "poster": w["poster_asset"],
+            "playable": playable, "watched": watched,
+            "progress_ratio": _ratio(pos, dur, watched),
+            "remaining_min": _remaining_min(pos, dur, watched),
+            "absent_volume": absent, "medium": w["medium"], "rank": ranks.get(w["id"])}
+    return out
+
+
+def _enrich_episodes(conn: sqlite3.Connection, ids: list[int]) -> dict[int, dict]:
+    rows = conn.execute(
+        "SELECT e.id, e.number, e.title, s.id AS season_id, s.number AS season_number,"
+        " w.id AS work_id, w.title_fr, w.poster_asset, p.position, p.duration, p.watched"
+        " FROM episode e JOIN season s ON s.id = e.season_id JOIN work w ON w.id = s.work_id"
+        " LEFT JOIN progress p ON p.target_kind = 'episode' AND p.target_id = e.id"
+        f" WHERE e.id IN ({_marks(len(ids))})", ids).fetchall()
+    return {r["id"]: {
+        "kind": "episode", "id": r["id"], "work_id": r["work_id"],
+        "season_id": r["season_id"], "work_title": r["title_fr"],
+        "season_number": r["season_number"], "number": r["number"], "title": r["title"],
+        "poster": r["poster_asset"], "watched": bool(r["watched"]),
+        "progress_ratio": _ratio(r["position"], r["duration"], bool(r["watched"])),
+        "remaining_min": _remaining_min(r["position"], r["duration"], bool(r["watched"]))}
+        for r in rows}
+
+
+def _enrich_collections(conn: sqlite3.Connection, ids: list[int]) -> dict[int, dict]:
+    colls = conn.execute(
+        f"SELECT id, name FROM collection WHERE id IN ({_marks(len(ids))})", ids).fetchall()
+    members: dict[int, list[sqlite3.Row]] = {c["id"]: [] for c in colls}
+    rows = conn.execute(
+        "SELECT wc.collection_id, w.id, w.poster_asset FROM work_collection wc"
+        " JOIN work w ON w.id = wc.work_id"
+        f" WHERE wc.collection_id IN ({_marks(len(ids))})"
+        " ORDER BY wc.rank IS NULL, CAST(wc.rank AS INTEGER), w.id", ids)
+    for r in rows:
+        members[r["collection_id"]].append(r)
+    avail = _availability(conn, sorted({m["id"] for ms in members.values() for m in ms}))
+    return {c["id"]: {
+        "kind": "collection", "id": c["id"], "name": c["name"],
+        "count": len(members[c["id"]]),
+        "playable_count": sum(avail[m["id"]][0] for m in members[c["id"]]),
+        "posters": [m["poster_asset"] for m in members[c["id"]]
+                    if m["poster_asset"] is not None][:3]} for c in colls}
+
+
+def enrich(conn: sqlite3.Connection, refs: list[dict],
+           collection_id: int | None) -> list[dict]:
+    """Éléments de vue enrichis (arbitrage 16), dans l'ordre reçu, inconnus omis.
+
+    Au plus une requête principale par sorte, avec IN (…)."""
+    builders = {"work": lambda ids: _enrich_works(conn, ids, collection_id),
+                "episode": lambda ids: _enrich_episodes(conn, ids),
+                "collection": lambda ids: _enrich_collections(conn, ids)}
+    found: dict[str, dict[int, dict]] = {}
+    for kind, build in builders.items():
+        ids = sorted({r["id"] for r in refs if r["kind"] == kind})
+        found[kind] = build(ids) if ids else {}
+    return [found[r["kind"]][r["id"]] for r in refs
+            if r["kind"] in found and r["id"] in found[r["kind"]]]

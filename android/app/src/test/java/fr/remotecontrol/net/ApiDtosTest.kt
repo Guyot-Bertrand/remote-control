@@ -23,6 +23,33 @@ class ApiDtosTest {
     }
 
     @Test
+    fun old_server_sync_decodes() {
+        // JSON de l'itération 1 : aucun des nouveaux champs.
+        val dto = RcJson.decodeFromString<SyncDto>(Fixtures.text("sync_full.json"))
+        assertNull(dto.totalWorks)
+        assertNull(dto.mediaFiles[0].audioLangs)
+        assertNull(dto.mediaFiles[0].subtitleLangs)
+        assertNull(dto.mediaFiles[0].width)
+        assertNull(dto.mediaFiles[0].durationS)
+        assertNull(dto.works[0].medium)
+        assertNull(dto.episodes[0].durationMin)
+    }
+
+    @Test
+    fun new_fields_decode() {
+        val dto = RcJson.decodeFromString<SyncDto>(NEW_FIELDS_JSON)
+        assertEquals(1200, dto.totalWorks)
+        assertEquals("DVD", dto.works[0].medium)
+        assertEquals(42, dto.episodes[0].durationMin)
+        val f = dto.mediaFiles[0]
+        assertEquals(listOf("en"), f.audioLangs)
+        assertEquals(listOf("fr", "en"), f.subtitleLangs)
+        assertEquals(624, f.width)
+        assertEquals(352, f.height)
+        assertEquals(2520.5, f.durationS!!, 0.0)
+    }
+
+    @Test
     fun sync_incremental_decodes_deleted() {
         val sync = RcJson.decodeFromString<SyncDto>(Fixtures.text("sync_incremental.json"))
         assertEquals(listOf(3L), sync.deleted.work)
@@ -105,3 +132,12 @@ class ApiDtosTest {
         assertEquals(612.5, snap.state.position, 0.0)
     }
 }
+
+private const val NEW_FIELDS_JSON = """
+{"revision": 9, "full": true, "total_works": 1200,
+ "works": [{"id": 1, "type": "film", "key": "k", "title_fr": "A", "medium": "DVD"}],
+ "seasons": [{"id": 1, "work_id": 2, "number": 1, "label": "Saison 1"}],
+ "episodes": [{"id": 1, "season_id": 1, "number": 1, "title": "E", "duration_min": 42}],
+ "media_files": [{"id": 1, "work_id": 1, "quality": "SD", "relpath": "a.avi", "present": true,
+   "audio_langs": ["en"], "subtitle_langs": ["fr", "en"], "width": 624, "height": 352, "duration_s": 2520.5}]}
+"""

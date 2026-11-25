@@ -13,6 +13,8 @@ import fr.remotecontrol.data.sync.SyncCoordinator
 import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.discovery.NsdServerDiscovery
 import fr.remotecontrol.discovery.ServerLocator
+import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.mirror.TvMirror
 import fr.remotecontrol.net.EventsClient
 import fr.remotecontrol.net.OkHttpRcApi
 import fr.remotecontrol.net.ServerEvent
@@ -29,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import okhttp3.OkHttpClient
 
@@ -55,6 +58,9 @@ class AppContainer(context: Context) {
     val sync: SyncRepository = SyncRepository(db, api)
     val coordinator: SyncCoordinator = SyncCoordinator(sync, events)
     val tvStatus: TvStatus = TvStatus(events)
+    val tvMirror: TvMirror by lazy {
+        TvMirror(api, store, connected = locator.state.map { it is ServerState.Connected })
+    }
     val filter: CatalogFilter = CatalogFilter()
     val playLauncher: PlayLauncher by lazy { PlayLauncher(api, locator::reportPlayerMissing) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }

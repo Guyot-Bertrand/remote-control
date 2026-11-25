@@ -1,0 +1,4351 @@
+{
+ "paused-full": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "paused",
+  "view": null,
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 12
+  }
+ },
+ "paused-full-sd": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "paused",
+  "view": null,
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 704 576'%3E%3Crect width='704' height='576' fill='%233a3128'/%3E%3Crect y='380' width='704' height='196' fill='%23241d17'/%3E%3Crect x='90' y='120' width='170' height='260' fill='%235b4c3c'/%3E%3Crect x='420' y='160' width='210' height='220' fill='%234a3d31'/%3E%3Ccircle cx='300' cy='300' r='70' fill='%238a6f52'/%3E%3Crect x='250' y='370' width='100' height='206' fill='%231a1511'/%3E%3C/svg%3E",
+   "title": "Bonjour l'angoisse",
+   "position": 2472.0,
+   "duration": 5404.0,
+   "work_id": 101
+  }
+ },
+ "home": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 3,
+   "screen": "home",
+   "title": null,
+   "subtitle": "4 en cours · 12 ajouts ce mois-ci",
+   "filter": null,
+   "query": null,
+   "work_id": null,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": [
+    {
+     "label": "Reprendre",
+     "people": [],
+     "items": [
+      {
+       "kind": "episode",
+       "id": 45,
+       "work_id": 12,
+       "season_id": 3,
+       "work_title": "Heroes",
+       "season_number": 1,
+       "number": 5,
+       "title": "Hiros",
+       "poster": null,
+       "watched": false,
+       "progress_ratio": 0.56,
+       "remaining_min": 18
+      },
+      {
+       "kind": "work",
+       "id": 301,
+       "type": "film",
+       "title_fr": "Ava",
+       "title_vo": "Ava",
+       "title_alt": null,
+       "directors": [
+        "Léa Mysius"
+       ],
+       "year": 2017,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": 0.73,
+       "remaining_min": 27,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "episode",
+       "id": 46,
+       "work_id": 20,
+       "season_id": 7,
+       "work_title": "Back to Life",
+       "season_number": 2,
+       "number": 3,
+       "title": "Épisode 3",
+       "poster": null,
+       "watched": false,
+       "progress_ratio": 0.56,
+       "remaining_min": 11
+      },
+      {
+       "kind": "work",
+       "id": 214,
+       "type": "film",
+       "title_fr": "Mulholland Drive",
+       "title_vo": "Mulholland Drive",
+       "title_alt": null,
+       "directors": [
+        "David Lynch"
+       ],
+       "year": 2001,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": 0.64,
+       "remaining_min": 52,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 205,
+       "type": "film",
+       "title_fr": "Magnolia",
+       "title_vo": "Magnolia",
+       "title_alt": null,
+       "directors": [
+        "Paul Thomas Anderson"
+       ],
+       "year": 1999,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": 0.3,
+       "remaining_min": 130,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      }
+     ]
+    },
+    {
+     "label": "Récemment ajoutés",
+     "people": [],
+     "items": [
+      {
+       "kind": "work",
+       "id": 101,
+       "type": "film",
+       "title_fr": "Bonjour l'angoisse",
+       "title_vo": "Bonjour l'angoisse",
+       "title_alt": null,
+       "directors": [
+        "Pierre Tchernia"
+       ],
+       "year": 1988,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 102,
+       "type": "spectacle",
+       "title_fr": "La symphonie des jeux vidéo",
+       "title_vo": "La symphonie des jeux vidéo",
+       "title_alt": null,
+       "directors": [],
+       "year": 2022,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 303,
+       "type": "film",
+       "title_fr": "Les Cinq Diables",
+       "title_vo": "Les Cinq Diables",
+       "title_alt": null,
+       "directors": [
+        "Léa Mysius"
+       ],
+       "year": 2022,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 304,
+       "type": "film",
+       "title_fr": "Paris, Texas",
+       "title_vo": "Paris, Texas",
+       "title_alt": null,
+       "directors": [
+        "Wim Wenders"
+       ],
+       "year": 1984,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 305,
+       "type": "film",
+       "title_fr": "Le Charme discret de la bourgeoisie",
+       "title_vo": "Le Charme discret de la bourgeoisie",
+       "title_alt": null,
+       "directors": [
+        "Luis Buñuel"
+       ],
+       "year": 1972,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 306,
+       "type": "film",
+       "title_fr": "Les Parapluies de Cherbourg",
+       "title_vo": "Les Parapluies de Cherbourg",
+       "title_alt": null,
+       "directors": [
+        "Jacques Demy"
+       ],
+       "year": 1964,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 307,
+       "type": "film",
+       "title_fr": "Barry Lyndon",
+       "title_vo": "Barry Lyndon",
+       "title_alt": null,
+       "directors": [
+        "Stanley Kubrick"
+       ],
+       "year": 1975,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 308,
+       "type": "film",
+       "title_fr": "Stalker",
+       "title_vo": "Stalker",
+       "title_alt": null,
+       "directors": [
+        "Andreï Tarkovski"
+       ],
+       "year": 1979,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 309,
+       "type": "film",
+       "title_fr": "Cléo de 5 à 7",
+       "title_vo": "Cléo de 5 à 7",
+       "title_alt": null,
+       "directors": [
+        "Agnès Varda"
+       ],
+       "year": 1962,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 310,
+       "type": "film",
+       "title_fr": "In the Mood for Love",
+       "title_vo": "In the Mood for Love",
+       "title_alt": null,
+       "directors": [
+        "Wong Kar-wai"
+       ],
+       "year": 2000,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      }
+     ]
+    },
+    {
+     "label": "Collections",
+     "people": [],
+     "items": [
+      {
+       "kind": "collection",
+       "id": 4,
+       "name": "Les 1000 plus grands films de tous les temps [2020]",
+       "count": 1000,
+       "playable_count": 612,
+       "posters": []
+      },
+      {
+       "kind": "collection",
+       "id": 5,
+       "name": "Cinéphilie [Sergent Pepper]",
+       "count": 250,
+       "playable_count": 198,
+       "posters": []
+      },
+      {
+       "kind": "collection",
+       "id": 6,
+       "name": "Théâtre filmé",
+       "count": 84,
+       "playable_count": 80,
+       "posters": []
+      }
+     ]
+    }
+   ]
+  },
+  "pause": null
+ },
+ "home-paused": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 7,
+   "screen": "home",
+   "title": null,
+   "subtitle": "4 en cours · 12 ajouts ce mois-ci",
+   "filter": null,
+   "query": null,
+   "work_id": null,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": [
+    {
+     "label": "Récemment ajoutés",
+     "people": [],
+     "items": [
+      {
+       "kind": "work",
+       "id": 101,
+       "type": "film",
+       "title_fr": "Bonjour l'angoisse",
+       "title_vo": "Bonjour l'angoisse",
+       "title_alt": null,
+       "directors": [
+        "Pierre Tchernia"
+       ],
+       "year": 1988,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 102,
+       "type": "spectacle",
+       "title_fr": "La symphonie des jeux vidéo",
+       "title_vo": "La symphonie des jeux vidéo",
+       "title_alt": null,
+       "directors": [],
+       "year": 2022,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 303,
+       "type": "film",
+       "title_fr": "Les Cinq Diables",
+       "title_vo": "Les Cinq Diables",
+       "title_alt": null,
+       "directors": [
+        "Léa Mysius"
+       ],
+       "year": 2022,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 304,
+       "type": "film",
+       "title_fr": "Paris, Texas",
+       "title_vo": "Paris, Texas",
+       "title_alt": null,
+       "directors": [
+        "Wim Wenders"
+       ],
+       "year": 1984,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 305,
+       "type": "film",
+       "title_fr": "Le Charme discret de la bourgeoisie",
+       "title_vo": "Le Charme discret de la bourgeoisie",
+       "title_alt": null,
+       "directors": [
+        "Luis Buñuel"
+       ],
+       "year": 1972,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 306,
+       "type": "film",
+       "title_fr": "Les Parapluies de Cherbourg",
+       "title_vo": "Les Parapluies de Cherbourg",
+       "title_alt": null,
+       "directors": [
+        "Jacques Demy"
+       ],
+       "year": 1964,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 307,
+       "type": "film",
+       "title_fr": "Barry Lyndon",
+       "title_vo": "Barry Lyndon",
+       "title_alt": null,
+       "directors": [
+        "Stanley Kubrick"
+       ],
+       "year": 1975,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 308,
+       "type": "film",
+       "title_fr": "Stalker",
+       "title_vo": "Stalker",
+       "title_alt": null,
+       "directors": [
+        "Andreï Tarkovski"
+       ],
+       "year": 1979,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 309,
+       "type": "film",
+       "title_fr": "Cléo de 5 à 7",
+       "title_vo": "Cléo de 5 à 7",
+       "title_alt": null,
+       "directors": [
+        "Agnès Varda"
+       ],
+       "year": 1962,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      },
+      {
+       "kind": "work",
+       "id": 310,
+       "type": "film",
+       "title_fr": "In the Mood for Love",
+       "title_vo": "In the Mood for Love",
+       "title_alt": null,
+       "directors": [
+        "Wong Kar-wai"
+       ],
+       "year": 2000,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      }
+     ]
+    },
+    {
+     "label": "Collections",
+     "people": [],
+     "items": [
+      {
+       "kind": "collection",
+       "id": 4,
+       "name": "Les 1000 plus grands films de tous les temps [2020]",
+       "count": 1000,
+       "playable_count": 612,
+       "posters": []
+      },
+      {
+       "kind": "collection",
+       "id": 5,
+       "name": "Cinéphilie [Sergent Pepper]",
+       "count": 250,
+       "playable_count": 198,
+       "posters": []
+      },
+      {
+       "kind": "collection",
+       "id": 6,
+       "name": "Théâtre filmé",
+       "count": 84,
+       "playable_count": 80,
+       "posters": []
+      }
+     ]
+    }
+   ]
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 12
+  }
+ },
+ "browse": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "browse",
+   "title": "Films",
+   "subtitle": "2 552 films · Titre",
+   "filter": "playable",
+   "query": null,
+   "work_id": null,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [
+    {
+     "kind": "work",
+     "id": 201,
+     "type": "film",
+     "title_fr": "M le maudit",
+     "title_vo": "M",
+     "title_alt": null,
+     "directors": [
+      "Fritz Lang"
+     ],
+     "year": 1931,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 202,
+     "type": "film",
+     "title_fr": "Ma nuit chez Maud",
+     "title_vo": "Ma nuit chez Maud",
+     "title_alt": null,
+     "directors": [
+      "Éric Rohmer"
+     ],
+     "year": 1969,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": "Blu-ray",
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 203,
+     "type": "film",
+     "title_fr": "Madame de...",
+     "title_vo": "Madame de...",
+     "title_alt": null,
+     "directors": [
+      "Max Ophüls"
+     ],
+     "year": 1953,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 204,
+     "type": "film",
+     "title_fr": "Mad Max",
+     "title_vo": "Mad Max",
+     "title_alt": null,
+     "directors": [
+      "George Miller"
+     ],
+     "year": 1979,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": "DISK2",
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 205,
+     "type": "film",
+     "title_fr": "Magnolia",
+     "title_vo": "Magnolia",
+     "title_alt": null,
+     "directors": [
+      "Paul Thomas Anderson"
+     ],
+     "year": 1999,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": 0.3,
+     "remaining_min": 132,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 206,
+     "type": "film",
+     "title_fr": "Mais où est donc passée la 7e compagnie ?",
+     "title_vo": "Mais où est donc passée la 7e compagnie ?",
+     "title_alt": null,
+     "directors": [
+      "Robert Lamoureux"
+     ],
+     "year": 1973,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 207,
+     "type": "film",
+     "title_fr": "Manhattan",
+     "title_vo": "Manhattan",
+     "title_alt": null,
+     "directors": [
+      "Woody Allen"
+     ],
+     "year": 1979,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 208,
+     "type": "film",
+     "title_fr": "Marius",
+     "title_vo": "Marius",
+     "title_alt": null,
+     "directors": [
+      "Alexander Korda"
+     ],
+     "year": 1931,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 209,
+     "type": "film",
+     "title_fr": "Mean Streets",
+     "title_vo": "Mean Streets",
+     "title_alt": null,
+     "directors": [
+      "Martin Scorsese"
+     ],
+     "year": 1973,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 210,
+     "type": "film",
+     "title_fr": "Metropolis",
+     "title_vo": "Metropolis",
+     "title_alt": null,
+     "directors": [
+      "Fritz Lang"
+     ],
+     "year": 1927,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 211,
+     "type": "film",
+     "title_fr": "Miller's Crossing",
+     "title_vo": "Miller's Crossing",
+     "title_alt": null,
+     "directors": [
+      "Joel Coen",
+      "Ethan Coen"
+     ],
+     "year": 1990,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": "DVD",
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 212,
+     "type": "film",
+     "title_fr": "Mon oncle",
+     "title_vo": "Mon oncle",
+     "title_alt": null,
+     "directors": [
+      "Jacques Tati"
+     ],
+     "year": 1958,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 213,
+     "type": "film",
+     "title_fr": "Mort à Venise",
+     "title_vo": "Morte a Venezia",
+     "title_alt": null,
+     "directors": [
+      "Luchino Visconti"
+     ],
+     "year": 1971,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 214,
+     "type": "film",
+     "title_fr": "Mulholland Drive",
+     "title_vo": "Mulholland Drive",
+     "title_alt": null,
+     "directors": [
+      "David Lynch"
+     ],
+     "year": 2001,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": 0.6,
+     "remaining_min": 58,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 215,
+     "type": "film",
+     "title_fr": "Muriel ou le Temps d'un retour",
+     "title_vo": "Muriel ou le Temps d'un retour",
+     "title_alt": null,
+     "directors": [
+      "Alain Resnais"
+     ],
+     "year": 1963,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 216,
+     "type": "film",
+     "title_fr": "Mystic River",
+     "title_vo": "Mystic River",
+     "title_alt": null,
+     "directors": [
+      "Clint Eastwood"
+     ],
+     "year": 2003,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    }
+   ],
+   "anchor": 205,
+   "position": {
+    "letter": "M",
+    "index": 1240,
+    "total": 2552
+   },
+   "sections": []
+  },
+  "pause": null
+ },
+ "browse-paused": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "browse",
+   "title": "Films",
+   "subtitle": "2 552 films · Titre",
+   "filter": "playable",
+   "query": null,
+   "work_id": null,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [
+    {
+     "kind": "work",
+     "id": 201,
+     "type": "film",
+     "title_fr": "M le maudit",
+     "title_vo": "M",
+     "title_alt": null,
+     "directors": [
+      "Fritz Lang"
+     ],
+     "year": 1931,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 202,
+     "type": "film",
+     "title_fr": "Ma nuit chez Maud",
+     "title_vo": "Ma nuit chez Maud",
+     "title_alt": null,
+     "directors": [
+      "Éric Rohmer"
+     ],
+     "year": 1969,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": "Blu-ray",
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 203,
+     "type": "film",
+     "title_fr": "Madame de...",
+     "title_vo": "Madame de...",
+     "title_alt": null,
+     "directors": [
+      "Max Ophüls"
+     ],
+     "year": 1953,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 204,
+     "type": "film",
+     "title_fr": "Mad Max",
+     "title_vo": "Mad Max",
+     "title_alt": null,
+     "directors": [
+      "George Miller"
+     ],
+     "year": 1979,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": "DISK2",
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 205,
+     "type": "film",
+     "title_fr": "Magnolia",
+     "title_vo": "Magnolia",
+     "title_alt": null,
+     "directors": [
+      "Paul Thomas Anderson"
+     ],
+     "year": 1999,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": 0.3,
+     "remaining_min": 132,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 206,
+     "type": "film",
+     "title_fr": "Mais où est donc passée la 7e compagnie ?",
+     "title_vo": "Mais où est donc passée la 7e compagnie ?",
+     "title_alt": null,
+     "directors": [
+      "Robert Lamoureux"
+     ],
+     "year": 1973,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 207,
+     "type": "film",
+     "title_fr": "Manhattan",
+     "title_vo": "Manhattan",
+     "title_alt": null,
+     "directors": [
+      "Woody Allen"
+     ],
+     "year": 1979,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 208,
+     "type": "film",
+     "title_fr": "Marius",
+     "title_vo": "Marius",
+     "title_alt": null,
+     "directors": [
+      "Alexander Korda"
+     ],
+     "year": 1931,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 209,
+     "type": "film",
+     "title_fr": "Mean Streets",
+     "title_vo": "Mean Streets",
+     "title_alt": null,
+     "directors": [
+      "Martin Scorsese"
+     ],
+     "year": 1973,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 210,
+     "type": "film",
+     "title_fr": "Metropolis",
+     "title_vo": "Metropolis",
+     "title_alt": null,
+     "directors": [
+      "Fritz Lang"
+     ],
+     "year": 1927,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 211,
+     "type": "film",
+     "title_fr": "Miller's Crossing",
+     "title_vo": "Miller's Crossing",
+     "title_alt": null,
+     "directors": [
+      "Joel Coen",
+      "Ethan Coen"
+     ],
+     "year": 1990,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": "DVD",
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 212,
+     "type": "film",
+     "title_fr": "Mon oncle",
+     "title_vo": "Mon oncle",
+     "title_alt": null,
+     "directors": [
+      "Jacques Tati"
+     ],
+     "year": 1958,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 213,
+     "type": "film",
+     "title_fr": "Mort à Venise",
+     "title_vo": "Morte a Venezia",
+     "title_alt": null,
+     "directors": [
+      "Luchino Visconti"
+     ],
+     "year": 1971,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 214,
+     "type": "film",
+     "title_fr": "Mulholland Drive",
+     "title_vo": "Mulholland Drive",
+     "title_alt": null,
+     "directors": [
+      "David Lynch"
+     ],
+     "year": 2001,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": 0.6,
+     "remaining_min": 58,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 215,
+     "type": "film",
+     "title_fr": "Muriel ou le Temps d'un retour",
+     "title_vo": "Muriel ou le Temps d'un retour",
+     "title_alt": null,
+     "directors": [
+      "Alain Resnais"
+     ],
+     "year": 1963,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    },
+    {
+     "kind": "work",
+     "id": 216,
+     "type": "film",
+     "title_fr": "Mystic River",
+     "title_vo": "Mystic River",
+     "title_alt": null,
+     "directors": [
+      "Clint Eastwood"
+     ],
+     "year": 2003,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": null
+    }
+   ],
+   "anchor": 205,
+   "position": {
+    "letter": "M",
+    "index": 1240,
+    "total": 2552
+   },
+   "sections": []
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 12
+  }
+ },
+ "collection": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 4,
+   "screen": "collection",
+   "title": "Les 1000 plus grands films de tous les temps [2020]",
+   "subtitle": "1000 œuvres · 612 lisibles",
+   "filter": "playable",
+   "query": null,
+   "work_id": null,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": 4,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [
+    {
+     "kind": "work",
+     "id": 508,
+     "type": "film",
+     "title_fr": "Mon oncle",
+     "title_vo": "Mon oncle",
+     "title_alt": null,
+     "directors": [
+      "Jacques Tati"
+     ],
+     "year": 1958,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "408"
+    },
+    {
+     "kind": "work",
+     "id": 509,
+     "type": "film",
+     "title_fr": "Mort à Venise",
+     "title_vo": "Mort à Venise",
+     "title_alt": null,
+     "directors": [
+      "Luchino Visconti"
+     ],
+     "year": 1971,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": "DISK2",
+     "medium": null,
+     "rank": "409"
+    },
+    {
+     "kind": "work",
+     "id": 510,
+     "type": "film",
+     "title_fr": "Le Mépris",
+     "title_vo": "Le Mépris",
+     "title_alt": null,
+     "directors": [
+      "Jean-Luc Godard"
+     ],
+     "year": 1963,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "410"
+    },
+    {
+     "kind": "work",
+     "id": 511,
+     "type": "film",
+     "title_fr": "Cléo de 5 à 7",
+     "title_vo": "Cléo de 5 à 7",
+     "title_alt": null,
+     "directors": [
+      "Agnès Varda"
+     ],
+     "year": 1962,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "411"
+    },
+    {
+     "kind": "work",
+     "id": 512,
+     "type": "film",
+     "title_fr": "Paris, Texas",
+     "title_vo": "Paris, Texas",
+     "title_alt": null,
+     "directors": [
+      "Wim Wenders"
+     ],
+     "year": 1984,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": 0.4,
+     "remaining_min": 88,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "412"
+    },
+    {
+     "kind": "work",
+     "id": 513,
+     "type": "film",
+     "title_fr": "Le Cercle rouge",
+     "title_vo": "Le Cercle rouge",
+     "title_alt": null,
+     "directors": [
+      "Jean-Pierre Melville"
+     ],
+     "year": 1970,
+     "poster": null,
+     "playable": false,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": "Blu-ray",
+     "rank": "413"
+    },
+    {
+     "kind": "work",
+     "id": 514,
+     "type": "film",
+     "title_fr": "Stalker",
+     "title_vo": "Stalker",
+     "title_alt": null,
+     "directors": [
+      "Andreï Tarkovski"
+     ],
+     "year": 1979,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "414"
+    },
+    {
+     "kind": "work",
+     "id": 515,
+     "type": "film",
+     "title_fr": "Barry Lyndon",
+     "title_vo": "Barry Lyndon",
+     "title_alt": null,
+     "directors": [
+      "Stanley Kubrick"
+     ],
+     "year": 1975,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "415"
+    },
+    {
+     "kind": "work",
+     "id": 516,
+     "type": "film",
+     "title_fr": "In the Mood for Love",
+     "title_vo": "In the Mood for Love",
+     "title_alt": null,
+     "directors": [
+      "Wong Kar-wai"
+     ],
+     "year": 2000,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "416"
+    },
+    {
+     "kind": "work",
+     "id": 517,
+     "type": "film",
+     "title_fr": "La Nuit du chasseur",
+     "title_vo": "La Nuit du chasseur",
+     "title_alt": null,
+     "directors": [
+      "Charles Laughton"
+     ],
+     "year": 1955,
+     "poster": null,
+     "playable": true,
+     "watched": true,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "417"
+    },
+    {
+     "kind": "work",
+     "id": 518,
+     "type": "film",
+     "title_fr": "Les Parapluies de Cherbourg",
+     "title_vo": "Les Parapluies de Cherbourg",
+     "title_alt": null,
+     "directors": [
+      "Jacques Demy"
+     ],
+     "year": 1964,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "418"
+    },
+    {
+     "kind": "work",
+     "id": 519,
+     "type": "film",
+     "title_fr": "Le Charme discret de la bourgeoisie",
+     "title_vo": "Le Charme discret de la bourgeoisie",
+     "title_alt": null,
+     "directors": [
+      "Luis Buñuel"
+     ],
+     "year": 1972,
+     "poster": null,
+     "playable": true,
+     "watched": false,
+     "progress_ratio": null,
+     "remaining_min": null,
+     "absent_volume": null,
+     "medium": null,
+     "rank": "419"
+    }
+   ],
+   "anchor": 512,
+   "position": {
+    "letter": null,
+    "index": 412,
+    "total": 1000
+   },
+   "sections": []
+  },
+  "pause": null
+ },
+ "search": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 2,
+   "screen": "search",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": "tchernia",
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": [
+    {
+     "label": "Personnes",
+     "people": [
+      {
+       "name": "Pierre Tchernia",
+       "role": "Réalisation",
+       "count": 1
+      }
+     ],
+     "items": []
+    },
+    {
+     "label": "Œuvres",
+     "people": [],
+     "items": [
+      {
+       "kind": "work",
+       "id": 101,
+       "type": "film",
+       "title_fr": "Bonjour l'angoisse",
+       "title_vo": "Bonjour l'angoisse",
+       "title_alt": null,
+       "directors": [
+        "Pierre Tchernia"
+       ],
+       "year": 1988,
+       "poster": null,
+       "playable": true,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": null,
+       "rank": null
+      }
+     ]
+    }
+   ]
+  },
+  "pause": null
+ },
+ "search-empty": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 5,
+   "screen": "search",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": "almodovar",
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": [
+    {
+     "label": "Personnes",
+     "people": [],
+     "items": []
+    },
+    {
+     "label": "Œuvres",
+     "people": [],
+     "items": []
+    },
+    {
+     "label": "Aussi connu sous",
+     "people": [],
+     "items": []
+    }
+   ]
+  },
+  "pause": null
+ },
+ "search-short": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 6,
+   "screen": "search",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": "t",
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null
+ },
+ "search-paused": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 3,
+   "screen": "search",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": "alien",
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": [
+    {
+     "label": "Œuvres",
+     "people": [],
+     "items": [
+      {
+       "kind": "work",
+       "id": 401,
+       "type": "film",
+       "title_fr": "Alien, le huitième passager",
+       "title_vo": "Alien",
+       "title_alt": "Alien",
+       "directors": [
+        "Ridley Scott"
+       ],
+       "year": 1979,
+       "poster": null,
+       "playable": false,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": "DVD",
+       "rank": null
+      }
+     ]
+    },
+    {
+     "label": "Aussi connu sous",
+     "people": [],
+     "items": [
+      {
+       "kind": "work",
+       "id": 401,
+       "type": "film",
+       "title_fr": "Alien, le huitième passager",
+       "title_vo": "Alien",
+       "title_alt": "Alien",
+       "directors": [
+        "Ridley Scott"
+       ],
+       "year": 1979,
+       "poster": null,
+       "playable": false,
+       "watched": false,
+       "progress_ratio": null,
+       "remaining_min": null,
+       "absent_volume": null,
+       "medium": "DVD",
+       "rank": null
+      }
+     ]
+    }
+   ]
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 704 576'%3E%3Crect width='704' height='576' fill='%233a3128'/%3E%3Crect y='380' width='704' height='196' fill='%23241d17'/%3E%3Crect x='90' y='120' width='170' height='260' fill='%235b4c3c'/%3E%3Crect x='420' y='160' width='210' height='220' fill='%234a3d31'/%3E%3Ccircle cx='300' cy='300' r='70' fill='%238a6f52'/%3E%3Crect x='250' y='370' width='100' height='206' fill='%231a1511'/%3E%3C/svg%3E",
+   "title": "Bonjour l'angoisse",
+   "position": 2472.0,
+   "duration": 5404.0,
+   "work_id": 101
+  }
+ },
+ "work": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "work",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 12,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/works/12": {
+    "id": 12,
+    "type": "film",
+    "title_fr": "Ava",
+    "title_vo": "Ava",
+    "year": 2017,
+    "duration_min": 99,
+    "genres": [
+     "comédie dramatique"
+    ],
+    "directors": [
+     "Léa Mysius"
+    ],
+    "cast": [
+     "Noée Abita",
+     "Laure Calamy",
+     "Juan Cano"
+    ],
+    "synopsis": "Ava, 13 ans, est en vacances au bord de l'océan quand elle apprend qu'elle va perdre la vue plus vite que prévu. Tandis que sa mère s'efforce de lui offrir un été léger, Ava apprend à vivre dans le noir, s'attache à un grand chien noir et à son maître en fuite.",
+    "collections": [
+     {
+      "id": 4,
+      "name": "Les 1000 plus grands films de tous les temps [2020]",
+      "rank": "2017"
+     }
+    ],
+    "media_files": [
+     {
+      "id": 7,
+      "quality": "FHD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/7.mkv",
+      "audio_langs": [
+       "fr",
+       "en"
+      ],
+      "subtitle_langs": [
+       "fr"
+      ],
+      "width": 1920,
+      "height": 1080,
+      "duration_s": 5940.0
+     },
+     {
+      "id": 8,
+      "quality": "HD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/8.mkv",
+      "audio_langs": [
+       "fr"
+      ],
+      "subtitle_langs": [],
+      "width": 1280,
+      "height": 720,
+      "duration_s": 5940.0
+     }
+    ],
+    "tags": [
+     "[FR]"
+    ],
+    "poster": null,
+    "medium": null,
+    "seasons": [],
+    "progress": {
+     "position": 4320.0,
+     "duration": 5940.0,
+     "watched": false,
+     "media_file_id": 7
+    }
+   }
+  }
+ },
+ "work-dvd": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "work",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 13,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/works/13": {
+    "id": 13,
+    "type": "film",
+    "title_fr": "Alien, le huitième passager",
+    "title_vo": "Alien",
+    "year": 1979,
+    "duration_min": 117,
+    "genres": [
+     "science-fiction",
+     "horreur"
+    ],
+    "directors": [
+     "Ridley Scott"
+    ],
+    "cast": [
+     "Tom Skerritt",
+     "Sigourney Weaver",
+     "Veronica Cartwright",
+     "Harry Dean Stanton",
+     "John Hurt",
+     "Ian Holm"
+    ],
+    "synopsis": "De retour d'une mission commerciale, l'équipage du cargo spatial Nostromo est tiré de son sommeil artificiel pour répondre à un signal venu d'une planète inconnue. L'un d'eux en rapporte, sans le savoir, un passager redoutable.",
+    "collections": [
+     {
+      "id": 4,
+      "name": "Les 1000 plus grands films de tous les temps [2020]",
+      "rank": null
+     }
+    ],
+    "media_files": [
+     {
+      "id": 20,
+      "quality": "DVD",
+      "present": false,
+      "volume_label": "Films 1",
+      "relpath": "x/20.mkv",
+      "audio_langs": null,
+      "subtitle_langs": null,
+      "width": null,
+      "height": null,
+      "duration_s": null
+     }
+    ],
+    "tags": [],
+    "poster": null,
+    "medium": "DVD",
+    "seasons": [],
+    "progress": null
+   }
+  }
+ },
+ "season-selected": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "season",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 30,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  }
+ },
+ "season-paused": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "season",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 30,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 30
+  },
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  },
+  "player": {
+   "current": {
+    "target_kind": "episode",
+    "target_id": 105,
+    "media_file_id": 305,
+    "season_id": 3,
+    "title": "Heroes — S01E05"
+   },
+   "state": {
+    "running": true,
+    "paused": true,
+    "position": 1394.0,
+    "duration": 2490.0
+   }
+  }
+ },
+ "preplay": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "preplay",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": null,
+   "season_id": 3,
+   "episode_id": 112,
+   "media_file_id": 312,
+   "collection_id": null,
+   "audio_track": 1,
+   "subtitle_track": {
+    "kind": "embedded",
+    "index": 1
+   },
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 30
+  },
+  "fetch": {
+   "/api/seasons/3": {
+    "id": 3,
+    "work_id": 30,
+    "number": 1,
+    "label": "Saison 1",
+    "work": {
+     "id": 30,
+     "type": "serie",
+     "key": "heroes",
+     "title_fr": "Heroes",
+     "title_vo": "Heroes",
+     "year": 2006,
+     "episodic": true,
+     "poster": null
+    },
+    "episodes": [
+     {
+      "id": 101,
+      "season_id": 3,
+      "number": 1,
+      "title": "Genesis",
+      "duration_min": 53,
+      "progress": {
+       "position": 0.0,
+       "duration": 3180.0,
+       "watched": true,
+       "media_file_id": 301,
+       "updated_at": 1
+      },
+      "media_files": [
+       {
+        "id": 301,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/301.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 3180.0
+       }
+      ]
+     },
+     {
+      "id": 102,
+      "season_id": 3,
+      "number": 2,
+      "title": "Don't Look Back",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 302,
+       "updated_at": 2
+      },
+      "media_files": [
+       {
+        "id": 302,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/302.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 103,
+      "season_id": 3,
+      "number": 3,
+      "title": "One Giant Leap",
+      "duration_min": 42,
+      "progress": {
+       "position": 0.0,
+       "duration": 2520.0,
+       "watched": true,
+       "media_file_id": 303,
+       "updated_at": 3
+      },
+      "media_files": [
+       {
+        "id": 303,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/303.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 104,
+      "season_id": 3,
+      "number": 4,
+      "title": "Collision",
+      "duration_min": 43,
+      "progress": {
+       "position": 0.0,
+       "duration": 2580.0,
+       "watched": true,
+       "media_file_id": 304,
+       "updated_at": 4
+      },
+      "media_files": [
+       {
+        "id": 304,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/304.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 105,
+      "season_id": 3,
+      "number": 5,
+      "title": "Hiros",
+      "duration_min": 41,
+      "progress": {
+       "position": 1394.0,
+       "duration": 2490.0,
+       "watched": false,
+       "media_file_id": 305,
+       "updated_at": 10
+      },
+      "media_files": [
+       {
+        "id": 305,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/305.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2460.0
+       }
+      ]
+     },
+     {
+      "id": 106,
+      "season_id": 3,
+      "number": 6,
+      "title": "Better Halves",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 306,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/306.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 107,
+      "season_id": 3,
+      "number": 7,
+      "title": "Nothing to Hide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 307,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/307.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 108,
+      "season_id": 3,
+      "number": 8,
+      "title": "Seven Minutes to Midnight",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 308,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/308.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 109,
+      "season_id": 3,
+      "number": 9,
+      "title": "Homecoming",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 309,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/309.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 110,
+      "season_id": 3,
+      "number": 10,
+      "title": "Six Months Ago",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 310,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/310.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 111,
+      "season_id": 3,
+      "number": 11,
+      "title": "Fallout",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 311,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/311.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 112,
+      "season_id": 3,
+      "number": 12,
+      "title": "Godsend",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 312,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/312.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 113,
+      "season_id": 3,
+      "number": 13,
+      "title": "The Fix",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 313,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/313.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 114,
+      "season_id": 3,
+      "number": 14,
+      "title": "Distractions",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 314,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/314.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 115,
+      "season_id": 3,
+      "number": 15,
+      "title": "Run!",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 315,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/315.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 116,
+      "season_id": 3,
+      "number": 16,
+      "title": "Unexpected",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 316,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/316.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 117,
+      "season_id": 3,
+      "number": 17,
+      "title": "Company Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 317,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/317.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     },
+     {
+      "id": 118,
+      "season_id": 3,
+      "number": 18,
+      "title": "Parasite",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 318,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/318.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 119,
+      "season_id": 3,
+      "number": 19,
+      "title": ".07%",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 319,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/319.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 120,
+      "season_id": 3,
+      "number": 20,
+      "title": "Five Years Gone",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 320,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/320.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 121,
+      "season_id": 3,
+      "number": 21,
+      "title": "The Hard Part",
+      "duration_min": 42,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 321,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/321.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2520.0
+       }
+      ]
+     },
+     {
+      "id": 122,
+      "season_id": 3,
+      "number": 22,
+      "title": "Landslide",
+      "duration_min": 43,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 322,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/322.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2580.0
+       }
+      ]
+     },
+     {
+      "id": 123,
+      "season_id": 3,
+      "number": 23,
+      "title": "How to Stop an Exploding Man",
+      "duration_min": 44,
+      "progress": null,
+      "media_files": [
+       {
+        "id": 323,
+        "quality": "SD",
+        "present": true,
+        "volume_label": "Séries",
+        "relpath": "x/323.mkv",
+        "audio_langs": [
+         "en"
+        ],
+        "subtitle_langs": [
+         "en",
+         "fr"
+        ],
+        "width": 624,
+        "height": 352,
+        "duration_s": 2640.0
+       }
+      ]
+     }
+    ],
+    "highlight_episode_id": 105
+   },
+   "/api/works/30": {
+    "id": 30,
+    "type": "serie",
+    "title_fr": "Heroes",
+    "title_vo": "Heroes",
+    "year": 2006,
+    "duration_min": null,
+    "genres": [
+     "science-fiction"
+    ],
+    "directors": [
+     "Tim Kring"
+    ],
+    "cast": [],
+    "synopsis": null,
+    "collections": [],
+    "media_files": [],
+    "tags": [],
+    "poster": null,
+    "medium": null,
+    "seasons": [
+     {
+      "id": 3,
+      "number": 1,
+      "label": "Saison 1"
+     }
+    ],
+    "progress": null
+   },
+   "/api/media/312/tracks": {
+    "audio": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "aac",
+      "default": true
+     }
+    ],
+    "subtitles": [
+     {
+      "index": 1,
+      "lang": "en",
+      "title": null,
+      "codec": "subrip",
+      "default": false
+     }
+    ],
+    "external": [
+     {
+      "path": "/disques/Séries/Heroes/S01E12.fr.srt",
+      "lang": "fr"
+     }
+    ],
+    "video_codec": "h264",
+    "height": 352,
+    "width": 624,
+    "duration": 2580.0,
+    "default": {
+     "audio": 1,
+     "subtitle": {
+      "kind": "embedded",
+      "index": 1
+     }
+    }
+   }
+  },
+  "player": {
+   "current": {
+    "target_kind": "episode",
+    "target_id": 105,
+    "media_file_id": 305,
+    "season_id": 3,
+    "title": "Heroes — S01E05"
+   },
+   "state": {
+    "running": true,
+    "paused": true,
+    "position": 1394.0,
+    "duration": 2490.0
+   }
+  }
+ }
+}

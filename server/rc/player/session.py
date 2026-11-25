@@ -26,9 +26,13 @@ log = logging.getLogger(__name__)
 
 SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
+# Reprise d'une vidéo mise de côté : la télé garde la capture en plein écran jusqu'à ce
+# que mpv ait repris l'image (sa fenêtre la couvre alors), puis passe en « lecture ».
+RESUME_SETTLE = 0.5  # secondes après la première avance de la vidéo
+RESUME_FALLBACK = 4  # secondes au plus, si mpv ne signale rien
 WATCHED_RATIO = 0.9
 
-Screen = Literal["home", "work", "season", "playing", "message"]
+Screen = Literal["home", "work", "season", "view", "playing", "paused", "message"]
 
 
 @dataclass
@@ -37,13 +41,18 @@ class TvState:
     work_id: int | None = None
     season_id: int | None = None
     message: str | None = None
+    view: dict | None = None
+    pause: dict | None = None
 
 
 class TvController:
     def __init__(self, bus: EventBus) -> None:
         self.bus = bus
         self.state = TvState("home")
-        self._last_sheet = TvState("home")
+        self._last_screen = TvState("home")
+        self.on_change: Callable[[TvState], None] = lambda state: None  # après chaque écran
+        # Vue retenue remise à jour (progression…) quand elle réapparaît en fin de lecture.
+        self.refresh_view: Callable[[dict], dict] = lambda view: view
 
     def show(self, screen: Screen, work_id: int | None = None,
              season_id: int | None = None, force: bool = False) -> bool:
@@ -51,24 +60,52 @@ class TvController:
         retenue : elle apparaîtra à la fin de la lecture."""
         wanted = TvState(screen, work_id, season_id)
         if screen in ("home", "work", "season"):
-            self._last_sheet = wanted
+            self._last_screen = wanted  # une fiche remplace la vue retenue
         if self.state.screen == "playing" and not force:
             return False
         self._set(wanted)
         return True
+
+    def show_view(self, view: dict, pause: dict | None = None) -> None:
+        """Affiche la vue du téléphone (avec la vignette de pause le cas échéant) et la
+        retient comme dernier écran hors lecture."""
+        self._last_screen = TvState("view", view=view)
+        self._set(TvState("view", view=view, pause=pause))
+
+    def show_paused(self, pause: dict) -> None:
+        self._set(TvState("paused", pause=pause))
+
+    def remember_view(self, view: dict) -> None:
+        """Retient la vue sans l'afficher (lecture en cours)."""
+        self._last_screen = TvState("view", view=view)
+
+    def update_pause(self, pause: dict) -> None:
+        """Republie l'écran courant avec une nouvelle `pause` (vue ou pause seulement)."""
+        if self.state.screen in ("view", "paused"):
+            self._set(replace(self.state, pause=pause))
 
     def set_playing(self, work_id: int | None) -> None:
         self._set(TvState("playing", work_id=work_id))
 
     def playback_ended(self, message: str | None) -> None:
         if message is None:
-            self._set(self._last_sheet)
+            last = self._last_screen
+            if last.screen == "view" and last.view is not None:
+                try:
+                    last = self._last_screen = replace(last, view=self.refresh_view(last.view))
+                except Exception:
+                    log.exception("mise à jour de la vue retenue impossible")
+            self._set(last)
         else:
             self._set(TvState("message", message=message))
 
     def _set(self, state: TvState) -> None:
         self.state = state
         self.bus.publish({"type": "tv", "state": asdict(state)})
+        try:
+            self.on_change(state)
+        except Exception:
+            log.exception("on_change a levé une exception")
 
 
 @dataclass
@@ -172,7 +209,12 @@ class _Session:
     subtitle: SubSel
     last_save: float
     tracks: MediaTracks
+    path: Path
     paused: bool = False
+    # Vidéo mise de côté : "minimize" (mpv réduit) ou "restart" (mpv arrêté, relancé à
+    # la reprise ; position, durée et volume gardés dans l'état publié).
+    parked: Literal["minimize", "restart"] | None = None
+    image: str | None = None  # adresse de la capture de cette pause
 
 
 class PlaybackService:
@@ -180,7 +222,9 @@ class PlaybackService:
                  bus: EventBus, indexes_getter: Callable[[], dict],
                  clock: Callable[[], float] = time.monotonic,
                  on_catalog: Callable[[int], None] | None = None,
-                 player_available: Callable[[], bool] = lambda: True) -> None:
+                 player_available: Callable[[], bool] = lambda: True,
+                 pause_image: Path | None = None,
+                 pause_mode: Callable[[], str] = lambda: "restart") -> None:
         self.conn, self.player, self.tv, self.bus = conn, player, tv, bus
         self.player_available = player_available  # exécutable du lecteur présent ?
         self.indexes_getter, self.clock = indexes_getter, clock
@@ -194,6 +238,14 @@ class PlaybackService:
         self._published: PlayerState | None = None  # dernier état publié
         self._published_at = 0.0
         self._trailing: asyncio.TimerHandle | None = None  # publication différée en attente
+        # Reprise en cours : (session, position de reprise, appels différés) ; la télé
+        # passe en « lecture » quand la vidéo avance ou au bout de RESUME_FALLBACK.
+        self._resuming: tuple[_Session, float, list[asyncio.TimerHandle]] | None = None
+        self.pause_image, self.pause_mode = pause_image, pause_mode
+        self._captures = 0  # captures réussies (paramètre `v` de l'image)
+        self._parking = False  # mise de côté en cours : commandes sous le verrou
+        # Appelé quand la pause change pendant une session.
+        self.on_pause_change: Callable[[bool], None] = lambda paused: None
         player.on_state = self._on_state
 
     @property
@@ -204,6 +256,19 @@ class PlaybackService:
     def current(self) -> dict | None:
         return dict(self._session.current) if self._session else None
 
+    @property
+    def parked(self) -> bool:
+        return self._session is not None and self._session.parked is not None
+
+    def pause_info(self) -> dict | None:
+        """Vidéo en pause, au format `pause` de l'état télé ; None hors pause."""
+        s = self._session
+        if s is None or not self._state.paused:
+            return None
+        return {"image": s.image, "title": s.current["title"],
+                "position": float(self._state.position),
+                "duration": self._state.duration, "work_id": s.current["work_id"]}
+
     # -- lancement ------------------------------------------------------
 
     async def play(self, req: PlayRequest) -> None:
@@ -211,8 +276,15 @@ class PlaybackService:
             await self._play_locked(req)
 
     async def _play_locked(self, req: PlayRequest) -> None:
+        if self._is_current(req) and self._session.parked == "restart":
+            self._apply_to_kept(req)
+            await self._unpark_locked()
+            return
         if self._is_current(req):
             try:
+                if self._session.parked == "minimize":
+                    self._check_tracks(self._session, req.audio, req.subtitle)
+                    await self._unminimize()
                 if await self._rejoin(req):
                     return
             except PlayError:
@@ -241,7 +313,7 @@ class PlaybackService:
             log.exception("échec du démarrage de la lecture de %s", path)
             self._fail_start("player")
         current = self._describe(req, mf["id"])
-        self._session = _Session(current, audio, subtitle, self.clock(), tracks)
+        self._session = _Session(current, audio, subtitle, self.clock(), tracks, path)
         self._state = PlayerState(position=start_at, running=True)
         self.tv.set_playing(current["work_id"])
         self._publish()
@@ -261,11 +333,7 @@ class PlaybackService:
         commande) : l'appelant relance alors normalement."""
         s = self._session
         assert s is not None
-        if req.audio is not None and not audio_valid(req.audio, s.tracks):
-            raise PlayError("invalid")
-        if req.subtitle is not None and req.subtitle != {"kind": "none"} and not sub_valid(
-                req.subtitle, s.tracks):
-            raise PlayError("invalid")
+        self._check_tracks(s, req.audio, req.subtitle)
         if req.start == "start":
             await self.player.seek(0, False)
         if req.audio is not None and req.audio != s.audio:
@@ -281,6 +349,13 @@ class PlaybackService:
         if self.tv.state.screen != "playing":
             self.tv.set_playing(s.current["work_id"])
         return True
+
+    def _check_tracks(self, s: _Session, audio: int | None, subtitle: SubSel | None) -> None:
+        if audio is not None and not audio_valid(audio, s.tracks):
+            raise PlayError("invalid")
+        if subtitle is not None and subtitle != {"kind": "none"} and not sub_valid(
+                subtitle, s.tracks):
+            raise PlayError("invalid")
 
     def _fail_start(self, code: Literal["player", "player_missing"]) -> None:
         self._state = replace(self._state, running=False)
@@ -332,29 +407,250 @@ class PlaybackService:
 
     # -- commandes ------------------------------------------------------
 
+    def _kept(self) -> _Session | None:
+        """Session mise de côté par arrêt du lecteur (commandes mémorisées)."""
+        s = self._session
+        return s if s is not None and s.parked == "restart" else None
+
+    def _needs_lock(self) -> bool:
+        return self._parking or self.parked
+
     async def pause(self, paused: bool) -> None:
-        await self.player.set_pause(paused)
+        # Toujours sous le verrou : une reprise envoyée juste avant une mise de côté passe
+        # avant elle, et la mise de côté la voit (état noté sans attendre l'écho de mpv).
+        async with self._lock:
+            if self.parked and not paused:
+                await self._unpark_locked()
+            elif self._kept() is None:
+                await self.player.set_pause(paused)
+                if self._session is not None:
+                    self._state = replace(self._state, paused=paused)
 
     async def seek(self, seconds: float, relative: bool) -> None:
-        await self.player.seek(seconds, relative)
+        if not self._needs_lock():
+            await self.player.seek(seconds, relative)
+            return
+        async with self._lock:
+            if self._kept() is None:
+                await self.player.seek(seconds, relative)
+                return
+            st = self._state
+            position = max(0.0, st.position + seconds if relative else seconds)
+            if st.duration:
+                position = min(position, st.duration)
+            self._state = replace(st, position=position)
+            self._publish()
+            self.tv.update_pause(self.pause_info())
 
     async def set_volume(self, level: int) -> None:
-        await self.player.set_volume(level)
+        if not self._needs_lock():
+            await self.player.set_volume(level)
+            return
+        async with self._lock:
+            if self._kept() is None:
+                await self.player.set_volume(level)
+                return
+            self._state = replace(self._state, volume=level)
+            self._publish()
 
     async def set_audio(self, index: int | None) -> None:
+        if self._needs_lock():
+            async with self._lock:
+                await self._set_audio(index)
+        else:
+            await self._set_audio(index)
+
+    async def _set_audio(self, index: int | None) -> None:
         if self._session is not None and not audio_valid(index, self._session.tracks):
             raise PlayError("invalid")
-        await self.player.set_audio(index)
+        if self._kept() is None:
+            await self.player.set_audio(index)
+        else:
+            self._state = replace(self._state, audio=index)
+            self._publish()
         if self._session is not None:
             self._session.audio = index
 
     async def set_subtitle(self, sel: SubSel) -> None:
+        if self._needs_lock():
+            async with self._lock:
+                await self._set_subtitle(sel)
+        else:
+            await self._set_subtitle(sel)
+
+    async def _set_subtitle(self, sel: SubSel) -> None:
         if self._session is not None and sel != {"kind": "none"} and not sub_valid(
                 sel, self._session.tracks):
             raise PlayError("invalid")
-        await self.player.set_subtitle(sel)
+        if self._kept() is None:
+            await self.player.set_subtitle(sel)
+        else:
+            self._state = replace(self._state, subtitle=sel)
+            self._publish()
         if self._session is not None:
             self._session.subtitle = sel
+
+    # -- mise de côté ---------------------------------------------------
+
+    async def park(self) -> dict | None:
+        """Met de côté la vidéo en pause : capture, puis mpv réduit (`minimize`) ou
+        arrêté et relancé à la reprise (`restart`). None s'il n'y a rien à faire."""
+        async with self._lock:
+            s = self._session
+            if s is None or s.parked is not None or not self._state.paused:
+                return None
+            self._parking = True
+            try:
+                return await self._park_locked(s)
+            finally:
+                self._parking = False
+
+    async def _park_locked(self, s: _Session) -> dict | None:
+        self._cancel_resuming()
+        s.image = await self._capture()
+        if self._session is not s or not self._state.paused:  # fin pendant la capture
+            return None
+        if self.pause_mode() == "minimize":
+            try:
+                await self.player.set_minimized(True)
+                s.parked = "minimize"
+            except Exception:
+                log.warning("réduction de la fenêtre impossible, arrêt du lecteur",
+                            exc_info=True)
+        if s.parked is None:
+            kept = self._state
+            self._save(kept)
+            s.parked = "restart"  # les événements du lecteur sont ignorés dès maintenant
+            try:
+                await self.player.stop()
+            except Exception:
+                log.warning("arrêt du lecteur impossible pendant la mise de côté",
+                            exc_info=True)
+            self._state = replace(kept, running=True, paused=True)
+        self._publish()
+        return self.pause_info()
+
+    async def _capture(self) -> str | None:
+        if self.pause_image is None:
+            return None
+        try:
+            await self.player.screenshot(self.pause_image)
+        except Exception:
+            log.warning("capture de la pause impossible", exc_info=True)
+            return None
+        self._captures += 1
+        return f"/api/player/pause.jpg?v={self._captures}"
+
+    def _apply_to_kept(self, req: PlayRequest) -> None:
+        """Lecture demandée du média mis de côté : début et pistes appliqués à l'état
+        gardé (pistes refusées si inconnues)."""
+        s = self._session
+        assert s is not None
+        self._check_tracks(s, req.audio, req.subtitle)
+        if req.start == "start":
+            self._state = replace(self._state, position=0)
+        if req.audio is not None:
+            s.audio = req.audio
+        if req.subtitle is not None:
+            s.subtitle = req.subtitle
+
+    async def _unminimize(self) -> None:
+        s = self._session
+        assert s is not None
+        s.parked, s.image = None, None
+        try:
+            await self.player.set_minimized(False)
+        except Exception:
+            log.warning("restauration de la fenêtre impossible", exc_info=True)
+
+    async def _unpark_locked(self) -> None:
+        """Ramène la vidéo mise de côté, en plein écran et en lecture."""
+        s = self._session
+        assert s is not None and s.parked is not None
+        image = s.image  # effacée par la reprise, montrée jusqu'au retour de la vidéo
+        if s.parked == "minimize":
+            await self._unminimize()
+            await self.player.set_pause(False)
+        elif not await self._restart(s):
+            return
+        self._await_video(s, image)
+        self._publish()
+
+    def _await_video(self, s: _Session, image: str | None) -> None:
+        """La vidéo revient : la télé montre la capture en plein écran (même image que
+        celle que mpv va afficher) et ne passe en « lecture » qu'une fois mpv reparti,
+        sous sa fenêtre plein écran : pas d'écran intermédiaire visible."""
+        self._cancel_resuming()
+        info = {"image": image, "title": s.current["title"],
+                "position": self._state.position, "duration": self._state.duration,
+                "work_id": s.current["work_id"]}
+        if self.tv.state.screen != "paused" or self.tv.state.pause != info:
+            self.tv.show_paused(info)
+        timer = asyncio.get_running_loop().call_later(
+            RESUME_FALLBACK, self._video_back, s)
+        self._resuming = (s, self._state.position, [timer])
+
+    def _video_moved(self, state: PlayerState) -> None:
+        r = self._resuming
+        if r is None or r[0] is not self._session or state.paused:
+            return
+        if state.position != r[1] and len(r[2]) == 1:
+            r[2].append(asyncio.get_running_loop().call_later(
+                RESUME_SETTLE, self._video_back, r[0]))
+
+    def _video_back(self, s: _Session) -> None:
+        self._cancel_resuming()
+        if self._session is s and s.parked is None:
+            self.tv.set_playing(s.current["work_id"])
+
+    def _cancel_resuming(self) -> None:
+        if self._resuming is not None:
+            for t in self._resuming[2]:
+                t.cancel()
+            self._resuming = None
+
+    async def _restart(self, s: _Session) -> bool:
+        """Relance du lecteur arrêté à la mise de côté. Faux (session terminée, message
+        à la télé) si le fichier n'est plus accessible ; PlayError si le lecteur ne
+        démarre pas."""
+        kept = self._state
+        mf = self.conn.execute("SELECT * FROM media_file WHERE id = ?",
+                               (s.current["media_file_id"],)).fetchone()
+        try:
+            if mf is None:
+                raise PlayError("not_found")
+            path = resolve_version(self.conn, mf, self.indexes_getter())
+        except PlayError as exc:
+            self._finish(kept, message(exc.code, exc.volume_label))
+            return False
+        tracks = load_tracks(self.conn, mf, path)
+        try:
+            await self.player.start(path, kept.position, s.audio, s.subtitle,
+                                    [e.path for e in tracks.external])
+        except FileNotFoundError:  # exécutable du lecteur introuvable
+            log.warning("lecteur vidéo introuvable : impossible de relancer %s", path)
+            self._finish(kept, message("player_missing"))
+            raise PlayError("player_missing") from None
+        except Exception:
+            log.exception("échec de la relance de la vidéo mise de côté %s", path)
+            self._finish(kept, message("player"))
+            raise PlayError("player") from None
+        s.path, s.tracks, s.parked, s.image = path, tracks, None, None
+        s.paused = False
+        self._state = replace(kept, running=True, paused=False)
+        if kept.volume != 100:
+            try:
+                await self.player.set_volume(kept.volume)
+            except Exception:
+                log.warning("volume non rétabli après la relance", exc_info=True)
+        self._notify_pause(False)
+        return True
+
+    def _notify_pause(self, paused: bool) -> None:
+        try:
+            self.on_pause_change(paused)
+        except Exception:
+            log.exception("on_pause_change a levé une exception")
 
     async def stop(self) -> None:
         async with self._lock:
@@ -376,6 +672,8 @@ class PlaybackService:
 
     def _on_state(self, state: PlayerState) -> None:
         s = self._session
+        if s is not None and s.parked == "restart":
+            return  # lecteur arrêté par la mise de côté : la session continue
         if s is None:
             self._state = replace(state, running=False)
         elif state.error is not None:
@@ -385,10 +683,20 @@ class PlaybackService:
             self._finish(state, None)
             return
         else:
+            moved = state.position != self._state.position
             self._state = state
-            if state.paused != s.paused or self.clock() - s.last_save >= SAVE_INTERVAL:
+            if moved:
+                self._video_moved(state)
+            if moved and s.parked == "minimize" and state.paused:
+                # mpv réduit suit les sauts : la vignette de pause aussi. En pause, mpv
+                # ne signale la position qu'à un saut (même rythme que la publication).
+                self.tv.update_pause(self.pause_info())
+            changed = state.paused != s.paused
+            if changed or self.clock() - s.last_save >= SAVE_INTERVAL:
                 s.paused = state.paused
                 self._save(state)
+            if changed:
+                self._notify_pause(state.paused)
         self._publish_throttled()
 
     def _publish_throttled(self) -> None:
@@ -421,6 +729,7 @@ class PlaybackService:
 
     def _finish(self, state: PlayerState, message: str | None) -> None:
         self._cancel_trailing()
+        self._cancel_resuming()
         try:
             self._save(state)
             self.on_catalog(current_revision(self.conn))  # progression visible sans attendre

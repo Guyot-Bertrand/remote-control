@@ -17,6 +17,7 @@ from rc.db import current_revision, open_db
 from rc.events import EventBus
 from rc.fake_tree import make_fake_tree
 from rc.player import session as session_mod
+from rc.mirror import MirrorService
 from rc.player.session import PlaybackService, TvController
 from rc.probe import MediaTracks, Track, cached_tracks
 from rc.volumes import Volume, build_index, locate_files
@@ -56,7 +57,8 @@ def env(tmp_path, monkeypatch):
     tv = TvController(bus)
     player = FakePlayer()
     playback = PlaybackService(conn, player, tv, bus, lambda: indexes)
-    services = Services(conn, config, bus, tv, playback, lambda: indexes)
+    mirror = MirrorService(conn, tv, playback)
+    services = Services(conn, config, bus, tv, playback, lambda: indexes, mirror)
     app = FastAPI()
     install_api(app, services)
 
@@ -379,7 +381,8 @@ def test_tv_show_and_state(env):
     assert env.client.post("/api/tv/show", json={"screen": "season", "id": 1}).json() == {
         "shown": True}
     assert env.client.get("/api/tv/state").json() == {
-        "screen": "season", "work_id": 5, "season_id": 1, "message": None}
+        "screen": "season", "work_id": 5, "season_id": 1, "message": None,
+        "view": None, "pause": None}
     assert env.client.post("/api/tv/show", json={"screen": "work", "id": 999}).status_code == 404
     r = env.client.post("/api/tv/show", json={"screen": "work"})
     assert r.status_code == 422 and r.json() == error_body("invalid", None)
@@ -394,12 +397,13 @@ def test_ws_hello_then_tv_event(env):
         hello = ws.receive_json()
         assert hello == {"type": "hello", "revision": current_revision(env.conn),
                          "tv": {"screen": "home", "work_id": None, "season_id": None,
-                                "message": None},
+                                "message": None, "view": None, "pause": None},
                          "player": env.client.get("/api/player/state").json()}
         env.client.post("/api/tv/show", json={"screen": "work", "id": 1})
         msg = ws.receive_json()
         assert msg == {"type": "tv", "state": {"screen": "work", "work_id": 1,
-                                               "season_id": None, "message": None}}
+                                               "season_id": None, "message": None,
+                                               "view": None, "pause": None}}
     assert env.playback.bus.subscriber_count == 0  # désabonné à la déconnexion
 
 
@@ -540,7 +544,8 @@ def test_tv_home_empty_db(tmp_path):
     config = Config(data_dir=tmp_path / "data", allowed_hosts=["testserver"])
     playback = PlaybackService(conn, FakePlayer(), tv, bus, dict)
     app = FastAPI()
-    install_api(app, Services(conn, config, bus, tv, playback, dict))
+    install_api(app, Services(conn, config, bus, tv, playback, dict,
+                              MirrorService(conn, tv, playback)))
     with TestClient(app) as client:
         assert client.get("/api/tv/home").json() == {"recent": [], "showcase": None}
     conn.close()
@@ -654,3 +659,52 @@ def test_routing_errors_use_api_format(env):
     assert r.status_code == 405
     assert r.json() == {"error": "invalid", "volume_label": None,
                         "message": "Requête invalide."}
+
+
+def test_full_sync_has_total_works(env):
+    full = env.client.get("/api/sync").json()
+    assert full["total_works"] == len(full["works"]) == 7
+    assert "total_works" not in env.client.get("/api/sync?since=0").json()
+
+
+VIEW = {"phone_id": "tel-1", "seq": 10, "screen": "browse", "title": "Films",
+        "items": [{"kind": "work", "id": 1}]}
+
+
+def test_tv_view_accepts_and_publishes(env):
+    r = env.client.post("/api/tv/view", json=VIEW)
+    assert r.json() == {"accepted": True}
+    view = env.client.get("/api/tv/state").json()["view"]
+    assert view["items"][0]["title_fr"] == "Ava"
+
+
+def test_tv_view_too_many_items_is_422(env):
+    body = {**VIEW, "items": [{"kind": "work", "id": 1}] * 41}
+    r = env.client.post("/api/tv/view", json=body)
+    assert r.status_code == 422 and r.json()["error"] == "invalid"
+    too_many_sections = {**VIEW, "sections": [{"label": "x"}] * 7}
+    assert env.client.post("/api/tv/view", json=too_many_sections).status_code == 422
+    assert env.client.post("/api/tv/view", json={**VIEW, "phone_id": ""}).status_code == 422
+    assert env.client.post("/api/tv/view", json={**VIEW, "seq": -1}).status_code == 422
+
+
+def test_tv_view_stale_seq(env):
+    assert env.client.post("/api/tv/view", json=VIEW).json() == {"accepted": True}
+    assert env.client.post("/api/tv/view", json=VIEW).json() == {"accepted": False}
+
+
+def test_pause_image_404_then_served(env):
+    r = env.client.get("/api/player/pause.jpg")
+    assert r.status_code == 404 and r.json()["error"] == "not_found"
+    pause = env.config.data_dir / "pause"
+    pause.mkdir(parents=True, exist_ok=True)
+    (pause / "pause.jpg").write_bytes(b"\xff\xd8jpeg")
+    r = env.client.get("/api/player/pause.jpg")
+    assert r.status_code == 200 and r.content == b"\xff\xd8jpeg"
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_hello_includes_view_and_pause_keys(env):
+    with env.client.websocket_connect("/api/events") as ws:
+        tv = ws.receive_json()["tv"]
+    assert tv["view"] is None and tv["pause"] is None

@@ -290,6 +290,15 @@ class MpvPlayer:
     async def set_subtitle(self, sel: SubSel) -> None:
         await self._c().set_property("sid", self._sid(sel))
 
+    async def screenshot(self, dest: Path) -> None:
+        # « video » : image seule, sans sous-titres ni OSD
+        await self._c().command("screenshot-to-file", str(dest), "video")
+
+    async def set_minimized(self, minimized: bool) -> None:
+        await self._c().set_property("window-minimized", minimized)
+        if not minimized:
+            await self._c().set_property("fullscreen", True)
+
     async def stop(self) -> None:
         self._stopping = True
         if self._client is not None and self._proc and self._proc.returncode is None:

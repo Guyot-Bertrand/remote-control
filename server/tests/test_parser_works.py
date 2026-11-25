@@ -65,3 +65,9 @@ def test_groups(result):
             "https://fr.wikipedia.org/wiki/Alien_(s%C3%A9rie_de_films)",
         )
     ]
+
+
+def test_parser_keeps_physical_codes(result):
+    assert work(result, "Alien, le huitième passager").media == ["DVD"]
+    assert work(result, "Ava").media == []
+    assert work(result, "Alien, le huitième passager").videos[0].playable is False

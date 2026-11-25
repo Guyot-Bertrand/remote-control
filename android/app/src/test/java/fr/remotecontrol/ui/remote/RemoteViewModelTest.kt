@@ -13,6 +13,7 @@ import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
+import fr.remotecontrol.ui.common.FilePills
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -112,6 +113,27 @@ class RemoteViewModelTest {
         assertEquals("abc", ui.poster)
         assertEquals("2017 · FHD · Français", ui.details)
         assertEquals(listOf(1L to 2L), asked)
+    }
+
+    @Test fun language_falls_back_to_file_audio_when_track_unknown() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(playing)
+        // Pistes illisibles : la langue vient des langues audio du fichier, dans le catalogue.
+        api.tracksResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope)) { _, _ ->
+            flowOf(PlayingInfo(poster = null, year = 2006, quality = "SD", audioLangs = listOf("en", "fr")))
+        }.also { vms += it }
+        observe(vm, scope)
+        assertEquals("2006 · SD · Anglais", withTimeout(5_000) { vm.state.first { it.details.isNotEmpty() } }.details)
+    }
+
+    @Test fun header_pills_of_the_playing_file() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(playing)
+        api.tracksResult = ApiResult.Ok(tracks)
+        val info = PlayingInfo(null, 2006, "SD", audioLangs = listOf("en"), subtitleLangs = listOf("fr"), width = 624, height = 352)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope)) { _, _ -> flowOf(info) }.also { vms += it }
+        observe(vm, scope)
+        val ui = withTimeout(5_000) { vm.state.first { it.pills != null } }
+        assertEquals(FilePills("SD", "624\u202F×\u202F352", listOf("Anglais", "ST français")), ui.pills)
     }
 
     @Test fun skip_and_restart_commands() = runBlocking {

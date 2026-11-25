@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.seasonView
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -62,6 +66,7 @@ import fr.remotecontrol.ui.common.PlayingOnTv
 import fr.remotecontrol.ui.common.Overline
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
+import fr.remotecontrol.ui.common.LanguagePill
 import fr.remotecontrol.ui.common.QualityPill
 import fr.remotecontrol.ui.common.RcIcons
 import fr.remotecontrol.ui.common.ScreenHeader
@@ -95,6 +100,7 @@ fun SeasonScreen(
     onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
+    PublishTvView(state?.let { s -> seasonView(s.season.id, s.season.workId, s.episodes.firstOrNull { it.selected }?.id) })
     val list = rememberLazyListState()
     val headerVisible by remember { derivedStateOf { list.firstVisibleItemIndex == 0 } }
     Column(Modifier.fillMaxSize()) {
@@ -153,6 +159,7 @@ private fun LazyListState.fullyVisible(index: Int): Boolean {
 internal fun seasonBarTitle(workTitle: String, headerVisible: Boolean): String? =
     workTitle.takeIf { !headerVisible && it.isNotBlank() }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SeriesHeader(state: SeasonUi) {
     val work = state.work
@@ -176,9 +183,14 @@ private fun SeriesHeader(state: SeasonUi) {
                 work?.directors?.takeIf { it.isNotEmpty() }?.let {
                     Text(it.joinToString(", "), style = caption13, color = RcColors.text2)
                 }
-                if (state.qualities.isNotEmpty()) {
-                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (state.qualities.isNotEmpty() || state.languages.isNotEmpty()) {
+                    FlowRow(
+                        Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         state.qualities.forEach { QualityPill(it) }
+                        state.languages.forEach { LanguagePill(it) }
                     }
                 }
             }
@@ -291,7 +303,8 @@ private fun EpisodeLine(
             if (episode.action == SheetAction.OpenRemote) {
                 PlayingOnTv()
             } else {
-                episode.status?.let { Text(it, style = caption13, color = RcColors.text3) }
+                // Maquette 4c : la durée (et le reste) ; le statut seulement si la durée est inconnue.
+                (episode.durationLine ?: episode.status)?.let { Text(it, style = caption13, color = RcColors.text3) }
             }
         }
         if (episode.action == SheetAction.OpenRemote) {
@@ -302,8 +315,13 @@ private fun EpisodeLine(
             return@Row
         }
         if (episode.watched) {
-            // Décorative : le statut « Vu » est déjà lu.
-            Icon(RcIcons.Check, contentDescription = null, tint = RcColors.seen, modifier = Modifier.size(22.dp))
+            // Décorative quand le statut « Vu » est écrit ; sinon (la durée l'a remplacé), elle l'annonce.
+            Icon(
+                RcIcons.Check,
+                contentDescription = Texts.watched.takeIf { episode.durationLine != null },
+                tint = RcColors.seen,
+                modifier = Modifier.size(22.dp),
+            )
         }
         if (episode.canResume) {
             IconButton(onClick = { onPlay(episode.id, StartMode.Resume) }, enabled = enabled) {
@@ -362,7 +380,7 @@ private fun HighlightedEpisode(
             }
             if (episode.highlighted && episode.canResume) EpisodeBadge(Texts.inProgress)
         }
-        episode.details?.let { Text(it, style = caption13, color = RcColors.text2) }
+        episode.durationLine?.let { Text(it, style = caption13, color = RcColors.text2) }
         if (episode.qualities.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { episode.qualities.forEach { QualityPill(it) } }
         }

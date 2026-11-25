@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import math
 import os
+import shutil
 import sqlite3
 import subprocess
 from dataclasses import asdict, dataclass
@@ -40,6 +42,8 @@ class MediaTracks:
     external: list[ExternalSub]
     video_codec: str | None
     height: int | None
+    width: int | None = None
+    duration: float | None = None
 
 
 def normalize_lang(value: str | None) -> str | None:
@@ -50,8 +54,11 @@ def normalize_lang(value: str | None) -> str | None:
 
 
 def probe_tracks(path: Path, runner=subprocess.run) -> MediaTracks:
+    cmd = ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)]
+    if shutil.which("nice"):
+        cmd = ["nice", "-n", "19", *cmd]
     proc = runner(
-        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
+        cmd,
         capture_output=True,
         text=True,
         check=True,
@@ -61,6 +68,7 @@ def probe_tracks(path: Path, runner=subprocess.run) -> MediaTracks:
     subs: list[Track] = []
     video_codec: str | None = None
     height: int | None = None
+    width: int | None = None
     for s in data.get("streams", []):
         kind = s.get("codec_type")
         tags = s.get("tags") or {}
@@ -68,6 +76,7 @@ def probe_tracks(path: Path, runner=subprocess.run) -> MediaTracks:
             if video_codec is None:
                 video_codec = s.get("codec_name")
                 height = s.get("height")
+                width = s.get("width")
             continue
         target = audio if kind == "audio" else subs if kind == "subtitle" else None
         if target is None:
@@ -81,7 +90,17 @@ def probe_tracks(path: Path, runner=subprocess.run) -> MediaTracks:
                 default=bool((s.get("disposition") or {}).get("default")),
             )
         )
-    return MediaTracks(audio, subs, [], video_codec, height)
+    raw_duration = (data.get("format") or {}).get("duration")
+    try:
+        duration = float(raw_duration) if raw_duration is not None else None
+    except (TypeError, ValueError):
+        duration = None
+    return MediaTracks(audio, subs, [], video_codec, height, width, usable_duration(duration))
+
+
+def usable_duration(d: float | None) -> float | None:
+    """Durée exploitable : finie et positive (NaN ferait échouer `int`, l'infini le JSON)."""
+    return d if d is not None and math.isfinite(d) and d > 0 else None
 
 
 def _sub_lang(video: Path, sub: Path) -> str | None:
@@ -121,6 +140,8 @@ def _from_json(text: str) -> MediaTracks:
         external=[ExternalSub(Path(e["path"]), e["lang"]) for e in d["external"]],
         video_codec=d["video_codec"],
         height=d["height"],
+        width=d["width"],  # KeyError sur un ancien cache : ré-analyse
+        duration=d["duration"],
     )
 
 
@@ -133,7 +154,10 @@ def cached_tracks(
         (media_file_id,),
     ).fetchone()
     if row is not None and row[0] == st.st_mtime and row[1] == st.st_size:
-        return _from_json(row[2])
+        try:
+            return _from_json(row[2])
+        except KeyError:
+            pass  # ancien format de cache : on ré-analyse
     tracks = probe_tracks(path, runner=runner)
     conn.execute(
         "INSERT INTO probe_cache (media_file_id, mtime, size, tracks_json)"
@@ -157,3 +181,19 @@ def default_selection(t: MediaTracks) -> tuple[int | None, SubSel]:
     if emb is not None:
         return chosen.index, {"kind": "embedded", "index": emb.index}
     return chosen.index, {"kind": "none"}
+
+
+def media_summary(t: MediaTracks) -> dict:
+    """Résumé affichable : langues sans doublon (ordre conservé), résolution, durée."""
+
+    def uniq(langs) -> list[str]:
+        return list(dict.fromkeys(lg for lg in langs if lg))
+
+    out = {
+        "audio_langs": uniq(a.lang for a in t.audio),
+        "subtitle_langs": uniq([s.lang for s in t.subtitles] + [e.lang for e in t.external]),
+        "width": t.width,
+        "height": t.height,
+        "duration_s": usable_duration(t.duration),  # le cache peut dater d'avant le filtre
+    }
+    return {k: v for k, v in out.items() if v is not None}

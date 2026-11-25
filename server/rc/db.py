@@ -6,7 +6,19 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 1  # PRAGMA user_version de la base créée par schema.sql
+SCHEMA_VERSION = 2  # PRAGMA user_version de la base créée par schema.sql
+
+
+# Colonnes ajoutées par la version 2 (table, colonne, type).
+_V2_COLUMNS = (
+    ("work", "medium", "TEXT"),
+    ("episode", "duration_min", "INTEGER"),
+    ("media_file", "audio_langs_json", "TEXT"),
+    ("media_file", "subtitle_langs_json", "TEXT"),
+    ("media_file", "width", "INTEGER"),
+    ("media_file", "height", "INTEGER"),
+    ("media_file", "duration_s", "REAL"),
+)
 
 
 class DatabaseTooNew(Exception):
@@ -27,12 +39,24 @@ def open_db(path: Path, check_same_thread: bool = True) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+        if version == 1:
+            _migrate_v1_to_v2(conn)
         if version < SCHEMA_VERSION:
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     except BaseException:
         conn.close()
         raise
     return conn
+
+
+def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """Ajoute les colonnes de la v2 puis demande un réimport complet du catalogue
+    (le médium des œuvres n'existe pas dans une base v1)."""
+    for table, column, decl in _V2_COLUMNS:
+        existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('needs_reimport', '1')")
 
 
 def current_revision(conn: sqlite3.Connection) -> int:

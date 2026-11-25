@@ -1,5 +1,6 @@
 package fr.remotecontrol.ui.common
 
+import fr.remotecontrol.ui.common.languageName as languageNameOf
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -165,6 +166,13 @@ object Texts {
     const val openRemote = "Ouvrir la télécommande"
     const val playingOnTv = "En cours sur la télé"
     const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
+    /** Maquette 4c, encart « Non numérisé · DVD ». */
+    fun notDigitizedOn(medium: String) = "Cette œuvre n'existe que sur $medium dans la collection."
+    fun notDigitizedOnHelp(medium: String) = "${notDigitizedOn(medium)} Une fois numérisée, elle deviendra lisible ici."
+    const val mediumSection = "Support"
+    const val firstSyncSaving = "Enregistrement des œuvres…"
+    const val firstSyncDownloading = "Téléchargement du catalogue…"
+    fun firstSyncWriting(done: Int, total: Int) = "${formatCount(done)} / ${formatCount(total)} œuvres"
     const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
     const val retry = "Réessayer"
     const val workNotFound = "Œuvre introuvable."
@@ -183,7 +191,8 @@ object Texts {
     const val showLess = "Afficher moins"
 
     /** Mention courte d'une œuvre non lisible : nom du disque débranché, ou « Non numérisé ». */
-    fun unavailableLabel(absentVolume: String?) = absentVolume?.ifEmpty { disk } ?: notDigitized
+    /** Disque débranché (son nom), sinon support d'origine de l'œuvre non numérisée (« DVD »), sinon « Non numérisé ». */
+    fun unavailableLabel(absentVolume: String?, medium: String? = null) = absentVolume?.ifEmpty { disk } ?: medium ?: notDigitized
     const val disk = "Disque"
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"
@@ -267,19 +276,8 @@ object Texts {
     fun workLine(year: Int?, type: String, directors: List<String>) =
         listOfNotNull(year?.toString(), typeSingular(type), directors.joinToString(", ").ifEmpty { null }).joinToString(" · ")
 
-    fun languageName(code: String?): String = when (code) {
-        null -> "Langue inconnue"
-        "fr" -> "Français"
-        "en" -> "Anglais"
-        "de" -> "Allemand"
-        "es" -> "Espagnol"
-        "it" -> "Italien"
-        "ja" -> "Japonais"
-        "ru" -> "Russe"
-        "pt" -> "Portugais"
-        "nl" -> "Néerlandais"
-        else -> code.uppercase()
-    }
+    /** Nom d'une langue de piste ([fr.remotecontrol.ui.common.languageName]), « Langue inconnue » sans code. */
+    fun languageName(code: String?): String = code?.let(::languageNameOf) ?: "Langue inconnue"
 
     /** « S2 É3 » (« É3 » hors saison), dans la ligne de reprise de l'accueil. */
     fun episodeShort(season: Int, number: Int): String = if (season == 0) "É$number" else "S$season É$number"

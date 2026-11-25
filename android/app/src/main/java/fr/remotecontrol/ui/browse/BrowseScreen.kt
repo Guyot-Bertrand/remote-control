@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.net.TvViewDto
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,21 +79,28 @@ import fr.remotecontrol.ui.theme.RcColors
 @Composable
 fun BrowseScreen(
     state: BrowseUi,
+    /** Vue publiée sur la télé ([BrowseViewModel.tvView]), suivant [onFirstVisible]. */
+    tvView: TvViewDto?,
     server: ServerState,
     onPlayableOnly: (Boolean) -> Unit,
     onType: (String?) -> Unit,
     onToggleSort: () -> Unit,
+    onFirstVisible: (Int) -> Unit,
     onOpen: (WorkSummary) -> Unit,
     onBack: () -> Unit,
 ) {
+    PublishTvView(tvView)
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
         if (state.collectionId != null) {
-            CollectionContent(state, server, onPlayableOnly, onOpen, onBack)
+            CollectionContent(state, server, onPlayableOnly, onFirstVisible, onOpen, onBack)
         } else {
-            TypeContent(state, server, onPlayableOnly, onType, onToggleSort, onOpen)
+            TypeContent(state, server, onPlayableOnly, onType, onToggleSort, onFirstVisible, onOpen)
         }
     }
 }
+
+/** Éléments de tête de la liste d'une collection (titre, interrupteur), avant la première œuvre. */
+private const val COLLECTION_HEADER_ITEMS = 2
 
 @Composable
 private fun TypeContent(
@@ -97,6 +109,7 @@ private fun TypeContent(
     onPlayableOnly: (Boolean) -> Unit,
     onType: (String?) -> Unit,
     onToggleSort: () -> Unit,
+    onFirstVisible: (Int) -> Unit,
     onOpen: (WorkSummary) -> Unit,
 ) {
     ScreenHeader(Texts.sectionBrowse, server)
@@ -133,6 +146,8 @@ private fun TypeContent(
     val gridState = rememberSaveable(state.type, state.recent, state.playableOnly, saver = LazyGridState.Saver) {
         LazyGridState()
     }
+    // Première œuvre visible : ancre de la vue publiée sur la télé.
+    LaunchedEffect(gridState) { snapshotFlow { gridState.firstVisibleItemIndex }.collect(onFirstVisible) }
     // Clés stables (id) : la grille tient les ~3 600 films sans recomposer les cellules au défilement.
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -284,7 +299,7 @@ private fun GridCell(work: WorkSummary, onOpen: (WorkSummary) -> Unit) {
             year = work.year,
             progress = work.progress?.toFloat(),
             watched = work.watched,
-            unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
+            unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume, work.medium),
             modifier = Modifier.fillMaxWidth(),
         )
         Column {
@@ -307,11 +322,16 @@ private fun CollectionContent(
     state: BrowseUi,
     server: ServerState,
     onPlayableOnly: (Boolean) -> Unit,
+    onFirstVisible: (Int) -> Unit,
     onOpen: (WorkSummary) -> Unit,
     onBack: () -> Unit,
 ) {
     ScreenHeader(null, server, onBack)
-    WorkList(state.works, onOpen, Modifier.fillMaxSize(), ranks = state.ranks) {
+    val list = rememberLazyListState()
+    LaunchedEffect(list) {
+        snapshotFlow { (list.firstVisibleItemIndex - COLLECTION_HEADER_ITEMS).coerceAtLeast(0) }.collect(onFirstVisible)
+    }
+    WorkList(state.works, onOpen, Modifier.fillMaxSize(), ranks = state.ranks, state = list) {
         item(key = "title") {
             Column(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),

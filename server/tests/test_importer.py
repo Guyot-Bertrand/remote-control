@@ -241,3 +241,24 @@ def test_refused_import_leaves_no_open_transaction(conn):
     with pytest.raises(ImportRefused):
         import_catalog(conn, result, {})
     assert not conn.in_transaction
+
+
+def test_medium_priority():
+    from rc.catalog.paths import medium_of
+    assert medium_of(["DVD", "BR"], playable=False) == "Blu-ray"
+    assert medium_of(["DVS"], playable=False) == "DVD (satellite)"
+    assert medium_of(["DVD"], playable=True) is None
+    assert medium_of([], playable=False) is None
+
+
+def test_import_stores_medium(conn):
+    text = TEXT + (
+        "MN ; film ; Mixte [2001] ; Mixte ; *\n"
+        "MF ; VI ; DVD\n"
+        "MF ; VI ; FHD ; 1G ; Mixte [2001] [1h30,1920x1080,16x9,FR].mp4\n")
+    import_catalog(conn, parse(text), {})
+    def medium(key):
+        return conn.execute("SELECT medium FROM work WHERE key = ?", (key,)).fetchone()[0]
+    assert medium("Alien, le huitieme passager [1979]") == "DVD"
+    assert medium("Mixte [2001]") is None
+    assert medium("Ava [2017]") is None

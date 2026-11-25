@@ -170,7 +170,7 @@ Sur reprise : `minimize` → restaurer, plein écran, `pause=no` ; `restart` →
 
 - Découpage exact des tâches, schéma de cache des analyses, noms des modules.
 - Valeurs fines de limitation, dans le respect de § 5.1.
-- Valeur par défaut de `pause_background` après l'essai sur la machine de l'utilisateur.
+- Valeur par défaut de `pause_background` après l'essai sur la machine de l'utilisateur. **Essai du 2026-11-25 (GNOME Wayland) : `minimize` échoue** (à la reprise, la fenêtre mpv reste derrière le navigateur ; il faut arrêter puis relancer). **`restart` fonctionne** (pas de clignotement, légère latence de reprise, voir `2026-11-25-notes-a-revoir.md`). **Valeur par défaut retenue : `restart`.** À revérifier sur le mini-PC une fois son gestionnaire de fenêtres choisi.
 
 ## 9. Maquettes (Claude Design) — livrées le 2026-11-24
 

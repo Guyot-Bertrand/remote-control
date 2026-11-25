@@ -260,7 +260,7 @@ async def test_episode_title_and_events(env):
     while not q.empty():
         msgs.append(q.get_nowait())
     assert {"type": "tv", "state": {"screen": "playing", "work_id": 5, "season_id": None,
-                                    "message": None}} in msgs
+                                    "message": None, "view": None, "pause": None}} in msgs
     player = [m for m in msgs if m["type"] == "player"][-1]
     assert player["state"]["position"] == 1 and player["current"] == cur
 
@@ -641,3 +641,73 @@ async def test_player_check_skipped_while_playing(env):
     assert exc.value.code == "player_missing"
     assert svc.current is None  # session précédente arrêtée et enregistrée
     assert [c[0] for c in env.player.calls] == ["start", "stop"]
+
+
+VIEW = {"kind": "search", "items": []}
+PAUSE = {"image": "/api/player/pause.jpg?v=3", "title": "Heroes", "position": 10.0,
+         "duration": 100.0, "work_id": 1}
+
+
+def last_tv(bus_queue):
+    last = None
+    while not bus_queue.empty():
+        m = bus_queue.get_nowait()
+        if m["type"] == "tv":
+            last = m
+    return last
+
+
+def test_show_view_publishes_view_and_pause(env):
+    q = env.bus.subscribe()
+    env.tv.show_view(VIEW)
+    assert last_tv(q)["state"] == {"screen": "view", "work_id": None, "season_id": None,
+                                   "message": None, "view": VIEW, "pause": None}
+    env.tv.show_view(VIEW, PAUSE)
+    assert last_tv(q)["state"]["pause"] == PAUSE
+
+
+def test_show_paused_publishes_pause(env):
+    q = env.bus.subscribe()
+    env.tv.show_paused(PAUSE)
+    st = last_tv(q)["state"]
+    assert st["screen"] == "paused" and st["pause"] == PAUSE and st["view"] is None
+
+
+async def test_playback_end_returns_to_last_view_without_pause(env):
+    env.tv.show_view(VIEW, PAUSE)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    env.player.on_state(PlayerState(position=5900, duration=6000, running=True, ended=True))
+    assert env.tv.state.screen == "view"
+    assert env.tv.state.view == VIEW and env.tv.state.pause is None
+
+
+async def test_tv_show_replaces_remembered_view(env):
+    env.tv.show_view(VIEW)
+    env.tv.show("work", 1)
+    await env.svc.play(PlayRequest("work", 3, "start"))
+    env.player.on_state(PlayerState(position=5900, duration=6000, running=True, ended=True))
+    assert env.tv.state.screen == "work" and env.tv.state.work_id == 1
+
+
+def test_remember_view_does_not_publish(env):
+    q = env.bus.subscribe()
+    env.tv.remember_view(VIEW)
+    assert q.empty() and env.tv.state.screen == "home"
+    env.tv.playback_ended(None)
+    assert env.tv.state.screen == "view" and env.tv.state.view == VIEW
+
+
+def test_update_pause_only_on_view_or_paused(env):
+    q = env.bus.subscribe()
+    env.tv.update_pause(PAUSE)
+    assert q.empty() and env.tv.state.pause is None
+    env.tv.show_view(VIEW)
+    last_tv(q)
+    env.tv.update_pause(PAUSE)
+    assert last_tv(q)["state"]["pause"] == PAUSE and env.tv.state.view == VIEW
+    env.tv.show_paused(PAUSE)
+    last_tv(q)
+    other = {**PAUSE, "image": None}
+    env.tv.update_pause(other)
+    st = last_tv(q)["state"]
+    assert st["screen"] == "paused" and st["pause"] == other

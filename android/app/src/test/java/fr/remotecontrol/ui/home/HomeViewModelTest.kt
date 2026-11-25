@@ -3,6 +3,7 @@ package fr.remotecontrol.ui.home
 import fr.remotecontrol.data.CatalogFilter
 import fr.remotecontrol.data.db.AppDatabase
 import fr.remotecontrol.data.db.ResumeRow
+import fr.remotecontrol.data.sync.SyncProgress
 import fr.remotecontrol.data.sync.SyncRepository
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.discovery.ServerAddress
@@ -21,12 +22,18 @@ import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.testDb
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -55,11 +62,12 @@ class HomeViewModelTest {
     private val empty = SyncDto(revision = 1, full = true)
     private val locator = ServerLocator(FakeKeyValueStore(), ServerProbe { InfoDto("rc", 1, 1) }, ServerDiscovery { emptyFlow() })
 
-    private fun viewModel() = HomeViewModel(
+    private fun viewModel(repo: SyncRepository = SyncRepository(db, api), progress: Flow<SyncProgress> = repo.progress) = HomeViewModel(
         db.catalogDao(),
         CatalogFilter(),
         locator,
-        SyncRepository(db, api),
+        repo,
+        progress,
     ).also { vms += it }
 
     // Room exécute ses requêtes hors du dispatcher de test : on attend l'état voulu.
@@ -73,6 +81,29 @@ class HomeViewModelTest {
         assertEquals(listOf("Back to Life", "Ava"), ui.resume.map { it.title })
         assertEquals("S1 É2 · reste 19 min", ui.resume[0].label)
         assertEquals("reste 1 h 29", ui.resume[1].label)
+    }
+
+    @Test fun home_first_sync_shows_writing_progress() = runBlocking {
+        val ui = viewModel(progress = MutableStateFlow(SyncProgress.Writing(1250, 3992))).await { it.syncCount != null }
+        assertEquals("1\u202F250 / 3\u202F992 œuvres", ui.syncCount)
+        assertEquals("Enregistrement des œuvres…", ui.syncLabel)
+        assertEquals(1250f / 3992f, ui.syncFraction!!, 1e-6f)
+    }
+
+    @Test fun home_first_sync_download_is_indeterminate() = runBlocking {
+        api.syncGate = CompletableDeferred()
+        api.syncResponses.addLast(ApiResult.Ok(empty))
+        val repo = SyncRepository(db, api)
+        val vm = viewModel(repo)
+        val sync = launch(Dispatchers.Default) { repo.sync(forceFull = true) }
+        val ui = vm.await { it.syncLabel != null }
+        assertEquals("Téléchargement du catalogue…", ui.syncLabel)
+        assertNull(ui.syncCount)
+        assertNull(ui.syncFraction)
+        api.syncGate!!.complete(Unit)
+        sync.join()
+        // Catalogue vide : Téléchargement → Repos, sans étape d'écriture.
+        assertNull(vm.await { it.syncLabel == null }.syncFraction)
     }
 
     @Test fun resume_label_falls_back_without_duration() {

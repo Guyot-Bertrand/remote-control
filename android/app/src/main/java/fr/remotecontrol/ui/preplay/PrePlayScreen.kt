@@ -24,6 +24,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.preplayView
+import fr.remotecontrol.player.PlayTarget
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.common.FilePillsRow
 import fr.remotecontrol.ui.common.PlayerMissingBanner
 import fr.remotecontrol.ui.common.PosterThumb
 import fr.remotecontrol.ui.common.RcIcons
@@ -60,6 +64,8 @@ import java.util.Locale
 @Composable
 fun PrePlayScreen(
     state: PrePlayUi,
+    /** Œuvre ou épisode à lire, montré sur la télé avec les choix en cours. */
+    target: PlayTarget,
     server: ServerState,
     /** Le lecteur n'est pas installé sur le PC : bandeau, et « Lire sur la télé » désactivé. */
     playerMissing: Boolean,
@@ -71,6 +77,10 @@ fun PrePlayScreen(
     onConfirm: () -> Unit,
     onClose: () -> Unit,
 ) {
+    PublishTvView(
+        if (state.loading) null
+        else preplayView(target, state.workId, state.seasonId, state.selectedMediaFileId, state.selectedAudio, state.selectedSubtitle),
+    )
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.prePlayTitle, server, onBack = onClose, backIcon = RcIcons.Clear, backLabel = Texts.close)
         if (playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
@@ -80,7 +90,7 @@ fun PrePlayScreen(
                 state.versions.forEach { v ->
                     OptionRow(
                         label = v.label,
-                        detail = v.absentLabel,
+                        detail = Texts.details(v.resolution, v.absentLabel).ifEmpty { null },
                         badge = state.versionBadges[v.mediaFileId],
                         selected = v.mediaFileId == state.selectedMediaFileId,
                         enabled = v.present,
@@ -145,6 +155,7 @@ private fun Header(state: PrePlayUi) {
                 overflow = TextOverflow.Ellipsis,
             )
             state.details?.let { Text(it, style = TextStyle(fontFamily = Inter, fontSize = 13.sp), color = RcColors.text2) }
+            state.pills?.let { FilePillsRow(it, Modifier.padding(top = 6.dp)) }
         }
     }
 }

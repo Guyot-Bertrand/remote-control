@@ -12,7 +12,11 @@ import fr.remotecontrol.testing.FakeRcApi
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.seed
 import fr.remotecontrol.testing.testDb
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -72,6 +76,66 @@ class SyncRepositoryTest {
         assertTrue(dao.work(4).first()!!.playable)
         assertEquals(5L, repo.localRevision())
         assertEquals(listOf(1L), ftsIds("sauvage"))
+    }
+
+    private fun rows(sql: String) = db.query(sql, null).use { c ->
+        buildList { while (c.moveToNext()) add((0 until c.columnCount).map { if (c.isNull(it)) null else c.getString(it) }) }
+    }
+
+    @Test fun new_fields_decode_and_are_stored() = runTest {
+        val dto = RcJson.decodeFromString<SyncDto>(
+            """{"revision": 9, "full": true, "total_works": 1,
+             "works": [{"id": 1, "type": "film", "key": "k", "title_fr": "A", "medium": "DVD"}],
+             "seasons": [{"id": 1, "work_id": 2, "number": 1, "label": "S1"}],
+             "episodes": [{"id": 1, "season_id": 1, "number": 1, "duration_min": 42}],
+             "media_files": [{"id": 1, "work_id": 1, "quality": "SD", "relpath": "a.avi", "present": true,
+               "audio_langs": ["en"], "subtitle_langs": ["fr","en"], "width": 624, "height": 352, "duration_s": 2520.5},
+               {"id": 2, "work_id": 1, "quality": "SD", "relpath": "b.avi"}]}""",
+        )
+        api.syncResponses.addLast(ApiResult.Ok(dto))
+        repo.sync()
+        assertEquals("DVD", dao.work(1).first()!!.medium)
+        assertEquals(listOf(listOf<String?>("42")), rows("SELECT durationMin FROM episode"))
+        assertEquals(
+            listOf(listOf<String?>("[\"en\"]", "[\"fr\",\"en\"]", "624", "352", "2520.5"), listOf(null, null, null, null, null)),
+            rows("SELECT audioLangs, subtitleLangs, width, height, durationS FROM media_file ORDER BY id"),
+        )
+    }
+
+    private fun bigSync(isFull: Boolean, n: Int, total: Int? = n) = SyncDto(
+        revision = 1, full = isFull, totalWorks = total,
+        works = (1L..n).map { full.works[0].copy(id = it) },
+    )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun full_sync_reports_downloading_then_writing() = runTest {
+        val seen = mutableListOf<SyncProgress>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { repo.progress.toList(seen) }
+        api.syncResponses.addLast(ApiResult.Ok(bigSync(isFull = true, n = 1200)))
+        repo.sync()
+        job.cancel()
+        assertEquals(
+            listOf(SyncProgress.Idle, SyncProgress.Downloading, SyncProgress.Writing(500, 1200), SyncProgress.Writing(1000, 1200), SyncProgress.Writing(1200, 1200), SyncProgress.Idle),
+            seen,
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun incremental_sync_reports_no_writing_progress() = runTest {
+        api.syncResponses.addLast(ApiResult.Ok(bigSync(isFull = true, n = 3)))
+        repo.sync()
+        val seen = mutableListOf<SyncProgress>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { repo.progress.toList(seen) }
+        api.syncResponses.addLast(ApiResult.Ok(bigSync(isFull = false, n = 700, total = null)))
+        repo.sync()
+        job.cancel()
+        assertEquals(listOf<SyncProgress>(SyncProgress.Idle), seen)
+    }
+
+    @Test fun progress_returns_to_idle_when_download_fails() = runTest {
+        api.syncResponses.addLast(ApiResult.Err(ApiError.Unreachable))
+        repo.sync(forceFull = true)
+        assertEquals(SyncProgress.Idle, repo.progress.value)
     }
 
     @Test fun work_collections_replaced_per_work() = runTest {

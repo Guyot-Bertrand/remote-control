@@ -12,7 +12,7 @@ import androidx.room.TypeConverters
         VolumeEntity::class, CollectionEntity::class, WorkCollectionEntity::class,
         ProgressEntity::class, MetaEntity::class, WorkFtsEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -27,9 +27,12 @@ const val DATABASE_NAME = "rc-cache.db"
 /**
  * La base n'est qu'un cache du catalogue (l'adresse du serveur est dans les préférences) : tout changement de
  * schéma, montée comme descente de version, l'efface, et la synchronisation suivante la remplit à nouveau.
+ *
+ * Ne pas ajouter `fallbackToDestructiveMigrationOnDowngrade` : appelé après, il rend les migrations de montée de
+ * version obligatoires (Room 2.8) et la mise à jour de l'appli plante au démarrage. `fallbackToDestructiveMigration`
+ * couvre déjà la descente.
  */
 fun buildDatabase(context: Context, name: String = DATABASE_NAME): AppDatabase =
     Room.databaseBuilder(context, AppDatabase::class.java, name)
         .fallbackToDestructiveMigration(dropAllTables = true)
-        .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
         .build()

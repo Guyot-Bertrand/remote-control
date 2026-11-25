@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 import rc
+from rc.analysis import analysis_loop
 from rc.api import Services, install_api
 from rc.assets import ingest_posters
 from rc.catalog.importer import ImportRefused, ImportReport, import_catalog, load_aliases
@@ -30,6 +31,7 @@ from rc.catalog.parser import parse_catalog
 from rc.config import Config
 from rc.db import current_revision, open_db
 from rc.events import EventBus
+from rc.mirror import MirrorService
 from rc.player.base import Player
 from rc.player.mpv import MpvPlayer
 from rc.player.session import PlaybackService, TvController
@@ -45,6 +47,7 @@ DEFAULT_TV_UI = Path(rc.__file__).resolve().parents[2] / "tv-ui"
 
 Stat = tuple[int, int]  # (taille, mtime en ns)
 LOGGED_DETAILS = 20  # avertissements et orphelins détaillés dans le journal
+PAUSE_MODES = ("minimize", "restart")
 SKIPPED_INTERFACES = ("lo", "docker", "br-", "veth", "virbr")
 
 
@@ -148,18 +151,21 @@ def restore_from_copy(conn: sqlite3.Connection, config: Config) -> None:
     copy = catalog_copy(config)
     if not copy.is_file():
         return
-    if conn.execute("SELECT EXISTS (SELECT 1 FROM work)").fetchone()[0]:
+    needs_reimport = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM meta WHERE key = 'needs_reimport')").fetchone()[0]
+    if not needs_reimport and conn.execute("SELECT EXISTS (SELECT 1 FROM work)").fetchone()[0]:
         return
     try:
         result = parse_catalog(copy.read_text(encoding="utf-8"))
         _log_warnings(result)
         aliases_file = config.data_dir / "aliases.txt"
         aliases = load_aliases(aliases_file) if aliases_file.is_file() else {}
-        report = import_catalog(conn, result, aliases)
+        report = import_catalog(conn, result, aliases, force=bool(needs_reimport))
+        conn.execute("DELETE FROM meta WHERE key = 'needs_reimport'")
     except Exception as exc:
         log.warning("base vide : réimport de la copie du catalogue impossible (%s)", exc)
         return
-    log.info("base vide : catalogue réimporté depuis %s (%d œuvres)", copy, report.added)
+    log.info("catalogue réimporté depuis %s (%d œuvres)", copy, report.added)
 
 
 def _posters_in_thread(db_file: str, assets_dir: Path,
@@ -356,10 +362,24 @@ def _runtime_dir(config: Config) -> Path:
     return Path(base) / "rc" if base else config.data_dir / "run"
 
 
+class RevalidatedStaticFiles(StaticFiles):
+    """Fichiers de l'écran télé : le navigateur les revalide à chaque chargement (ETag,
+    réponse 304 sans contenu s'ils n'ont pas changé). Sans cela, après une mise à jour,
+    il peut garder l'ancienne feuille de style avec le nouveau code : page en vrac."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(config: Config, player: Player | None = None,
                runner=subprocess.run) -> FastAPI:
     config.data_dir.mkdir(parents=True, exist_ok=True)
     (config.data_dir / "catalog").mkdir(exist_ok=True)
+    (config.data_dir / "pause").mkdir(exist_ok=True)
+    if config.pause_background not in PAUSE_MODES:
+        log.warning("pause_background inconnu (%r) : « restart » utilisé", config.pause_background)
     # check_same_thread=False : l'appli est créée dans un thread et servie dans celui de la
     # boucle d'événements (uvicorn, TestClient). La connexion n'est utilisée que dans ce
     # dernier ; les threads auxiliaires ouvrent leur propre connexion.
@@ -379,13 +399,20 @@ def create_app(config: Config, player: Player | None = None,
     indexes_getter = lambda: state.indexes  # noqa: E731
     playback = PlaybackService(conn, player, tv, bus, indexes_getter,
                                on_catalog=lambda rev: publish_catalog(state, rev),
-                               player_available=player_available)
+                               player_available=player_available,
+                               pause_image=config.data_dir / "pause" / "pause.jpg",
+                               pause_mode=lambda: ("minimize" if config.pause_background
+                                                   == "minimize" else "restart"))
     state.playback = playback
-    services = Services(conn, config, bus, tv, playback, indexes_getter)
+    mirror = MirrorService(conn, tv, playback)
+    playback.on_pause_change = mirror.on_pause_change
+    services = Services(conn, config, bus, tv, playback, indexes_getter, mirror)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        tasks = [asyncio.create_task(refresh_loop(state))]
+        tasks = [asyncio.create_task(refresh_loop(state)),
+                 asyncio.create_task(analysis_loop(state)),
+                 asyncio.create_task(mirror.idle_loop())]
         if config.mdns:
             tasks.append(asyncio.create_task(
                 mdns_announce(config.port, interval=config.poll_interval)))
@@ -404,7 +431,7 @@ def create_app(config: Config, player: Player | None = None,
     install_api(app, services)
     tv_ui = config.tv_ui_dir or DEFAULT_TV_UI
     if tv_ui.is_dir():
-        app.mount("/tv", StaticFiles(directory=tv_ui, html=True), name="tv")
+        app.mount("/tv", RevalidatedStaticFiles(directory=tv_ui, html=True), name="tv")
     else:
         log.warning("interface télé introuvable : %s", tv_ui)
     return app

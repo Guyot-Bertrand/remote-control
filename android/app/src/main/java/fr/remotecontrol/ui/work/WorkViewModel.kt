@@ -8,7 +8,6 @@ import fr.remotecontrol.data.db.ProgressEntity
 import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkCollectionRow
 import fr.remotecontrol.data.db.WorkEntity
-import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.net.PlayerSnapshotDto
 import fr.remotecontrol.player.Availability
 import fr.remotecontrol.player.SheetAction
@@ -29,6 +28,8 @@ import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.formatDuration
+import fr.remotecontrol.ui.common.languagePills
+import fr.remotecontrol.ui.common.resolutionLabel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class VersionUi(val mediaFileId: Long, val label: String, val present: Boolean, val absentLabel: String?)
+/** [resolution] : « 1920 × 1080 » si connue ; [languages] : pastilles « Anglais », « ST français ». */
+data class VersionUi(
+    val mediaFileId: Long,
+    val label: String,
+    val present: Boolean,
+    val absentLabel: String?,
+    /** Qualité seule (« FHD »), sans la taille de [label]. */
+    val quality: String = label,
+    val resolution: String? = null,
+    val languages: List<String> = emptyList(),
+)
 
 /**
  * [canPlay] : œuvre non épisodique dont au moins un fichier est présent.
@@ -70,6 +81,8 @@ data class WorkUi(
     val action: SheetAction = SheetAction.Play,
     /** Le lecteur n'est pas installé sur le PC (bandeau ; lecture impossible). */
     val playerMissing: Boolean = false,
+    /** Support d'origine (« DVD ») d'une œuvre non numérisée ; nul sinon ou s'il est inconnu. */
+    val medium: String? = null,
 )
 
 private data class Catalog(
@@ -83,7 +96,6 @@ private data class Catalog(
 class WorkViewModel(
     private val workId: Long,
     dao: CatalogDao,
-    api: RcApi,
     launcher: PlayLauncher,
     tvStatus: TvStatus,
     /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
@@ -94,8 +106,8 @@ class WorkViewModel(
 ) : ViewModel() {
     private val playAction = PlayAction(viewModelScope, launcher)
 
-    /** Envoyée à la télé une fois à l'ouverture (hors ligne, l'échec est ignoré), puis suivie en direct. */
-    private val tvSheet = TvSheet(viewModelScope, api, tvStatus, "work", workId)
+    /** Mention « Affichée sur la télé », suivie en direct ; l'écran publie lui-même sa vue. */
+    private val tvSheet = TvSheet(viewModelScope, tvStatus, "work", workId)
 
     /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
     val events: Flow<NavEvent> = playAction.events
@@ -128,7 +140,6 @@ class WorkViewModel(
     val missing: StateFlow<Boolean> = catalog.map { it.work == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-
     /** « Réessayer » du bandeau « PC injoignable » : nouvelle recherche du serveur. */
     fun retryServer() {
         viewModelScope.launch { locateServer() }
@@ -137,9 +148,6 @@ class WorkViewModel(
     fun playFromStart() = launch(StartMode.Start)
 
     fun resume() = launch(StartMode.Resume)
-
-    /** Retour sur l'écran : renvoie la fiche à la télé si elle montre autre chose et que rien n'est en lecture. */
-    fun onScreenResumed() = tvSheet.onScreenResumed()
 
     fun clearMessage() {
         playAction.message.value = null
@@ -166,6 +174,8 @@ class WorkViewModel(
             resumeProgress = progress?.duration?.takeIf { it > 0 }?.let { (progress.position / it).coerceIn(0.0, 1.0).toFloat() },
             onTv = tv,
             choiceSummary = if (work.episodic) null else choiceSummary(c.files, c.progress),
+            // Série : pas de disponibilité propre ; le serveur ne renseigne `medium` que sans fichier lisible.
+            medium = work.medium?.takeIf { work.episodic || availability == Availability.NotDigitized },
         )
     }
 }
@@ -176,4 +186,7 @@ fun MediaFileRow.toVersionUi() = VersionUi(
     label = Texts.versionLabel(quality, size),
     present = present,
     absentLabel = if (present) null else Texts.volumeAbsent(volumeLabel),
+    quality = quality,
+    resolution = resolutionLabel(width, height),
+    languages = languagePills(audioLangs, subtitleLangs),
 )

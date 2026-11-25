@@ -81,10 +81,10 @@ def make_player(tmp_path, monkeypatch):
     log = tmp_path / "log.jsonl"
     players = []
 
-    def make(script, props=None, mute=()):
+    def make(script, props=None, mute=(), fail=()):
         cfg = tmp_path / "cfg.json"
         cfg.write_text(json.dumps({"script": script, "props": props or {}, "log": str(log),
-                                   "mute": list(mute)}))
+                                   "mute": list(mute), "fail": list(fail)}))
         monkeypatch.setenv("FAKE_MPV_CONFIG", str(cfg))
         p = MpvPlayer(str(wrapper), ["--foo"], tmp_path / "run")
         states = []
@@ -218,3 +218,39 @@ async def test_start_failure_reports_error(tmp_path):
     with pytest.raises(FileNotFoundError):
         await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
     assert states[-1].running is False and states[-1].error == "start_failed"
+
+
+async def test_screenshot_sends_video_flag(make_player, tmp_path):
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.screenshot(tmp_path / "p.jpg")
+    assert ["screenshot-to-file", str(tmp_path / "p.jpg"), "video"] in logged(log)
+    await p.stop()
+
+
+async def test_screenshot_refused_raises_mpverror(make_player, tmp_path):
+    p, states, log = make_player([], fail=["screenshot-to-file"])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    with pytest.raises(MpvError):
+        await p.screenshot(tmp_path / "p.jpg")
+    await p.stop()
+
+
+async def test_minimize_sets_window_minimized_only(make_player, tmp_path):
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_minimized(True)
+    cmds = logged(log)
+    assert ["set_property", "window-minimized", True] in cmds
+    assert ["set_property", "fullscreen", True] not in cmds
+    await p.stop()
+
+
+async def test_unminimize_restores_fullscreen(make_player, tmp_path):
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_minimized(False)
+    cmds = logged(log)
+    assert ["set_property", "window-minimized", False] in cmds
+    assert ["set_property", "fullscreen", True] in cmds
+    await p.stop()

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from rc.catalog.model import ParsedWork, ParseResult, VideoFile
-from rc.catalog.paths import relpath
+from rc.catalog.paths import medium_of, relpath
 from rc.db import current_revision, next_revision
 
 
@@ -55,6 +55,11 @@ def _files(videos: list[VideoFile]) -> list[dict]:
     ]
 
 
+def _is_playable(w: ParsedWork) -> bool:
+    return any(v.playable for v in w.videos) or any(
+        v.playable for e in w.episodes for v in e.videos)
+
+
 def _payload(w: ParsedWork) -> dict:
     """Tout ce qui est importé pour une œuvre ; son hash est le content_hash."""
     poster = relpath(w.poster.rel_dir, w.poster.filename) if w.poster else None
@@ -69,6 +74,7 @@ def _payload(w: ParsedWork) -> dict:
         "episode_count": w.episode_count, "directors": w.directors, "genres": w.genres,
         "cast": w.cast, "synopsis": w.synopsis, "imdb_id": w.imdb_id, "tags": w.tags,
         "episodic": w.episodic, "poster_relpath": poster,
+        "medium": medium_of(w.media, _is_playable(w)),
         "files": _files(w.videos),
         "seasons": seasons,
         "episodes": [
@@ -186,8 +192,8 @@ def _write_work(conn, work_id: int, p: dict, content_hash: str,
     conn.execute(
         "INSERT INTO work (id, type, key, title_fr, title_vo, title_alt, year, "
         "duration_min, episode_count, directors_json, genres_json, cast_json, synopsis, "
-        "imdb_id, tags_json, episodic, poster_relpath, content_hash, rev) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "imdb_id, tags_json, episodic, poster_relpath, medium, content_hash, rev) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (id) DO UPDATE SET type = excluded.type, key = excluded.key, "
         "title_fr = excluded.title_fr, title_vo = excluded.title_vo, "
         "title_alt = excluded.title_alt, year = excluded.year, "
@@ -197,12 +203,12 @@ def _write_work(conn, work_id: int, p: dict, content_hash: str,
         "imdb_id = excluded.imdb_id, tags_json = excluded.tags_json, "
         "episodic = excluded.episodic, poster_asset = CASE WHEN "
         "poster_relpath IS excluded.poster_relpath THEN poster_asset ELSE NULL END, "
-        "poster_relpath = excluded.poster_relpath, "
+        "poster_relpath = excluded.poster_relpath, medium = excluded.medium, "
         "content_hash = excluded.content_hash, rev = excluded.rev",
         (work_id, p["type"], p["key"], p["title_fr"], p["title_vo"], p["title_alt"],
          p["year"], p["duration_min"], p["episode_count"], _dumps(p["directors"]),
          _dumps(p["genres"]), _dumps(p["cast"]), p["synopsis"], p["imdb_id"],
-         _dumps(p["tags"]), int(p["episodic"]), p["poster_relpath"], content_hash, rev),
+         _dumps(p["tags"]), int(p["episodic"]), p["poster_relpath"], p["medium"], content_hash, rev),
     )
     _unbury(conn, "work", work_id)
 

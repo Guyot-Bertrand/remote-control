@@ -9,10 +9,14 @@ import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
+import fr.remotecontrol.testing.collectNow
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -25,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 class BrowseViewModelTest {
@@ -124,11 +129,15 @@ class BrowseViewModelTest {
         filter.playableOnly.value = false
         val vm = viewModel(BrowseRoute(type = "film"))
         vm.await { it.loaded && it.works.size == 3 }
-        val seen = mutableListOf<BrowseUi>()
-        val job = launch(Dispatchers.Unconfined) { vm.state.collect { seen += it } }
+        // Liste thread-safe, collectée hors du thread de Room : le test attend que le collecteur
+        // ait lui-même reçu l'état final, plutôt que de se fier à `state.value`.
+        val seen = CopyOnWriteArrayList<BrowseUi>()
+        val job = launch(Dispatchers.Default) { vm.state.collect { seen += it } }
         vm.setType("theatre")
-        vm.await { it.type == "theatre" && it.loaded }
-        job.cancel()
+        withTimeout(5_000) {
+            while (seen.none { it.type == "theatre" && it.loaded }) delay(10)
+        }
+        job.cancelAndJoin()
         val theatre = seen.filter { it.type == "theatre" }
         // Le filtre choisi s'affiche tout de suite, sans jamais montrer les films sous « Théâtre ».
         assertTrue(theatre.all { ui -> ui.works.all { it.type == "theatre" } })
@@ -143,5 +152,64 @@ class BrowseViewModelTest {
         // Room doit invalider la requête via la sous-requête sur `progress`.
         vm.await { ui -> ui.works.any { it.id == 3L && it.watched } }
         Unit
+    }
+
+    @Test fun browse_publishes_on_anchor_change_only() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute())
+        vm.await { it.loaded && it.works.size == 5 }
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 2L } } // première œuvre : Alien
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.onFirstVisible(3)
+        vm.onFirstVisible(3)
+        vm.onFirstVisible(4)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 4L } }
+        seen.stop()
+        // Alien, Ava, Back to Life, Le Prénom (3 puis 4) : ancres 3 puis 4, la vue de départ comprise.
+        assertEquals(listOf(2L, 3L, 4L), seen.items.map { it.anchor })
+        val last = seen.items.last()
+        assertEquals("browse", last.screen)
+        assertEquals("Toutes les œuvres", last.title)
+        assertEquals(5, last.position?.index)
+        assertEquals(listOf(2L, 1L, 5L, 3L, 4L), last.items.map { it.id })
+    }
+
+    @Test fun new_choice_never_republishes_the_old_list() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 3 }
+        vm.onFirstVisible(1)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 1L } }
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.setType("theatre")
+        withTimeout(5_000) { vm.tvView.first { it?.title == "Théâtre" } }
+        seen.stop()
+        // La vue de départ (films), puis seulement le théâtre : la télé ne saute pas en haut des films.
+        assertEquals("Films", seen.items.first().title)
+        assertTrue(seen.items.drop(1).all { it.title == "Théâtre" && it.items.map { i -> i.id } == listOf(4L) })
+    }
+
+    @Test fun new_filter_never_republishes_the_old_list() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(type = "film"))
+        vm.await { it.loaded && it.works.size == 3 }
+        vm.onFirstVisible(1)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 1L } }
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.setPlayableOnly(true)
+        withTimeout(5_000) { vm.tvView.first { it?.filter == "playable" } }
+        seen.stop()
+        assertEquals("all", seen.items.first().filter)
+        assertTrue(seen.items.drop(1).all { it.filter == "playable" && it.anchor == 1L })
+    }
+
+    @Test fun collection_view_follows_first_visible() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(collectionId = 2))
+        vm.await { it.works.isNotEmpty() && it.title.isNotEmpty() }
+        val v = withTimeout(5_000) { vm.tvView.first { it?.title == "Alien [1979-]" } }!!
+        assertEquals("collection", v.screen)
+        assertEquals(2L, v.collectionId)
+        assertEquals(listOf(2L), v.items.map { it.id })
     }
 }
