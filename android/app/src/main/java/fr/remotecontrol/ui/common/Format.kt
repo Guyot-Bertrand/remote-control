@@ -71,9 +71,9 @@ fun languagePills(audio: List<String>?, subtitles: List<String>?): List<String> 
 fun resolutionLabel(width: Int?, height: Int?): String? =
     if (width == null || height == null || width <= 0 || height <= 0) null else "$width × $height"
 
-/** « 41 min · reste 18 min », « 41 min » ou « reste 18 min » ; null si rien n'est connu. */
+/** « 41 min · reste 18 min », « 1 h 15 », « 41 min » ou « reste 18 min » ; null si rien n'est connu. */
 fun episodeDurationLine(durationMin: Int?, remainingMin: Int?): String? =
     listOfNotNull(
-        durationMin?.let { "$it min" },
+        durationMin?.let(::formatDuration),
         remainingMin?.let { Texts.remaining(it) },
     ).takeIf { it.isNotEmpty() }?.joinToString(" · ")

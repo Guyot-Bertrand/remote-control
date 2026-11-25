@@ -142,9 +142,9 @@ interface CatalogDao {
     fun progress(kind: String, id: Long): Flow<ProgressEntity?>
 
     @Query(
-        "SELECT w.poster AS poster, w.year AS year, w.titleFr AS title, " +
-            "(SELECT m.quality FROM media_file m WHERE m.id = :mediaFileId) AS quality, " +
-            "(SELECT m.audioLangs FROM media_file m WHERE m.id = :mediaFileId) AS audioLangs FROM work w WHERE w.id = :workId",
+        "SELECT w.poster AS poster, w.year AS year, w.titleFr AS title, m.quality AS quality, " +
+            "m.audioLangs AS audioLangs, m.subtitleLangs AS subtitleLangs, m.width AS width, m.height AS height " +
+            "FROM work w LEFT JOIN media_file m ON m.id = :mediaFileId WHERE w.id = :workId",
     )
     fun playingInfo(workId: Long, mediaFileId: Long): Flow<PlayingInfo?>
 

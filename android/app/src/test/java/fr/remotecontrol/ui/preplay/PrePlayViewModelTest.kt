@@ -1,6 +1,8 @@
 package fr.remotecontrol.ui.preplay
 
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.MediaFileEntity
+import fr.remotecontrol.ui.common.FilePills
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
@@ -73,6 +75,19 @@ class PrePlayViewModelTest {
         assertEquals(SubSel.None, ui.selectedSubtitle)
         assertTrue(ui.canConfirm)
         assertTrue(api.calls.contains("tracks(1)"))
+    }
+
+    @Test fun header_pills_follow_selected_version() = runBlocking {
+        db.syncDao().upsertMediaFiles(
+            listOf(MediaFileEntity(2, 1, null, "HD", "1.6G", "Films/A/Ava.mp4", "DISK1", true, listOf("en"), listOf("fr"), 624, 352)),
+        )
+        val vm = viewModel(TargetKind.Work, 1, StartMode.Start)
+        // Version FHD sans langues ni dimensions connues : la qualité seule, sans la taille.
+        assertEquals(FilePills("FHD"), vm.loaded().pills)
+        vm.selectVersion(2)
+        val hd = vm.await { it.selectedMediaFileId == 2L && !it.loading }
+        assertEquals(FilePills("HD", "624\u202F×\u202F352", listOf("Anglais", "ST français")), hd.pills)
+        assertEquals("624\u202F×\u202F352", hd.versions.single { it.mediaFileId == 2L }.resolution)
     }
 
     @Test fun resume_preselects_progress_version() = runBlocking {

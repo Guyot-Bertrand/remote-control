@@ -98,8 +98,8 @@ data class FileLanguages(val audioLangs: List<String>?, val subtitleLangs: List<
 data class EpisodeQuality(val episodeId: Long, val quality: String)
 
 /**
- * Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre, qualité et langues
- * audio du fichier.
+ * Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre ; qualité, langues et
+ * dimensions du fichier.
  */
 data class PlayingInfo(
     val poster: String?,
@@ -107,4 +107,7 @@ data class PlayingInfo(
     val quality: String?,
     val title: String? = null,
     val audioLangs: List<String>? = null,
+    val subtitleLangs: List<String>? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )

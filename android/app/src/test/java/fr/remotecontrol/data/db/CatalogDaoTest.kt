@@ -198,6 +198,10 @@ class CatalogDaoTest {
             listOf(FileLanguages(listOf("en"), listOf("fr")), FileLanguages(null, null)),
             dao.seasonLanguages(1).first(),
         )
-        assertEquals(listOf("fr"), dao.playingInfo(1, 1).first()?.audioLangs)
+        val playing = dao.playingInfo(1, 1).first()!!
+        assertEquals(listOf("fr") to listOf("en"), playing.audioLangs to playing.subtitleLangs)
+        assertEquals(Triple("FHD", 1920, 1038), Triple(playing.quality, playing.width, playing.height))
+        // Fichier inconnu : l'œuvre reste décrite, sans qualité.
+        assertEquals(null, dao.playingInfo(1, 999).first()?.quality)
     }
 }

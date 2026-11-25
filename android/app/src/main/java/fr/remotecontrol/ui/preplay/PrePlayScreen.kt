@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.SubSel
 import fr.remotecontrol.ui.common.PillButton
+import fr.remotecontrol.ui.common.FilePillsRow
 import fr.remotecontrol.ui.common.PlayerMissingBanner
 import fr.remotecontrol.ui.common.PosterThumb
 import fr.remotecontrol.ui.common.RcIcons
@@ -145,6 +146,7 @@ private fun Header(state: PrePlayUi) {
                 overflow = TextOverflow.Ellipsis,
             )
             state.details?.let { Text(it, style = TextStyle(fontFamily = Inter, fontSize = 13.sp), color = RcColors.text2) }
+            state.pills?.let { FilePillsRow(it, Modifier.padding(top = 6.dp)) }
         }
     }
 }

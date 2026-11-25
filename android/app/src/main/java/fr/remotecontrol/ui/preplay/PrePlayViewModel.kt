@@ -22,6 +22,7 @@ import fr.remotecontrol.player.sortVersions
 import fr.remotecontrol.player.subtitleOptions
 import fr.remotecontrol.player.trackOptions
 import fr.remotecontrol.ui.common.EPISODE
+import fr.remotecontrol.ui.common.FilePills
 import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.PrePlayRoute
@@ -75,7 +76,12 @@ data class PrePlayUi(
     val canRetry: Boolean = false,
     /** Mention sous « Lire sur la télé » : « Ces choix seront repris la prochaine fois pour ce film. » */
     val footer: String = Texts.choicesRemembered,
-)
+) {
+    /** Pastilles de l'en-tête (maquette 4c) : qualité, résolution et langues de la version choisie. */
+    val pills: FilePills?
+        get() = versions.firstOrNull { it.mediaFileId == selectedMediaFileId }
+            ?.let { FilePills(it.quality, it.resolution, it.languages) }
+}
 
 /**
  * Écran « Version et pistes… » (un ViewModel par entrée de navigation) : versions de la cible (les absentes sont listées, pas sélectionnables),

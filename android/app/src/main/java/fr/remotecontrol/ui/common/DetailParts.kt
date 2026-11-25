@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -150,6 +152,24 @@ fun LanguagePill(text: String, modifier: Modifier = Modifier, dimmed: Boolean = 
             .background(RcColors.surface2)
             .padding(horizontal = 7.dp, vertical = 4.dp),
     )
+}
+
+/** Pastilles d'un fichier (maquette 4c) : qualité et résolution, puis langues. */
+data class FilePills(val quality: String, val resolution: String? = null, val languages: List<String> = emptyList())
+
+/** Rangée des pastilles d'un fichier, en tête de la télécommande et de « Version et pistes ». */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun FilePillsRow(pills: FilePills, modifier: Modifier = Modifier) {
+    FlowRow(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        QualityPill(pills.quality, detail = pills.resolution)
+        pills.languages.forEach { LanguagePill(it) }
+    }
 }
 
 /** Titre de section en petites capitales (« AVEC », « COLLECTIONS »). */

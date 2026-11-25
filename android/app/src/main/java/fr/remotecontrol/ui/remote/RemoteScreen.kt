@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.net.SubSel
+import fr.remotecontrol.ui.common.FilePillsRow
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.PillButton
 import fr.remotecontrol.ui.common.PosterThumb
@@ -148,6 +149,7 @@ private fun Title(state: RemoteUi) {
             if (line.isNotEmpty()) {
                 Text(line, style = TextStyle(fontFamily = Inter, fontSize = 13.sp), color = RcColors.text2)
             }
+            state.pills?.let { FilePillsRow(it, Modifier.padding(top = 6.dp)) }
         }
     }
 }

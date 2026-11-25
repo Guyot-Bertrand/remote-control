@@ -47,6 +47,8 @@ data class VersionUi(
     val label: String,
     val present: Boolean,
     val absentLabel: String?,
+    /** Qualité seule (« FHD »), sans la taille de [label]. */
+    val quality: String = label,
     val resolution: String? = null,
     val languages: List<String> = emptyList(),
 )
@@ -189,6 +191,7 @@ fun MediaFileRow.toVersionUi() = VersionUi(
     label = Texts.versionLabel(quality, size),
     present = present,
     absentLabel = if (present) null else Texts.volumeAbsent(volumeLabel),
+    quality = quality,
     resolution = resolutionLabel(width, height),
     languages = languagePills(audioLangs, subtitleLangs),
 )

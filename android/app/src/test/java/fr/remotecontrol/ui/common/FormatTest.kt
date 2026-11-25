@@ -51,6 +51,8 @@ class FormatTest {
         assertEquals("Théâtre", Texts.typeLabel("theatre"))
         assertEquals("Langue inconnue", Texts.languageName(null))
         assertEquals("SV", Texts.languageName("sv"))
+        // Une seule table de langues : mêmes noms pour les pistes et les pastilles.
+        listOf("fr", "en", "ja", "ru", "xx").forEach { assertEquals(languageName(it), Texts.languageName(it)) }
         assertEquals("Épisode 2", Texts.episodeCode(0, 2))
         assertEquals("S01E02", Texts.episodeCode(1, 2))
         assertEquals("Back to Life — S01E02", Texts.episodeTitle("Back to Life", 1, 2))
@@ -154,6 +156,8 @@ class FormatTest {
     @Test
     fun episode_duration_line() {
         assertEquals("41 min", episodeDurationLine(41, null))
+        assertEquals("1 h 15", episodeDurationLine(75, null))
+        assertEquals("1 h 15 \u00B7 reste 1 h 02", episodeDurationLine(75, 62))
         assertEquals("41 min \u00B7 reste 18 min", episodeDurationLine(41, 18))
         assertEquals("reste 18 min", episodeDurationLine(null, 18))
         assertEquals(null, episodeDurationLine(null, null))
@@ -161,7 +165,11 @@ class FormatTest {
 
     @Test
     fun first_sync_texts() {
-        assertEquals("Cette \u0153uvre n'existe qu'en DVD.", Texts.notDigitizedOn("DVD"))
+        assertEquals("Cette \u0153uvre n'existe que sur DVD dans la collection.", Texts.notDigitizedOn("DVD"))
+        assertEquals(
+            "Cette \u0153uvre n'existe que sur DVD dans la collection. Une fois num\u00E9ris\u00E9e, elle deviendra lisible ici.",
+            Texts.notDigitizedOnHelp("DVD"),
+        )
         assertEquals("T\u00E9l\u00E9chargement du catalogue\u2026", Texts.firstSyncDownloading)
         assertEquals("1\u202F250 / 3\u202F992 \u0153uvres", Texts.firstSyncWriting(1250, 3992))
     }
