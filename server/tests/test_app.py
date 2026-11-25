@@ -177,6 +177,10 @@ def test_tv_static_served(tmp_path):
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/html")
         assert client.get("/api/info").json()["name"] == "Remote-Control"
+        # Après une mise à jour, le navigateur de la télé doit revalider ses fichiers
+        # (sinon : ancienne feuille de style avec le nouveau code, page en vrac).
+        for path in ("/tv/", "/tv/style.css", "/tv/app.js"):
+            assert client.get(path).headers["cache-control"] == "no-cache"
     with pytest.raises(Exception):  # connexion fermée à l'arrêt
         app.state.rc.conn.execute("SELECT 1")
 

@@ -362,6 +362,17 @@ def _runtime_dir(config: Config) -> Path:
     return Path(base) / "rc" if base else config.data_dir / "run"
 
 
+class RevalidatedStaticFiles(StaticFiles):
+    """Fichiers de l'écran télé : le navigateur les revalide à chaque chargement (ETag,
+    réponse 304 sans contenu s'ils n'ont pas changé). Sans cela, après une mise à jour,
+    il peut garder l'ancienne feuille de style avec le nouveau code : page en vrac."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(config: Config, player: Player | None = None,
                runner=subprocess.run) -> FastAPI:
     config.data_dir.mkdir(parents=True, exist_ok=True)
@@ -420,7 +431,7 @@ def create_app(config: Config, player: Player | None = None,
     install_api(app, services)
     tv_ui = config.tv_ui_dir or DEFAULT_TV_UI
     if tv_ui.is_dir():
-        app.mount("/tv", StaticFiles(directory=tv_ui, html=True), name="tv")
+        app.mount("/tv", RevalidatedStaticFiles(directory=tv_ui, html=True), name="tv")
     else:
         log.warning("interface télé introuvable : %s", tv_ui)
     return app
