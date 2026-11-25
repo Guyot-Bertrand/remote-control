@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -498,3 +499,38 @@ def test_startup_silent_when_mpv_present(tmp_path, caplog):
         app = create_app(config)
     app.state.rc.conn.close()
     assert not [r for r in caplog.records if "mpv" in r.getMessage()]
+
+
+def test_v1_database_migrates_and_reimports(setup):
+    state, disk = setup
+    data = state.config.data_dir
+    state.conn.close()
+    for suffix in ("", "-wal", "-shm"):
+        Path(str(data / "rc.db") + suffix).unlink(missing_ok=True)
+    # copie du catalogue en place, base v1 contenant une œuvre périmée
+    shutil.copy2(FIXTURE, app_mod.catalog_copy(state.config))
+    v1 = sqlite3.connect(data / "rc.db")
+    v1.executescript((Path(__file__).parent / "fixtures" / "schema_v1.sql")
+                     .read_text(encoding="utf-8"))
+    v1.execute("INSERT INTO work_identity (id, type, key) VALUES (1, 'film', 'perimee')")
+    v1.execute("INSERT INTO work (id, type, key, title_fr, directors_json, genres_json,"
+               " cast_json, tags_json, episodic, content_hash, rev)"
+               " VALUES (1, 'film', 'perimee', 'Périmée', '[]', '[]', '[]', '[]', 0, 'h', 1)")
+    v1.commit()
+    v1.execute("PRAGMA user_version = 1")
+    v1.close()
+    app = create_app(state.config, player=FakePlayer())
+    restored = app.state.rc
+    try:
+        assert restored.conn.execute(
+            "SELECT value FROM meta WHERE key='needs_reimport'").fetchone() is None
+        expected = len(parse_catalog(FIXTURE.read_text(encoding="utf-8")).works)
+        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert restored.conn.execute(
+            "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
+        assert works(restored) == expected
+        assert restored.conn.execute(
+            "SELECT COUNT(*) FROM work WHERE key != 'perimee'").fetchone()[0] == expected
+    finally:
+        restored.conn.close()
+    state.conn = open_db(data / "rc.db")  # refermée par la fixture

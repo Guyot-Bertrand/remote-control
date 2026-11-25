@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS work (
     episodic INTEGER NOT NULL,
     poster_relpath TEXT,
     poster_asset TEXT NULL,
+    medium TEXT,
     content_hash TEXT NOT NULL,
     rev INTEGER NOT NULL
 );
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS episode (
     season_id INTEGER NOT NULL REFERENCES season (id) ON DELETE CASCADE,
     number INTEGER NOT NULL,
     title TEXT,
+    duration_min INTEGER,
     rev INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS episode_season ON episode (season_id);
@@ -77,6 +79,11 @@ CREATE TABLE IF NOT EXISTS media_file (
     subtitles_json TEXT NOT NULL,
     volume_uuid TEXT NULL,
     present INTEGER NOT NULL DEFAULT 0,
+    audio_langs_json TEXT,
+    subtitle_langs_json TEXT,
+    width INTEGER,
+    height INTEGER,
+    duration_s REAL,
     rev INTEGER NOT NULL,
     UNIQUE (work_id, episode_id, relpath)
 );

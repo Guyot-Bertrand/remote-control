@@ -29,7 +29,7 @@ def row(r: sqlite3.Row) -> dict:
         elif k in _HIDDEN:
             continue
         elif k.endswith(_JSON_SUFFIX):
-            d[k[: -len(_JSON_SUFFIX)]] = json.loads(v)
+            d[k[: -len(_JSON_SUFFIX)]] = None if v is None else json.loads(v)
         elif k in _BOOLS:
             d[k] = bool(v)
         else:

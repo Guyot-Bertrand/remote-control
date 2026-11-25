@@ -148,18 +148,21 @@ def restore_from_copy(conn: sqlite3.Connection, config: Config) -> None:
     copy = catalog_copy(config)
     if not copy.is_file():
         return
-    if conn.execute("SELECT EXISTS (SELECT 1 FROM work)").fetchone()[0]:
+    needs_reimport = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM meta WHERE key = 'needs_reimport')").fetchone()[0]
+    if not needs_reimport and conn.execute("SELECT EXISTS (SELECT 1 FROM work)").fetchone()[0]:
         return
     try:
         result = parse_catalog(copy.read_text(encoding="utf-8"))
         _log_warnings(result)
         aliases_file = config.data_dir / "aliases.txt"
         aliases = load_aliases(aliases_file) if aliases_file.is_file() else {}
-        report = import_catalog(conn, result, aliases)
+        report = import_catalog(conn, result, aliases, force=bool(needs_reimport))
+        conn.execute("DELETE FROM meta WHERE key = 'needs_reimport'")
     except Exception as exc:
         log.warning("base vide : réimport de la copie du catalogue impossible (%s)", exc)
         return
-    log.info("base vide : catalogue réimporté depuis %s (%d œuvres)", copy, report.added)
+    log.info("catalogue réimporté depuis %s (%d œuvres)", copy, report.added)
 
 
 def _posters_in_thread(db_file: str, assets_dir: Path,
