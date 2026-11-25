@@ -410,8 +410,26 @@ function mount(html) {
   guardPosters(stage);
 }
 
+/** Copie figée d'une image chargée, à sa taille affichée : elle reste visible dans
+    l'écran qui s'efface pendant que l'image elle-même passe dans le nouvel écran. */
+function imageStill(img) {
+  const still = document.createElement('canvas');
+  still.width = img.naturalWidth;
+  still.height = img.naturalHeight;
+  try {
+    still.getContext('2d').drawImage(img, 0, 0);
+  } catch {
+    return null;
+  }
+  const cs = getComputedStyle(img);
+  still.style.cssText = `display:block;width:${img.offsetWidth}px;height:${img.offsetHeight}px;`
+    + `object-fit:${cs.objectFit};object-position:${cs.objectPosition}`;
+  return still;
+}
+
 /** Reprend dans `next` les images déjà chargées de l'écran affiché (même adresse) :
-    les affiches et l'image de pause ne sont ni rechargées ni redessinées. */
+    les affiches et l'image de pause ne sont ni rechargées ni redessinées. L'écran
+    affiché garde à leur place une copie figée, pour ne jamais les voir disparaître. */
 function keepImages(next) {
   const old = new Map();
   stage.querySelectorAll('img').forEach((img) => {
@@ -420,14 +438,19 @@ function keepImages(next) {
   });
   next.querySelectorAll('img').forEach((img) => {
     const prev = old.get(img.getAttribute('src'));
-    if (!prev) return;
+    if (!prev || !prev.complete || !prev.naturalWidth) return;
+    const still = imageStill(prev);
+    if (!still) return;
     old.delete(img.getAttribute('src'));
+    prev.replaceWith(still);
     for (const { name, value } of [...img.attributes]) {
       if (name !== 'src') prev.setAttribute(name, value);
     }
     img.replaceWith(prev);
   });
 }
+
+const FADE_MS = 200;
 
 /** Remplace l'écran par un fondu d'opacité (200 ms) au-dessus de l'ancien. */
 function mountFade(html) {
@@ -437,11 +460,15 @@ function mountFade(html) {
   guardPosters(next);
   keepImages(next);
   next.classList.add('screen-fade');
-  next.addEventListener('animationend', (ev) => {
-    if (ev.target !== next) return;
+  let done = false;
+  const finish = () => {
+    if (done || !next.isConnected) return;
+    done = true;
     next.classList.remove('screen-fade');
     while (next.previousElementSibling) next.previousElementSibling.remove(); // pas un écran plus récent
-  });
+  };
+  next.addEventListener('animationend', (ev) => { if (ev.target === next) finish(); });
+  setTimeout(finish, FADE_MS + 100); // onglet caché, animations réduites : pas d'animationend
   stage.appendChild(next);
 }
 
@@ -490,7 +517,9 @@ async function show(state) {
     html = renderMessage({ message: MSG_SHEET_UNAVAILABLE });
   }
   if (my !== seq) return;
-  if (state.screen === shown && FADE_SCREENS.has(shown)) mountFade(html);
+  if (state.screen === 'paused' && shown === 'paused' && refreshPausedFull(stage, state.pause)) {
+    // même image : mise à jour sur place, la dérive de l'image continue sans à-coup
+  } else if (state.screen === shown && FADE_SCREENS.has(shown)) mountFade(html);
   else mount(html);
   shown = state.screen;
   if (state.screen === 'playing') updateProgress(true);

@@ -81,3 +81,16 @@ function updatePause(root, st) {
     el.style.transform = `scaleX(${pauseRatio(st.position, st.duration)})`;
   });
 }
+
+/** Plein écran déjà affiché avec la même image : met à jour titre, temps et barre sur
+    place (sans re-rendu, la dérive continue). Renvoie false s'il faut le redessiner. */
+function refreshPausedFull(root, pause) {
+  const screen = root.lastElementChild;
+  if (!pause || !screen || !screen.classList.contains('paused-full')) return false;
+  const img = screen.querySelector('.paused-art img');
+  if ((img ? img.getAttribute('src') : null) !== (pause.image || null)) return false;
+  screen.querySelector('.paused-title').textContent = pauseTitle(pause.title);
+  screen.querySelector('[data-pause-time]').textContent = pauseTime(pause.position, pause.duration);
+  screen.querySelector('[data-pause-progress]').style.transform = `scaleX(${pauseRatio(pause.position, pause.duration)})`;
+  return true;
+}
