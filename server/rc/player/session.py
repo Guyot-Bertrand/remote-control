@@ -26,6 +26,10 @@ log = logging.getLogger(__name__)
 
 SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
+# Reprise d'une vidéo mise de côté : la télé garde la capture en plein écran jusqu'à ce
+# que mpv ait repris l'image (sa fenêtre la couvre alors), puis passe en « lecture ».
+RESUME_SETTLE = 0.5  # secondes après la première avance de la vidéo
+RESUME_FALLBACK = 4  # secondes au plus, si mpv ne signale rien
 WATCHED_RATIO = 0.9
 
 Screen = Literal["home", "work", "season", "view", "playing", "paused", "message"]
@@ -234,6 +238,9 @@ class PlaybackService:
         self._published: PlayerState | None = None  # dernier état publié
         self._published_at = 0.0
         self._trailing: asyncio.TimerHandle | None = None  # publication différée en attente
+        # Reprise en cours : (session, position de reprise, appels différés) ; la télé
+        # passe en « lecture » quand la vidéo avance ou au bout de RESUME_FALLBACK.
+        self._resuming: tuple[_Session, float, list[asyncio.TimerHandle]] | None = None
         self.pause_image, self.pause_mode = pause_image, pause_mode
         self._captures = 0  # captures réussies (paramètre `v` de l'image)
         self._parking = False  # mise de côté en cours : commandes sous le verrou
@@ -499,6 +506,7 @@ class PlaybackService:
                 self._parking = False
 
     async def _park_locked(self, s: _Session) -> dict | None:
+        self._cancel_resuming()
         s.image = await self._capture()
         if self._session is not s or not self._state.paused:  # fin pendant la capture
             return None
@@ -559,13 +567,47 @@ class PlaybackService:
         """Ramène la vidéo mise de côté, en plein écran et en lecture."""
         s = self._session
         assert s is not None and s.parked is not None
+        image = s.image  # effacée par la reprise, montrée jusqu'au retour de la vidéo
         if s.parked == "minimize":
             await self._unminimize()
             await self.player.set_pause(False)
         elif not await self._restart(s):
             return
-        self.tv.set_playing(s.current["work_id"])
+        self._await_video(s, image)
         self._publish()
+
+    def _await_video(self, s: _Session, image: str | None) -> None:
+        """La vidéo revient : la télé montre la capture en plein écran (même image que
+        celle que mpv va afficher) et ne passe en « lecture » qu'une fois mpv reparti,
+        sous sa fenêtre plein écran : pas d'écran intermédiaire visible."""
+        self._cancel_resuming()
+        info = {"image": image, "title": s.current["title"],
+                "position": self._state.position, "duration": self._state.duration,
+                "work_id": s.current["work_id"]}
+        if self.tv.state.screen != "paused" or self.tv.state.pause != info:
+            self.tv.show_paused(info)
+        timer = asyncio.get_running_loop().call_later(
+            RESUME_FALLBACK, self._video_back, s)
+        self._resuming = (s, self._state.position, [timer])
+
+    def _video_moved(self, state: PlayerState) -> None:
+        r = self._resuming
+        if r is None or r[0] is not self._session or state.paused:
+            return
+        if state.position != r[1] and len(r[2]) == 1:
+            r[2].append(asyncio.get_running_loop().call_later(
+                RESUME_SETTLE, self._video_back, r[0]))
+
+    def _video_back(self, s: _Session) -> None:
+        self._cancel_resuming()
+        if self._session is s and s.parked is None:
+            self.tv.set_playing(s.current["work_id"])
+
+    def _cancel_resuming(self) -> None:
+        if self._resuming is not None:
+            for t in self._resuming[2]:
+                t.cancel()
+            self._resuming = None
 
     async def _restart(self, s: _Session) -> bool:
         """Relance du lecteur arrêté à la mise de côté. Faux (session terminée, message
@@ -643,6 +685,8 @@ class PlaybackService:
         else:
             moved = state.position != self._state.position
             self._state = state
+            if moved:
+                self._video_moved(state)
             if moved and s.parked == "minimize" and state.paused:
                 # mpv réduit suit les sauts : la vignette de pause aussi. En pause, mpv
                 # ne signale la position qu'à un saut (même rythme que la publication).
@@ -685,6 +729,7 @@ class PlaybackService:
 
     def _finish(self, state: PlayerState, message: str | None) -> None:
         self._cancel_trailing()
+        self._cancel_resuming()
         try:
             self._save(state)
             self.on_catalog(current_revision(self.conn))  # progression visible sans attendre
