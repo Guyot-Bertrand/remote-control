@@ -268,6 +268,7 @@ class PlaybackService:
         if self._is_current(req):
             try:
                 if self._session.parked == "minimize":
+                    self._check_tracks(self._session, req.audio, req.subtitle)
                     await self._unminimize()
                 if await self._rejoin(req):
                     return
@@ -400,14 +401,15 @@ class PlaybackService:
         return self._parking or self.parked
 
     async def pause(self, paused: bool) -> None:
-        if not self._needs_lock():
-            await self.player.set_pause(paused)
-            return
-        async with self._lock:  # après une mise de côté en cours
+        # Toujours sous le verrou : une reprise envoyée juste avant une mise de côté passe
+        # avant elle, et la mise de côté la voit (état noté sans attendre l'écho de mpv).
+        async with self._lock:
             if self.parked and not paused:
                 await self._unpark_locked()
             elif self._kept() is None:
                 await self.player.set_pause(paused)
+                if self._session is not None:
+                    self._state = replace(self._state, paused=paused)
 
     async def seek(self, seconds: float, relative: bool) -> None:
         if not self._needs_lock():

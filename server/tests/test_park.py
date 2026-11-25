@@ -342,3 +342,30 @@ async def test_seek_while_minimized_updates_pause_tile(env):
     assert env.tv.state.screen == "view"
     assert env.tv.state.pause["position"] == 1454
     assert env.tv.state.pause["image"] == "/api/player/pause.jpg?v=1"
+
+
+async def test_unpause_sent_just_before_park_is_not_lost(env):
+    await paused_at_1394(env)
+    pause_gate = env.player.pause_gate = asyncio.Event()
+    shot_gate = env.player.screenshot_gate = asyncio.Event()
+    resuming = asyncio.create_task(env.svc.pause(False))  # commande encore en route
+    await asyncio.sleep(0)
+    parking = asyncio.create_task(env.svc.park())
+    await asyncio.sleep(0)
+    shot_gate.set()  # la mise de côté irait jusqu'à l'arrêt du lecteur
+    await asyncio.sleep(0)
+    pause_gate.set()
+    await resuming
+    assert await parking is None
+    assert not env.svc.parked
+    assert ("stop",) not in env.player.calls and ("set_pause", False) in env.player.calls
+
+
+async def test_invalid_track_while_minimized_keeps_video_minimized(env):
+    env.mode = "minimize"
+    await parked(env)
+    env.player.calls.clear()
+    with pytest.raises(PlayError) as exc:
+        await env.svc.play(PlayRequest("work", 1, "resume", audio=9))
+    assert exc.value.code == "invalid"
+    assert env.player.calls == [] and env.svc.parked
