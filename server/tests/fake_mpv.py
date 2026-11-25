@@ -97,7 +97,7 @@ async def _main(argv):
     sock = next(a.split("=", 1)[1] for a in argv if a.startswith("--input-ipc-server="))
     cfg = json.loads(Path(os.environ["FAKE_MPV_CONFIG"]).read_text())
     fake = FakeMpv(sock, cfg.get("props"), log=cfg.get("log"), script=cfg.get("script"),
-                   mute=cfg.get("mute", ()))
+                   mute=cfg.get("mute", ()), fail=cfg.get("fail", ()))
     if cfg.get("log"):
         with open(cfg["log"], "a") as f:
             f.write(json.dumps(["argv", *argv]) + "\n")

@@ -15,6 +15,8 @@ class FakePlayer:
         self.stop_gate: asyncio.Event | None = None  # stop lent
         self.stop_state: PlayerState | None = None  # état final émis par stop (comme mpv)
         self.command_error: Exception | None = None  # levée par les commandes (mpv figé)
+        self.screenshot_error: Exception | None = None  # levée par screenshot
+        self.minimize_error: Exception | None = None  # levée par set_minimized
 
     def _command(self, *call):
         self.calls.append(call)
@@ -45,6 +47,17 @@ class FakePlayer:
 
     async def set_subtitle(self, sel):
         self._command("set_subtitle", sel)
+
+    async def screenshot(self, dest):
+        self.calls.append(("screenshot", dest))
+        if self.screenshot_error is not None:
+            raise self.screenshot_error
+        dest.write_bytes(b"\xff\xd8fake")
+
+    async def set_minimized(self, minimized):
+        self.calls.append(("set_minimized", minimized))
+        if self.minimize_error is not None:
+            raise self.minimize_error
 
     async def stop(self):
         self.calls.append(("stop",))
