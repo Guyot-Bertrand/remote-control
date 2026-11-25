@@ -28,6 +28,7 @@ let seq = 0; // jeton de rendu : une réponse arrivée après un changement d'é
 let homeTurn = 0;
 let homeTimer = null;
 let shown = null; // écran actuellement monté (state.screen)
+let shownHtml = null; // son rendu, sans l'heure (stableHtml)
 const FADE_SCREENS = new Set(['view', 'paused']); // même écran : fondu, affiches conservées
 
 // -- mise à l'échelle du canevas ------------------------------------------
@@ -654,9 +655,18 @@ async function load(state) {
   }
 }
 
-async function show(state) {
+/** Rendu comparable d'un rendu à l'autre : l'heure et la date (tenues à jour sur place)
+    et l'animation d'entrée n'y comptent pas. */
+function stableHtml(html) {
+  return html.replace(/(data-(?:clock|date)>)[^<]*/g, '$1').replace(/ rc-enter\b/g, '');
+}
+
+/** Affiche `state`. `refresh` : même état redessiné après une annonce `catalog` ; rien
+    ne bouge si le rendu est identique. */
+async function show(state, { refresh = false } = {}) {
   const my = ++seq;
   clearTimeout(homeTimer);
+  homeTimer = null;
   if (state.screen !== 'view') sheetCache.clear();
   let html;
   let failed = false;
@@ -668,15 +678,20 @@ async function show(state) {
     failed = true;
   }
   if (my !== seq) return;
-  if (state.screen === 'paused' && shown === 'paused' && refreshPausedFull(stage, state.pause)) {
+  const stable = stableHtml(html);
+  if (refresh && state.screen === shown && stable === shownHtml) {
+    // contenu inchangé : pas de fondu ni de nouveau montage
+  } else if (state.screen === 'paused' && shown === 'paused'
+      && refreshPausedFull(stage, state.pause)) {
     // même image : mise à jour sur place, la dérive de l'image continue sans à-coup
   } else if (state.screen === shown && FADE_SCREENS.has(shown)) mountFade(html);
   else mount(html);
   shown = state.screen;
+  shownHtml = stable;
   shownSheetKey = state.screen === 'view' && !failed ? sheetKey(state.view) : null;
   if (state.screen === 'playing') updateProgress(true);
   if (state.screen === 'home') {
-    homeTimer = setTimeout(() => { homeTurn += 1; show(tv); }, HOME_ROTATE_MS);
+    homeTimer = setTimeout(() => { homeTimer = null; homeTurn += 1; show(tv); }, HOME_ROTATE_MS);
   }
 }
 
@@ -712,7 +727,10 @@ function connect() {
       }
     } else if (msg.type === 'catalog' && tv.screen !== 'playing') {
       sheetCache.clear();
-      show(tv); // fiches rechargées après chaque import
+      // Veille : la vitrine est tirée au hasard à chaque chargement ; elle se met à jour
+      // à la prochaine alternance (3 min) plutôt qu'à chaque annonce de l'analyse.
+      if (tv.screen === 'home' && shown === 'home' && homeTimer !== null) return;
+      show(tv, { refresh: true }); // fiches rechargées après chaque import ou analyse
     }
   };
   ws.onclose = () => setTimeout(connect, RECONNECT_MS);
