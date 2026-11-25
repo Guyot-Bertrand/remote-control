@@ -109,3 +109,9 @@ def test_enrich_collection(conn):
     o = enrich(conn, [{"kind": "collection", "id": COLL}], None)[0]
     assert o["name"] == "Saga" and o["count"] == 6 and o["playable_count"] == 2
     assert o["posters"] == ["pa", "p4", "p5"]
+
+
+def test_remaining_never_negative(conn):
+    conn.execute("UPDATE progress SET position = 6000.0 WHERE target_kind = 'work'")
+    o = enrich(conn, [{"kind": "work", "id": A}], None)[0]
+    assert o["remaining_min"] == 0

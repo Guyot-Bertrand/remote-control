@@ -245,3 +245,13 @@ async def test_idle_counts_from_end_of_playback(env, m):  # noqa: F811
     env.clock.t += 600
     m.check_idle()
     assert env.tv.state.screen == "home"
+
+
+async def test_remembered_view_shows_fresh_progress_after_playback(env, m):  # noqa: F811
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=10.0, duration=6000.0)
+    assert await m.accept(V_BROWSE)
+    emit(env, position=3000.0, duration=6000.0)
+    await env.svc.stop()
+    assert env.tv.state.screen == "view"
+    assert env.tv.state.view["items"][0]["progress_ratio"] == 0.5

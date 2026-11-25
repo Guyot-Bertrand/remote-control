@@ -31,6 +31,7 @@ class MirrorService:
         self._idle_from: float | None = None
         self._on_view = False  # la télé montre-t-elle une vue sans pause ?
         tv.on_change = self._tv_changed
+        tv.refresh_view = self._refreshed
         self._tasks: set[asyncio.Task] = set()  # mises de côté programmées
 
     async def accept(self, view: dict) -> bool:
@@ -90,6 +91,13 @@ class MirrorService:
                 self.check_idle()
             except Exception:  # CancelledError n'en hérite pas : l'annulation passe
                 log.exception("vérification d'inactivité en échec")
+
+    def _refreshed(self, view: dict) -> dict:
+        """Vue retenue ré-enrichie (les éléments enrichis gardent `kind` et `id`)."""
+        fresh = self._enriched(view)
+        if view is self._view:
+            self._view = fresh
+        return fresh
 
     def _enriched(self, view: dict) -> dict:
         view = dict(view)

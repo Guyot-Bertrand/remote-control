@@ -173,7 +173,7 @@ def _remaining_min(position: float | None, duration: float | None,
                    watched: bool) -> int | None:
     if watched or not duration:
         return None
-    return round((duration - (position or 0.0)) / 60)
+    return max(0, round((duration - (position or 0.0)) / 60))
 
 
 def _tv_summary(w: sqlite3.Row, position: float | None, duration: float | None,

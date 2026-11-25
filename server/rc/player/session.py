@@ -47,6 +47,8 @@ class TvController:
         self.state = TvState("home")
         self._last_screen = TvState("home")
         self.on_change: Callable[[TvState], None] = lambda state: None  # après chaque écran
+        # Vue retenue remise à jour (progression…) quand elle réapparaît en fin de lecture.
+        self.refresh_view: Callable[[dict], dict] = lambda view: view
 
     def show(self, screen: Screen, work_id: int | None = None,
              season_id: int | None = None, force: bool = False) -> bool:
@@ -83,7 +85,13 @@ class TvController:
 
     def playback_ended(self, message: str | None) -> None:
         if message is None:
-            self._set(self._last_screen)
+            last = self._last_screen
+            if last.screen == "view" and last.view is not None:
+                try:
+                    last = self._last_screen = replace(last, view=self.refresh_view(last.view))
+                except Exception:
+                    log.exception("mise à jour de la vue retenue impossible")
+            self._set(last)
         else:
             self._set(TvState("message", message=message))
 
