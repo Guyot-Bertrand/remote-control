@@ -48,3 +48,32 @@ fun indexLetter(title: String): String {
     val first = fold(title).firstOrNull { it.isLetterOrDigit() } ?: return "#"
     return if (first.isLetter()) first.uppercase() else "#"
 }
+
+/** Nom français d'une langue (« fr » → « Français ») ; toute autre langue : son code en majuscules. */
+fun languageName(code: String): String = when (code) {
+    "fr" -> "Français"
+    "en" -> "Anglais"
+    "de" -> "Allemand"
+    "es" -> "Espagnol"
+    "it" -> "Italien"
+    "ja" -> "Japonais"
+    "nl" -> "Néerlandais"
+    "pt" -> "Portugais"
+    else -> code.uppercase(Locale.ROOT)
+}
+
+/** Pastilles de langues : audio puis sous-titres (« ST français ») ; vide si les deux sont inconnus. */
+fun languagePills(audio: List<String>?, subtitles: List<String>?): List<String> =
+    audio.orEmpty().map(::languageName) +
+        subtitles.orEmpty().map { "ST ${languageName(it).lowercase(Locale.ROOT)}" }
+
+/** « 1920 × 1080 » (espaces fines insécables), ou null si une dimension est inconnue ou nulle. */
+fun resolutionLabel(width: Int?, height: Int?): String? =
+    if (width == null || height == null || width <= 0 || height <= 0) null else "$width × $height"
+
+/** « 41 min · reste 18 min », « 41 min » ou « reste 18 min » ; null si rien n'est connu. */
+fun episodeDurationLine(durationMin: Int?, remainingMin: Int?): String? =
+    listOfNotNull(
+        durationMin?.let { "$it min" },
+        remainingMin?.let { Texts.remaining(it) },
+    ).takeIf { it.isNotEmpty() }?.joinToString(" · ")
