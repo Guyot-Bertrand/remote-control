@@ -46,6 +46,7 @@ class TvController:
         self.bus = bus
         self.state = TvState("home")
         self._last_screen = TvState("home")
+        self.on_change: Callable[[TvState], None] = lambda state: None  # après chaque écran
 
     def show(self, screen: Screen, work_id: int | None = None,
              season_id: int | None = None, force: bool = False) -> bool:
@@ -89,6 +90,10 @@ class TvController:
     def _set(self, state: TvState) -> None:
         self.state = state
         self.bus.publish({"type": "tv", "state": asdict(state)})
+        try:
+            self.on_change(state)
+        except Exception:
+            log.exception("on_change a levé une exception")
 
 
 @dataclass

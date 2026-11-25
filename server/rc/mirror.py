@@ -10,7 +10,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 
 from rc.api.serialize import enrich
-from rc.player.session import PlaybackService, TvController
+from rc.player.session import PlaybackService, TvController, TvState
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +26,11 @@ class MirrorService:
         self.clock, self.idle_after = clock, idle_after
         self._seqs: OrderedDict[str, int] = OrderedDict()  # dernier seq par téléphone
         self._view: dict | None = None  # dernière vue acceptée (enrichie)
-        self._view_at: float | None = None
+        # Début de l'inactivité : dernière vue acceptée, ou retour de la télé sur une vue
+        # sans pause (fin de lecture, reprise…), selon le plus récent.
+        self._idle_from: float | None = None
+        self._on_view = False  # la télé montre-t-elle une vue sans pause ?
+        tv.on_change = self._tv_changed
         self._tasks: set[asyncio.Task] = set()  # mises de côté programmées
 
     async def accept(self, view: dict) -> bool:
@@ -40,17 +44,16 @@ class MirrorService:
         while len(self._seqs) > MAX_PHONES:
             self._seqs.popitem(last=False)  # oublie le plus ancien
         view = self._enriched(view)
-        self._view, self._view_at = view, self.clock()
+        self._view, self._idle_from = view, self.clock()
         await self._apply(view)
         return True
 
     def on_pause_change(self, paused: bool) -> None:
         """Branché sur `playback.on_pause_change` : une pause pendant que le téléphone
         montre autre chose que la télécommande met la vidéo de côté."""
-        view = self._view
-        if not paused or view is None or view["screen"] == "remote":
+        if not paused or not self._wants_park_view():
             return
-        task = asyncio.get_running_loop().create_task(self._apply(view))
+        task = asyncio.get_running_loop().create_task(self._apply_latest())
         self._tasks.add(task)
         task.add_done_callback(self._task_done)
 
@@ -59,11 +62,25 @@ class MirrorService:
         if not task.cancelled() and task.exception() is not None:
             log.error("mise de côté programmée en échec", exc_info=task.exception())
 
+    def _wants_park_view(self) -> bool:
+        return self._view is not None and self._view["screen"] != "remote"
+
+    async def _apply_latest(self) -> None:
+        """Tâche programmée à la pause : la vue retenue est lue quand elle s'exécute."""
+        if self._wants_park_view():
+            await self._apply(self._view)
+
+    def _tv_changed(self, state: TvState) -> None:
+        on_view = state.screen == "view" and state.pause is None
+        if on_view and not self._on_view:
+            self._idle_from = self.clock()
+        self._on_view = on_view
+
     def check_idle(self) -> None:
         """Retour à la veille sans vue depuis `idle_after` secondes (hors pause)."""
         st = self.tv.state
-        if (self._view_at is not None and st.screen == "view" and st.pause is None
-                and self.clock() - self._view_at > self.idle_after):
+        if (self._idle_from is not None and st.screen == "view" and st.pause is None
+                and self.clock() - self._idle_from > self.idle_after):
             self.tv.show("home")
 
     async def idle_loop(self, sleep: Callable = asyncio.sleep) -> None:
@@ -90,8 +107,11 @@ class MirrorService:
         if (view["screen"] != "remote" and pb.current is not None and pb.state.paused
                 and not pb.parked):
             await pb.park()
-            if self._view is not view:  # vue plus récente reçue pendant la mise de côté
-                return
+            latest = self._view
+            if latest is not view:  # vue plus récente reçue pendant la mise de côté
+                if latest["screen"] != "remote":
+                    return  # elle s'affiche par son propre `accept`
+                view = latest  # la télécommande n'a rien pu montrer : plein écran
         self._show(view)
 
     def _show(self, view: dict) -> None:
@@ -103,7 +123,9 @@ class MirrorService:
             if not remote:  # la télécommande n'est pas un écran à montrer en fin de lecture
                 self.tv.remember_view(view)
         elif remote:
-            if pb.parked:
-                self.tv.show_paused(pb.pause_info())
+            pause = pb.pause_info()
+            st = self.tv.state
+            if pb.parked and not (st.screen == "paused" and st.pause == pause):
+                self.tv.show_paused(pause)
         else:
             self.tv.show_view(view, pb.pause_info())

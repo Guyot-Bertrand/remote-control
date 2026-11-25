@@ -188,3 +188,60 @@ async def test_items_are_enriched(env, m):  # noqa: F811
     assert v["sections"][0]["items"][0]["title_fr"] == "Ava"
     assert v["sections"][0]["label"] == "Œuvres"
     assert v["phone_id"] == "p" and v["title"] == "Films"
+
+
+async def test_remote_view_during_park_shows_fullscreen_pause(env, m):  # noqa: F811
+    await paused_at_1394(env)
+    gate = env.player.screenshot_gate = asyncio.Event()
+    first = asyncio.create_task(m.accept(view(V_BROWSE, 1)))
+    await asyncio.sleep(0)
+    assert await m.accept(view(V_REMOTE, 2))  # pendant la capture
+    gate.set()
+    assert await first
+    assert env.svc.parked and env.tv.state.screen == "paused"
+    assert env.tv.state.pause["position"] == 1394
+
+
+async def test_newer_view_during_park_shown_once(env, m):  # noqa: F811
+    await paused_at_1394(env)
+    gate = env.player.screenshot_gate = asyncio.Event()
+    shown = []
+    real = env.tv.show_view
+    env.tv.show_view = lambda v, pause=None: (shown.append(v["screen"]), real(v, pause))
+    first = asyncio.create_task(m.accept(view(V_BROWSE, 1)))
+    await asyncio.sleep(0)
+    second = asyncio.create_task(m.accept(view(V_SEARCH, 2)))
+    await asyncio.sleep(0)
+    gate.set()
+    await first
+    await second
+    assert shown == ["search"]
+    assert env.tv.state.view["screen"] == "search" and env.tv.state.pause is not None
+
+
+async def test_scheduled_park_uses_latest_view(env, m):  # noqa: F811
+    env.svc.on_pause_change = m.on_pause_change
+    await m.accept(view(V_BROWSE, 1))
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=10.0, duration=6000.0)
+    emit(env, position=10.0, duration=6000.0, paused=True)  # tâche programmée
+    await m.accept(view(V_REMOTE, 2))  # avant que la tâche ne tourne
+    for _ in range(5):
+        await asyncio.sleep(0)
+    assert not env.svc.parked and env.tv.state.screen == "playing"
+
+
+async def test_idle_counts_from_end_of_playback(env, m):  # noqa: F811
+    await m.accept(V_BROWSE)
+    await env.svc.play(PlayRequest("work", 1, "start"))
+    emit(env, position=10.0, duration=6000.0)
+    env.clock.t += 7200
+    m.check_idle()
+    await env.svc.stop()
+    assert env.tv.state.screen == "view" and env.tv.state.view["screen"] == "browse"
+    env.clock.t += 60
+    m.check_idle()
+    assert env.tv.state.screen == "view"
+    env.clock.t += 600
+    m.check_idle()
+    assert env.tv.state.screen == "home"
