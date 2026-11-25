@@ -64,8 +64,11 @@ def _values(conn: sqlite3.Connection, media_file_id: int, path: Path) -> tuple |
     declared = [str(path.parent / s["filename"]) for s in json.loads(mf["subtitles_json"])]
     tracks.external = find_external_subs(path, declared)
     s = media_summary(tracks)
+    width, duration = s.get("width"), s.get("duration_s")
+    if width is None and duration is None:
+        width = 0  # rien d'exploitable : marqué analysé comme un échec, sinon rejoué sans fin
     return (json.dumps(s["audio_langs"]), json.dumps(s["subtitle_langs"]),
-            s.get("width"), s.get("height"), s.get("duration_s"))
+            width, s.get("height"), duration)
 
 
 def analyze_file(conn: sqlite3.Connection, media_file_id: int, path: Path) -> bool:
@@ -126,6 +129,7 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
     db_file = _db_file(state.conn)
     poll = state.config.poll_interval
     queue: list[tuple[int, Path]] = []
+    failed: set[int] = set()  # analyses en erreur : écartées jusqu'au prochain index complet
     handled_index: float | None = None
     last_announce = state.clock()
     while True:
@@ -139,6 +143,8 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
                 queue = pending_files(state.conn, state.indexes, recheck)
                 if recheck:
                     handled_index = full  # seulement une fois la liste obtenue
+                    failed.clear()
+                queue = [f for f in queue if f[0] not in failed]
                 if not queue:
                     publish_catalog(state, current_revision(state.conn))
                     last_announce = state.clock()
@@ -148,6 +154,7 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
             try:
                 await asyncio.to_thread(_analyze_in_thread, db_file, media_file_id, path)
             except Exception:
+                failed.add(media_file_id)
                 log.exception("échec de l'analyse de %s", path)
             if not queue or state.clock() - last_announce >= ANNOUNCE_EVERY:
                 publish_catalog(state, current_revision(state.conn))

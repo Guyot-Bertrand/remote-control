@@ -244,3 +244,79 @@ async def test_loop_survives_transient_errors(state, monkeypatch, caplog):
     assert analyzed == [1, 2, 3]  # la boucle a continué après les deux erreurs
     assert sleeps[:2] == [7.0, 7.0]
     assert "tour d'analyse en échec" in caplog.text
+
+
+# -- fichiers impossibles à terminer : la boucle doit finir par dormir -----
+
+def add_file(state, tmp_path, monkeypatch):
+    state.conn.execute("INSERT INTO media_file (id, quality, relpath, subtitles_json, present,"
+                       " rev) VALUES (1, 'HD', 'f.mp4', '[]', 1, 0)")
+    (tmp_path / "f.mp4").touch()
+    monkeypatch.setattr(analysis, "resolve_media_path", lambda c, i, ix: tmp_path / "f.mp4")
+
+
+def counting_probe(monkeypatch, result):
+    calls = []
+
+    def probe(*a, **k):
+        calls.append(1)
+        if len(calls) > 20:
+            raise Stop  # boucle chaude : on arrête le test
+        return result()
+
+    monkeypatch.setattr(analysis, "cached_tracks", probe)
+    return calls
+
+
+async def test_loop_sleeps_when_probe_yields_no_width_nor_duration(state, tmp_path, monkeypatch):
+    add_file(state, tmp_path, monkeypatch)
+    calls = counting_probe(monkeypatch, lambda: MediaTracks(
+        [Track(1, "en", None, "aac", True)], [], [], None, None, None, None))
+    sleeps = []
+
+    async def sleep(s):
+        sleeps.append(s)
+        raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert len(calls) == 1 and sleeps == [7.0]
+    d = row(state.conn.execute("SELECT * FROM media_file WHERE id = 1").fetchone())
+    assert d["audio_langs"] == ["en"] and d["width"] is None and d["duration_s"] is None
+
+
+async def test_loop_skips_failing_file_until_next_full_index(state, tmp_path, monkeypatch,
+                                                             caplog):
+    add_file(state, tmp_path, monkeypatch)
+
+    def fail():
+        raise ValueError("cannot convert float NaN to integer")
+
+    calls = counting_probe(monkeypatch, fail)
+    sleeps = []
+
+    async def sleep(s):
+        sleeps.append(s)
+        if len(sleeps) == 2:
+            state.last_full_index = 100.0  # nouvel index complet : on réessaie
+        if len(sleeps) == 3:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert len(calls) == 2 and sleeps == [7.0, 7.0, 7.0]
+    assert caplog.text.count("échec de l'analyse") == 2
+
+
+def test_nan_or_infinite_duration_is_ignored(conn, monkeypatch, tmp_path):
+    import json
+    conn.execute("PRAGMA foreign_keys=OFF")
+    conn.execute("INSERT INTO episode (id, season_id, number, rev) VALUES (5, 1, 1, 0)")
+    conn.execute("UPDATE media_file SET episode_id = 5 WHERE id = 1")
+    for bad in (float("nan"), float("inf"), -3.0, 0.0):
+        monkeypatch.setattr(analysis, "cached_tracks", lambda *a, b=bad, **k: tracks_en(b))
+        analyze_file(conn, 1, tmp_path / "f.mp4")
+        r = conn.execute("SELECT duration_s, width FROM media_file").fetchone()
+        assert r["duration_s"] is None and r["width"] == 624
+        assert conn.execute("SELECT duration_min FROM episode").fetchone()[0] is None
+        json.dumps(row(r), allow_nan=False)

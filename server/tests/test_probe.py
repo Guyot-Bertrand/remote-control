@@ -164,3 +164,10 @@ def test_media_summary_dedupes_and_orders():
         "height": 352,
         "duration_s": 2490.5,
     }
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-1", "0", "N/A"])
+def test_probe_ignores_unusable_duration(raw):
+    out = json.dumps({"streams": [], "format": {"duration": raw}})
+    t = probe_tracks(Path("x.mkv"), runner=fake_runner(out))
+    assert t.duration is None

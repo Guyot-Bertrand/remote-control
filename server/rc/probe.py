@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import sqlite3
@@ -94,7 +95,12 @@ def probe_tracks(path: Path, runner=subprocess.run) -> MediaTracks:
         duration = float(raw_duration) if raw_duration is not None else None
     except (TypeError, ValueError):
         duration = None
-    return MediaTracks(audio, subs, [], video_codec, height, width, duration)
+    return MediaTracks(audio, subs, [], video_codec, height, width, usable_duration(duration))
+
+
+def usable_duration(d: float | None) -> float | None:
+    """Durée exploitable : finie et positive (NaN ferait échouer `int`, l'infini le JSON)."""
+    return d if d is not None and math.isfinite(d) and d > 0 else None
 
 
 def _sub_lang(video: Path, sub: Path) -> str | None:
@@ -188,6 +194,6 @@ def media_summary(t: MediaTracks) -> dict:
         "subtitle_langs": uniq([s.lang for s in t.subtitles] + [e.lang for e in t.external]),
         "width": t.width,
         "height": t.height,
-        "duration_s": t.duration,
+        "duration_s": usable_duration(t.duration),  # le cache peut dater d'avant le filtre
     }
     return {k: v for k, v in out.items() if v is not None}

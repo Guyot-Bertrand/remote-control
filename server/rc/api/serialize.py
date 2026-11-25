@@ -34,9 +34,8 @@ def row(r: sqlite3.Row) -> dict:
             d[k] = bool(v)
         else:
             d[k] = v
-    if d.get("width") == 0:  # analyse impossible : aucune valeur à afficher
-        for k in ("audio_langs", "subtitle_langs", "width", "height", "duration_s"):
-            d[k] = None
+    if d.get("width") == 0:  # marqueur « analysé » sans résolution : rien à afficher
+        d["width"] = d["height"] = None
     return d
 
 
