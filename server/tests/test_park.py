@@ -71,6 +71,12 @@ def progress_row(conn, kind="work", tid=1):
                         (kind, tid)).fetchone()
 
 
+async def video_back(env):
+    """La vidéo reprise avance : la télé quitte la capture plein écran pour « lecture »."""
+    emit(env, position=env.svc.state.position + 1, duration=env.svc.state.duration)
+    await asyncio.sleep(session_mod.RESUME_SETTLE + 0.05)
+
+
 def emit(env, **kw):
     env.player.on_state(PlayerState(running=True, **kw))
 
@@ -161,6 +167,7 @@ async def test_resume_restarts_at_kept_position_with_tracks(env):
     assert start["start_at"] == 1454 and start["audio"] == 2
     assert start["subtitle"] == {"kind": "embedded", "index": 1}
     assert "1920x1038" in start["path"].name
+    await video_back(env)
     assert env.tv.state.screen == "playing" and not env.svc.parked
     assert env.svc.state.running and not env.svc.state.paused
     assert env.svc.pause_info() is None
@@ -211,6 +218,7 @@ async def test_play_same_media_while_parked_unparks(env):
     await env.svc.play(PlayRequest("work", 1, "start", audio=2))
     start = env.player.starts()[-1]
     assert start["start_at"] == 0 and start["audio"] == 2
+    await video_back(env)
     assert not env.svc.parked and env.tv.state.screen == "playing"
 
 
@@ -251,6 +259,7 @@ async def test_park_minimize_keeps_player_running(env):
     env.player.calls.clear()
     await env.svc.pause(False)
     assert env.player.calls == [("set_minimized", False), ("set_pause", False)]
+    await video_back(env)
     assert not env.svc.parked and env.tv.state.screen == "playing"
 
 
@@ -369,3 +378,26 @@ async def test_invalid_track_while_minimized_keeps_video_minimized(env):
         await env.svc.play(PlayRequest("work", 1, "resume", audio=9))
     assert exc.value.code == "invalid"
     assert env.player.calls == [] and env.svc.parked
+
+
+async def test_resume_keeps_pause_image_until_video_plays(env, monkeypatch):
+    """À la reprise, la télé ne montre pas l'écran « lecture » avant que mpv ait repris
+    l'image : elle garde la capture en plein écran (pas de clignotement)."""
+    monkeypatch.setattr(session_mod, "RESUME_SETTLE", 0)
+    await parked(env)
+    await env.svc.pause(False)
+    assert env.tv.state.screen == "paused"
+    assert env.tv.state.pause["image"] is not None
+    await asyncio.sleep(0)
+    assert env.tv.state.screen == "paused"  # mpv n'a pas encore avancé
+    emit(env, position=1395.0, duration=2490.0)  # la vidéo repart
+    await asyncio.sleep(0.01)
+    assert env.tv.state.screen == "playing"
+
+
+async def test_resume_falls_back_to_playing_without_player_event(env, monkeypatch):
+    monkeypatch.setattr(session_mod, "RESUME_FALLBACK", 0)
+    await parked(env)
+    await env.svc.pause(False)
+    await asyncio.sleep(0.01)
+    assert env.tv.state.screen == "playing"
