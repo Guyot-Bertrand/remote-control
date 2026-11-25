@@ -654,3 +654,9 @@ def test_routing_errors_use_api_format(env):
     assert r.status_code == 405
     assert r.json() == {"error": "invalid", "volume_label": None,
                         "message": "Requête invalide."}
+
+
+def test_full_sync_has_total_works(env):
+    full = env.client.get("/api/sync").json()
+    assert full["total_works"] == len(full["works"]) == 7
+    assert "total_works" not in env.client.get("/api/sync?since=0").json()

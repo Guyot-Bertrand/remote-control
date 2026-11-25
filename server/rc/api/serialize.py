@@ -89,7 +89,9 @@ def sync(conn: sqlite3.Connection, since: int | None) -> dict:
             "progress": [progress(r) for r in changed("progress")],
             "volumes": [row(r) for r in conn.execute("SELECT * FROM volume ORDER BY uuid")],
         }
-        if not full:
+        if full:
+            out["total_works"] = len(works)
+        else:
             deleted: dict[str, list[int]] = {k: [] for k in DELETED_KINDS}
             for r in conn.execute("SELECT kind, id FROM tombstone WHERE rev > ?"
                                   " ORDER BY kind, id", (rev,)):

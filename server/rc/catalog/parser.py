@@ -15,6 +15,7 @@ from rc.catalog.model import (
     VideoFile,
 )
 from rc.catalog.paths import (
+    MEDIUM_LABELS,
     QUALITY_ORDER,
     base_name,
     episode_info,
@@ -205,6 +206,8 @@ def _on_video(st: _State, f: list[str]) -> None:
         subtitles=subs,
         playable=filename is not None and quality in QUALITY_ORDER,
     )
+    if quality in MEDIUM_LABELS and quality not in st.work.media:
+        st.work.media.append(quality)
     st.entries.append((video, st.season[1] if st.season else None))
 
 

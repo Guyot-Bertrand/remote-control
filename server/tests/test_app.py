@@ -530,6 +530,8 @@ def test_v1_database_migrates_and_reimports(setup):
             "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
         assert works(restored) == expected
         assert restored.conn.execute(
+            "SELECT medium FROM work WHERE key LIKE 'Alien%'").fetchone()[0] == "DVD"
+        assert restored.conn.execute(
             "SELECT COUNT(*) FROM work WHERE key != 'perimee'").fetchone()[0] == expected
     finally:
         restored.conn.close()
