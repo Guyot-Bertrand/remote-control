@@ -10,13 +10,13 @@ import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, RootModel, StringConstraints
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from rc.api import serialize
@@ -29,6 +29,9 @@ from rc.player.mpv import MpvError
 from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
                                load_tracks, pick_tracks, resolve_version)
 from rc.probe import MediaTracks
+
+if TYPE_CHECKING:
+    from rc.mirror import MirrorService
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +48,7 @@ class Services:
     tv: TvController
     playback: PlaybackService
     indexes_getter: Callable[[], dict[str, dict[str, Path]]]
+    mirror: MirrorService
 
     def player_snapshot(self) -> dict:
         return {"state": asdict(self.playback.state), "current": self.playback.current}
@@ -77,6 +81,46 @@ class TvShowBody(BaseModel):
     screen: Literal["home", "work", "season"]
     id: int | None = None
     force: bool = False
+
+
+class ItemRef(BaseModel):
+    kind: Literal["work", "episode", "collection"]
+    id: int
+
+
+class Person(BaseModel):
+    name: str
+    role: str
+    count: int
+
+
+class Section(BaseModel):
+    label: str
+    people: list[Person] = Field(default_factory=list, max_length=40)
+    items: list[ItemRef] = Field(default_factory=list, max_length=40)
+
+
+class TvViewBody(BaseModel):
+    """Vue du téléphone (arbitrage 14)."""
+    phone_id: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    seq: int = Field(ge=0)
+    screen: Literal["home", "browse", "collection", "search", "work", "season", "preplay",
+                    "remote"]
+    title: str | None = None
+    subtitle: str | None = None
+    filter: Literal["playable", "all"] | None = None
+    query: str | None = None
+    work_id: int | None = None
+    season_id: int | None = None
+    episode_id: int | None = None
+    media_file_id: int | None = None
+    collection_id: int | None = None
+    audio_track: int | None = None
+    subtitle_track: SubSelModel | None = None
+    items: list[ItemRef] = Field(default_factory=list, max_length=40)
+    anchor: int | None = None
+    position: dict | None = None
+    sections: list[Section] = Field(default_factory=list, max_length=6)
 
 
 class PlayBody(BaseModel):
@@ -233,6 +277,18 @@ def build_router(services: Services) -> APIRouter:
     @router.get("/tv/state")
     async def tv_state():
         return asdict(s.tv.state)
+
+    @router.post("/tv/view")
+    async def tv_view(body: TvViewBody):
+        return {"accepted": await s.mirror.accept(body.model_dump())}
+
+    @router.get("/player/pause.jpg")
+    async def pause_image():
+        path = s.config.data_dir / "pause" / "pause.jpg"
+        if not path.is_file():
+            return not_found()
+        return FileResponse(path, media_type="image/jpeg",
+                            headers={"Cache-Control": "no-store"})
 
     @router.post("/play")
     async def play(body: PlayBody):

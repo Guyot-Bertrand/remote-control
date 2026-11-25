@@ -536,3 +536,17 @@ def test_v1_database_migrates_and_reimports(setup):
     finally:
         restored.conn.close()
     state.conn = open_db(data / "rc.db")  # refermée par la fixture
+
+
+def test_create_app_wires_mirror(tmp_path, caplog):
+    config = Config(data_dir=tmp_path / "data", scan_roots=[tmp_path / "vide"],
+                    dev_dir_volumes=True, mdns=False, poll_interval=3600,
+                    allowed_hosts=["testserver"], pause_background="bizarre")
+    with caplog.at_level(logging.WARNING):
+        app = create_app(config, player=FakePlayer())
+    assert (config.data_dir / "pause").is_dir()
+    assert any("pause_background" in r.getMessage() for r in caplog.records)
+    playback = app.state.rc.playback
+    assert playback.pause_mode() == "restart"
+    assert playback.on_pause_change.__self__.__class__.__name__ == "MirrorService"
+    app.state.rc.conn.close()

@@ -31,6 +31,7 @@ from rc.catalog.parser import parse_catalog
 from rc.config import Config
 from rc.db import current_revision, open_db
 from rc.events import EventBus
+from rc.mirror import MirrorService
 from rc.player.base import Player
 from rc.player.mpv import MpvPlayer
 from rc.player.session import PlaybackService, TvController
@@ -46,6 +47,7 @@ DEFAULT_TV_UI = Path(rc.__file__).resolve().parents[2] / "tv-ui"
 
 Stat = tuple[int, int]  # (taille, mtime en ns)
 LOGGED_DETAILS = 20  # avertissements et orphelins détaillés dans le journal
+PAUSE_MODES = ("minimize", "restart")
 SKIPPED_INTERFACES = ("lo", "docker", "br-", "veth", "virbr")
 
 
@@ -364,6 +366,9 @@ def create_app(config: Config, player: Player | None = None,
                runner=subprocess.run) -> FastAPI:
     config.data_dir.mkdir(parents=True, exist_ok=True)
     (config.data_dir / "catalog").mkdir(exist_ok=True)
+    (config.data_dir / "pause").mkdir(exist_ok=True)
+    if config.pause_background not in PAUSE_MODES:
+        log.warning("pause_background inconnu (%r) : « restart » utilisé", config.pause_background)
     # check_same_thread=False : l'appli est créée dans un thread et servie dans celui de la
     # boucle d'événements (uvicorn, TestClient). La connexion n'est utilisée que dans ce
     # dernier ; les threads auxiliaires ouvrent leur propre connexion.
@@ -383,14 +388,20 @@ def create_app(config: Config, player: Player | None = None,
     indexes_getter = lambda: state.indexes  # noqa: E731
     playback = PlaybackService(conn, player, tv, bus, indexes_getter,
                                on_catalog=lambda rev: publish_catalog(state, rev),
-                               player_available=player_available)
+                               player_available=player_available,
+                               pause_image=config.data_dir / "pause" / "pause.jpg",
+                               pause_mode=lambda: ("minimize" if config.pause_background
+                                                   == "minimize" else "restart"))
     state.playback = playback
-    services = Services(conn, config, bus, tv, playback, indexes_getter)
+    mirror = MirrorService(conn, tv, playback)
+    playback.on_pause_change = mirror.on_pause_change
+    services = Services(conn, config, bus, tv, playback, indexes_getter, mirror)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         tasks = [asyncio.create_task(refresh_loop(state)),
-                 asyncio.create_task(analysis_loop(state))]
+                 asyncio.create_task(analysis_loop(state)),
+                 asyncio.create_task(mirror.idle_loop())]
         if config.mdns:
             tasks.append(asyncio.create_task(
                 mdns_announce(config.port, interval=config.poll_interval)))
