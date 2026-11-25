@@ -13,6 +13,8 @@ import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -25,6 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 class BrowseViewModelTest {
@@ -124,11 +127,15 @@ class BrowseViewModelTest {
         filter.playableOnly.value = false
         val vm = viewModel(BrowseRoute(type = "film"))
         vm.await { it.loaded && it.works.size == 3 }
-        val seen = mutableListOf<BrowseUi>()
-        val job = launch(Dispatchers.Unconfined) { vm.state.collect { seen += it } }
+        // Liste thread-safe, collectée hors du thread de Room : le test attend que le collecteur
+        // ait lui-même reçu l'état final, plutôt que de se fier à `state.value`.
+        val seen = CopyOnWriteArrayList<BrowseUi>()
+        val job = launch(Dispatchers.Default) { vm.state.collect { seen += it } }
         vm.setType("theatre")
-        vm.await { it.type == "theatre" && it.loaded }
-        job.cancel()
+        withTimeout(5_000) {
+            while (seen.none { it.type == "theatre" && it.loaded }) delay(10)
+        }
+        job.cancelAndJoin()
         val theatre = seen.filter { it.type == "theatre" }
         // Le filtre choisi s'affiche tout de suite, sans jamais montrer les films sous « Théâtre ».
         assertTrue(theatre.all { ui -> ui.works.all { it.type == "theatre" } })
