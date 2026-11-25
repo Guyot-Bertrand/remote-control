@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 import rc
+from rc.analysis import analysis_loop
 from rc.api import Services, install_api
 from rc.assets import ingest_posters
 from rc.catalog.importer import ImportRefused, ImportReport, import_catalog, load_aliases
@@ -388,7 +389,8 @@ def create_app(config: Config, player: Player | None = None,
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        tasks = [asyncio.create_task(refresh_loop(state))]
+        tasks = [asyncio.create_task(refresh_loop(state)),
+                 asyncio.create_task(analysis_loop(state))]
         if config.mdns:
             tasks.append(asyncio.create_task(
                 mdns_announce(config.port, interval=config.poll_interval)))
