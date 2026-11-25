@@ -24,16 +24,16 @@ class DatabaseBuildTest {
         context.deleteDatabase(name)
     }
 
-    /** Cache d'une version de développement plus récente (schéma 2) : effacé, jamais de plantage. */
+    /** Cache d'une version de développement plus récente (schéma 3) : effacé, jamais de plantage. */
     @Test fun newer_cache_is_wiped_on_downgrade() = runBlocking {
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use {
             it.execSQL("CREATE TABLE meta (`key` TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)")
             it.execSQL("INSERT INTO meta VALUES ('sync.revision', '9')")
-            it.version = 2
+            it.version = 3
         }
         val opened = buildDatabase(context, name).also { db = it }
         assertNull(opened.metaDao().get("sync.revision"))
         assertEquals(0, opened.catalogDao().workCount())
-        assertEquals(1, opened.openHelper.readableDatabase.version)
+        assertEquals(2, opened.openHelper.readableDatabase.version)
     }
 }

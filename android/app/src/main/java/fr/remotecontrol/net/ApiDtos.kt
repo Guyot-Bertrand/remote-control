@@ -25,6 +25,8 @@ data class SyncDto(
     val progress: List<ProgressDto> = emptyList(),
     val volumes: List<VolumeDto> = emptyList(),
     val deleted: DeletedDto = DeletedDto(),
+    /** Réponse complète seulement : nombre d'œuvres de la réponse (progression de la première synchro). */
+    @SerialName("total_works") val totalWorks: Int? = null,
 )
 
 @Serializable
@@ -55,6 +57,8 @@ data class WorkDto(
     val tags: List<String> = emptyList(),
     val episodic: Boolean = false,
     val poster: String? = null,
+    /** Support d'origine quand l'œuvre n'a pas de fichier lisible (arbitrage 13) ; nul sinon. */
+    val medium: String? = null,
 )
 
 @Serializable
@@ -71,6 +75,7 @@ data class EpisodeDto(
     @SerialName("season_id") val seasonId: Long,
     val number: Int,
     val title: String? = null,
+    @SerialName("duration_min") val durationMin: Int? = null,
 )
 
 @Serializable
@@ -83,6 +88,12 @@ data class MediaFileDto(
     val relpath: String,
     @SerialName("volume_uuid") val volumeUuid: String? = null,
     val present: Boolean = false,
+    /** Analyse du fichier (arbitrage 13) ; nuls tant que le fichier n'a pas été analysé. */
+    @SerialName("audio_langs") val audioLangs: List<String>? = null,
+    @SerialName("subtitle_langs") val subtitleLangs: List<String>? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    @SerialName("duration_s") val durationS: Double? = null,
 )
 
 @Serializable

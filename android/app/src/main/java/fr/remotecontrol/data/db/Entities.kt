@@ -29,6 +29,7 @@ data class WorkEntity(
     val poster: String?,
     val sortKey: String,
     val playable: Boolean = false,
+    val medium: String? = null,
 )
 
 @Entity(tableName = "season", indices = [Index("workId")])
@@ -45,6 +46,7 @@ data class EpisodeEntity(
     val seasonId: Long,
     val number: Int,
     val title: String?,
+    val durationMin: Int? = null,
 )
 
 @Entity(tableName = "media_file", indices = [Index("workId"), Index("episodeId")])
@@ -57,6 +59,11 @@ data class MediaFileEntity(
     val relpath: String,
     val volumeUuid: String?,
     val present: Boolean,
+    val audioLangs: List<String>? = null,
+    val subtitleLangs: List<String>? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val durationS: Double? = null,
 )
 
 @Entity(tableName = "volume")

@@ -21,6 +21,13 @@ sealed interface SyncOutcome {
     data class Failed(val error: ApiError) : SyncOutcome
 }
 
+/** Avancement d'une synchro complète ; une synchro incrémentale reste [Idle]. */
+sealed interface SyncProgress {
+    data object Idle : SyncProgress
+    data object Downloading : SyncProgress
+    data class Writing(val done: Int, val total: Int) : SyncProgress
+}
+
 class SyncRepository(
     private val db: AppDatabase,
     private val api: RcApi,
@@ -30,6 +37,9 @@ class SyncRepository(
     private val mutex = Mutex()
     private val _syncing = MutableStateFlow(false)
     val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
+
+    private val _progress = MutableStateFlow<SyncProgress>(SyncProgress.Idle)
+    val progress: StateFlow<SyncProgress> = _progress.asStateFlow()
 
     suspend fun localRevision(): Long? = db.metaDao().get(META_REVISION)?.toLongOrNull()
 
@@ -48,11 +58,14 @@ class SyncRepository(
             } catch (e: Exception) {
                 return@withLock SyncOutcome.Failed(ApiError.BadResponse)
             }
+            if (since == null) _progress.value = SyncProgress.Downloading
             when (val r = api.sync(since)) {
                 is ApiResult.Err -> SyncOutcome.Failed(r.error)
                 is ApiResult.Ok -> {
                     try {
-                        writer.apply(r.value)
+                        writer.apply(r.value) { done, total ->
+                            if (r.value.full) _progress.value = SyncProgress.Writing(done, total)
+                        }
                         db.metaDao().put(MetaEntity(META_SYNCED_AT, clock().toString()))
                         SyncOutcome.Done(r.value.revision, r.value.full)
                     } catch (e: CancellationException) {
@@ -63,6 +76,7 @@ class SyncRepository(
                 }
             }
         } finally {
+            _progress.value = SyncProgress.Idle
             _syncing.value = false
         }
     }

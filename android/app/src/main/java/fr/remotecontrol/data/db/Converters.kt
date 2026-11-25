@@ -10,10 +10,10 @@ class Converters {
     private val serializer = ListSerializer(String.serializer())
 
     @TypeConverter
-    fun fromList(list: List<String>): String = RcJson.encodeToString(serializer, list)
+    fun fromList(list: List<String>?): String? = list?.let { RcJson.encodeToString(serializer, it) }
 
     @TypeConverter
-    fun toList(json: String): List<String> = RcJson.decodeFromString(serializer, json)
+    fun toList(json: String?): List<String>? = json?.let { RcJson.decodeFromString(serializer, it) }
 
     @TypeConverter
     fun fromSubSel(sel: SubSel?): String? = sel?.let { RcJson.encodeToString(SubSel.serializer(), it) }
