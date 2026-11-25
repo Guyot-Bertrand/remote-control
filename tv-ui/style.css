@@ -352,11 +352,157 @@ svg { flex-shrink: 0; display: block; }
 }
 .paused-bar { display: block; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(243, 236, 223, .18); }
 
-/* -- vue du téléphone (socle) ---------------------------------------------- */
+/* -- vues miroir du téléphone (maquette 4a) --------------------------------- */
 
-.view-head { position: absolute; left: var(--tv-safe-x); top: var(--tv-safe-y); right: 600px; display: flex; flex-direction: column; gap: var(--sp-4); }
-.view-title { font-family: var(--rc-font-display); font-weight: 500; font-size: var(--tv-fs-hero); line-height: 1.05; }
-.view-sub { font-size: var(--tv-fs-meta); color: var(--rc-text-2); }
+/* En-tête : à gauche du coin d'état (448 px à droite), aligné sur son bas. */
+.mv-head {
+  position: absolute; left: var(--tv-safe-x); top: var(--tv-safe-y); width: 1240px; height: 252px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 40px;
+}
+.mv-head-text { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.mv-overline { display: flex; align-items: center; gap: 14px; font-size: var(--tv-fs-small); font-weight: 600; letter-spacing: .16em; color: var(--rc-accent); }
+.mv-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--rc-accent); }
+.mv-title { font-family: var(--rc-font-display); font-weight: 500; font-size: 72px; line-height: 1.05; text-wrap: balance; }
+.mv-title-coll { font-size: 46px; }
+.mv-title-query { font-size: 96px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-quote { color: var(--rc-text-3); }
+.mv-sub { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: var(--tv-fs-meta); color: var(--rc-text-2); }
+.mv-filter {
+  display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 20px 0 14px;
+  border-radius: var(--r-m); background: var(--rc-accent-soft); color: var(--rc-accent-strong);
+  font-size: var(--tv-fs-small); font-weight: 600;
+}
+
+/* Repère de position : grande lettre (ou « n° 412 ») laiton, texte et curseur. */
+.mv-marker { display: flex; align-items: flex-end; gap: 22px; flex-shrink: 0; }
+.mv-marker-big {
+  font-family: var(--rc-font-display); font-weight: 500; font-size: 132px; line-height: .8;
+  color: var(--rc-accent); white-space: nowrap;
+}
+.mv-collection .mv-marker-big { font-size: 80px; }
+.mv-marker-side { display: flex; flex-direction: column; gap: var(--sp-3); padding-bottom: var(--sp-1); }
+.mv-marker-text { font-size: 28px; color: var(--rc-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mv-track { position: relative; display: block; width: 240px; height: 6px; border-radius: 3px; background: var(--rc-surface-3); }
+.mv-track > span {
+  position: absolute; top: -5px; width: 16px; height: 16px; margin-left: -8px;
+  border-radius: 50%; background: var(--rc-accent);
+}
+
+/* Corps : sous l'en-tête et le coin d'état. */
+.mv-body { position: absolute; top: 348px; left: var(--tv-safe-x); right: var(--tv-safe-x); bottom: var(--tv-safe-y); overflow: hidden; }
+.mv-section-label { font-size: var(--tv-fs-small); font-weight: 600; letter-spacing: .14em; color: var(--rc-text-3); }
+
+/* Vignettes : affiche, marques (vu, entamé, disque absent, non numérisé), titre. */
+.mv-tile { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.mv-thumb { position: relative; flex-shrink: 0; }
+.mv-thumb > .poster { width: 100%; height: 100%; border-radius: var(--r-s); }
+.mv-tile .mv-thumb { width: 180px; height: 270px; }
+.mv-tile .noposter { --u: 180px; }
+.mv-tile-title { font-size: var(--tv-fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-tile-left { font-size: var(--tv-fs-small); color: var(--rc-text-3); white-space: nowrap; }
+.mv-off {
+  position: absolute; inset: 0; border-radius: var(--r-s); background: rgba(17, 15, 13, .62);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+  color: var(--rc-text-2);
+}
+/* Sans affiche : fond plein, le titre de la carte ne se mêle pas à l'icône. */
+.noposter + .mv-off { background: var(--rc-surface-2); }
+.mv-off-label {
+  max-width: 90%; padding: 4px 10px; border-radius: var(--r-s); background: rgba(17, 15, 13, .85);
+  font-size: 18px; font-weight: 600; letter-spacing: .06em; color: var(--rc-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Accueil : « Reprendre » en grand, puis les autres rangées, puis les collections. */
+/* Comme sur le téléphone, la dernière rangée peut être coupée par le bas de l'écran. */
+.mv-home-body { display: flex; flex-direction: column; gap: 28px; overflow: visible; }
+.mv-row { display: flex; }
+.mv-row-l { gap: 40px; }
+.mv-row-s { gap: 32px; }
+.mv-row .mv-tile { flex-shrink: 0; }
+.mv-row-l .mv-tile { width: 150px; }
+.mv-row-l .mv-thumb { width: 150px; height: 225px; }
+.mv-row-l .noposter { --u: 150px; }
+.mv-row-s .mv-tile { width: 130px; }
+.mv-row-s .mv-thumb { width: 130px; height: 195px; }
+.mv-row-s .noposter { --u: 130px; }
+.mv-row .thumb-bar { height: 4px; }
+.mv-coll-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.mv-coll-card { display: flex; align-items: center; gap: 24px; padding: 28px; border-radius: 16px; background: var(--rc-surface); }
+.mv-coll-icon {
+  width: 72px; height: 72px; flex-shrink: 0; border-radius: 16px; background: var(--rc-surface-2);
+  display: flex; align-items: center; justify-content: center; color: var(--rc-accent);
+}
+.mv-coll-text { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.mv-coll-name {
+  font-family: var(--rc-font-display); font-weight: 500; font-size: 32px; line-height: 1.15;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.mv-coll-count { font-size: var(--tv-fs-small); color: var(--rc-text-2); }
+
+/* Parcourir : deux rangées de huit affiches. */
+.mv-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 30px 40px; }
+
+/* Collection : deux colonnes de six lignes, par rang. */
+.mv-ranks {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(6, 100px);
+  grid-auto-flow: column; gap: 12px 80px;
+}
+.mv-rank-row { display: flex; align-items: center; gap: 24px; height: 100px; min-width: 0; }
+.mv-rank-row.off { opacity: .6; }
+.mv-rank {
+  width: 110px; flex-shrink: 0; text-align: right; font-family: var(--rc-font-display); font-weight: 500;
+  font-size: var(--tv-fs-h2); color: var(--rc-accent); font-variant-numeric: tabular-nums;
+}
+.mv-rank-thumb { position: relative; width: 64px; height: 96px; flex-shrink: 0; }
+.mv-rank-thumb > .poster { width: 100%; height: 100%; border-radius: 4px; }
+.mv-rank-thumb .noposter { --u: 64px; }
+.mv-rank-thumb .thumb-bar { height: 4px; }
+.mv-rank-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.mv-rank-title { font-size: var(--tv-fs-body); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-rank-meta { font-size: var(--tv-fs-small); color: var(--rc-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-rank-off { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--tv-fs-small); color: var(--rc-text-2); white-space: nowrap; }
+.mv-rank-off.warn { color: var(--rc-warn); }
+.mv-rank-seen { color: var(--rc-seen); }
+
+/* Recherche : une colonne par section, lettres trouvées en laiton. */
+.mv-search { display: grid; gap: 96px; }
+.mv-search-col { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.mv-person, .mv-found { display: flex; align-items: center; gap: 28px; min-width: 0; }
+.mv-avatar {
+  width: 140px; height: 140px; flex-shrink: 0; border-radius: 50%; background: var(--rc-surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--rc-font-display); font-size: 52px; color: var(--rc-accent-strong);
+}
+.mv-found .mv-thumb { width: 160px; height: 240px; }
+.mv-found .noposter { --u: 160px; }
+.mv-found-text { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.mv-found-title {
+  font-family: var(--rc-font-display); font-weight: 500; font-size: 44px; line-height: 1.1;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.mv-found-meta { font-size: 28px; color: var(--rc-text-2); }
+.mv-aka { display: flex; flex-direction: column; gap: var(--sp-3); padding: 28px 32px; border-radius: 16px; background: var(--rc-surface); }
+.mv-aka-title { font-family: var(--rc-font-display); font-style: italic; font-size: 44px; }
+.mv-searchview mark { background: transparent; color: var(--rc-accent-strong); font-weight: 700; }
+/* Plus de deux résultats dans une colonne : lignes plus basses. */
+.mv-search-col.compact { gap: 20px; }
+.mv-search-col.compact .mv-avatar { width: 96px; height: 96px; font-size: 36px; }
+.mv-search-col.compact .mv-found .mv-thumb { width: 96px; height: 144px; }
+.mv-search-col.compact .mv-found .noposter { --u: 96px; }
+.mv-search-col.compact .mv-found-title, .mv-search-col.compact .mv-aka-title { font-size: 34px; }
+.mv-search-col.compact .mv-aka { padding: 20px 28px; }
+
+.mv-empty {
+  height: 100%; padding-bottom: 60px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 28px; text-align: center;
+}
+.mv-empty-icon {
+  width: 120px; height: 120px; border-radius: 50%; background: var(--rc-surface-2);
+  display: flex; align-items: center; justify-content: center; color: var(--rc-text-2);
+}
+.mv-empty-title { font-family: var(--rc-font-display); font-weight: 500; font-size: 56px; }
+.mv-empty-text { max-width: 1100px; font-size: var(--tv-fs-meta); line-height: 1.45; color: var(--rc-text-2); }
 
 /* -- JavaScript bloqué (contenu statique de index.html, retiré par app.js) -- */
 
