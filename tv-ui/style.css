@@ -414,7 +414,7 @@ svg { flex-shrink: 0; display: block; }
 }
 
 /* Accueil : « Reprendre » en grand, puis les autres rangées, puis les collections. */
-/* Comme sur le téléphone, la dernière rangée peut être coupée par le bas de l'écran. */
+/* Seules les rangées entières sont rendues (views.js) ; elles peuvent mordre sur la marge du bas. */
 .mv-home-body { display: flex; flex-direction: column; gap: 28px; overflow: visible; }
 .mv-row { display: flex; }
 .mv-row-l { gap: 40px; }

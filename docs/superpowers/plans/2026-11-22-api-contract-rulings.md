@@ -59,7 +59,7 @@ Complète la Task 10 du plan serveur ; fait foi pour le serveur et l'appli Andro
     - `pause.image` est `null` si la capture a échoué.
     - `home`, `work`, `season` (veille et fiches de `tv/show`) restent pour la compatibilité.
 16. **Éléments enrichis** (dans `view.items` et `view.sections[].items`, même ordre que reçu ; un identifiant inconnu est omis) :
-    - `{"kind":"work","id","type","title_fr","title_vo","year","poster","playable","watched","progress_ratio","remaining_min","absent_volume","medium","rank"}` — `rank` : rang dans `view.collection_id` (texte, `null` hors collection) ; `absent_volume` : libellé du disque non branché qui porte les fichiers de l'œuvre, sinon `null`.
+    - `{"kind":"work","id","type","title_fr","title_vo","year","poster","playable","watched","progress_ratio","remaining_min","absent_volume","medium","rank"}` — `rank` : rang dans `view.collection_id` (texte, `null` hors collection) ; `absent_volume` : libellé du disque non branché qui porte les fichiers de l'œuvre, sinon `null`. Ajout (revue de la Task 12) : l'œuvre porte aussi `directors` (liste de noms, éventuellement vide) et `title_alt` (titre alternatif, `null` s'il n'y en a pas).
     - `{"kind":"episode","id","work_id","season_id","work_title","season_number","number","title","poster","watched","progress_ratio","remaining_min"}` (`poster` : celui de la série).
     - `{"kind":"collection","id","name","count","playable_count","posters"}` (`posters` : au plus 3 affiches de ses œuvres, par rang).
 17. **Qui pilote la télé** : le téléphone qui a envoyé la dernière vue acceptée. Les commandes de lecture ne changent rien.

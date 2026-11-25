@@ -284,7 +284,9 @@ def _enrich_works(conn: sqlite3.Connection, ids: list[int],
         playable, absent = avail[w["id"]]
         out[w["id"]] = {
             "kind": "work", "id": w["id"], "type": w["type"], "title_fr": w["title_fr"],
-            "title_vo": w["title_vo"], "year": w["year"], "poster": w["poster_asset"],
+            "title_vo": w["title_vo"], "title_alt": w["title_alt"],
+            "directors": json.loads(w["directors_json"]), "year": w["year"],
+            "poster": w["poster_asset"],
             "playable": playable, "watched": watched,
             "progress_ratio": _ratio(pos, dur, watched),
             "remaining_min": _remaining_min(pos, dur, watched),

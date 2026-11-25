@@ -14,6 +14,14 @@ const COLLECTION_ROWS = 12; // deux colonnes de six
 const SEARCH_COLUMNS = 3;
 const SEARCH_MIN_CHARS = 2;
 const EVENING_HOUR = 18; // « Bonsoir » à partir de 18 h
+// Accueil : hauteurs des rangées (px), d'après style.css, et place sous l'en-tête
+// (jusqu'à mi-marge du bas, comme sur la maquette).
+const HOME_ROOM = 1080 - 348 - 32;
+const HOME_GAP = 28;
+const HOME_LABEL_H = 32;
+const HOME_ROW_L_H = 225 + 10 + 32 + 10 + 32; // affiche, titre, « reste N min »
+const HOME_ROW_S_H = 195 + 10 + 32; // affiche, titre
+const HOME_COLL_H = 167; // carte de collection sur deux lignes
 
 const VIEW_ICON = {
   check: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`,
@@ -47,6 +55,9 @@ function foldWithMap(text) {
   let i = 0;
   for (const c of text) {
     const f = foldChar(c);
+    // Diacritique seul (texte déjà décomposé) : il reste dans le passage du caractère
+    // qui le précède, pour que l'accent soit surligné avec sa lettre.
+    if (!f && to.length) to[to.length - 1] = i + c.length;
     for (let k = 0; k < f.length; k += 1) {
       from.push(i);
       to.push(i + c.length);
@@ -160,8 +171,13 @@ function collectionCounts(c) {
   return `${plural(c.count, 'œuvre', 'œuvres')} · ${plural(c.playable_count, 'lisible', 'lisibles')}`;
 }
 
+function directorsText(it) {
+  return (it.directors || []).join(', ');
+}
+
+/** « 1958 · Jacques Tati » (liste par rang). */
 function workMeta(it) {
-  return joinDot([it.year, KIND[it.type] || '']);
+  return joinDot([it.year, directorsText(it)]);
 }
 
 // -- accueil --------------------------------------------------------------------------
@@ -183,23 +199,49 @@ function collectionCard(c) {
 </div>`;
 }
 
-function homeSection(s, first) {
+/** Sorte de rangée : collections (cartes), « Reprendre » (grandes vignettes avec ce
+    qui reste), ou autres (petites vignettes). */
+function homeSectionKind(s) {
   const items = s.items || [];
-  if (!items.length) return '';
+  if (items.every((it) => it.kind === 'collection')) return 'coll';
+  const resume = /^reprendre/i.test(s.label || '')
+    || items.every((it) => it.progress_ratio != null || it.remaining_min != null);
+  return resume ? 'l' : 's';
+}
+
+/** Hauteur d'une rangée (étiquette comprise), pour ne montrer que les rangées entières. */
+function homeSectionHeight(s, kind) {
+  const label = HOME_LABEL_H + HOME_GAP;
+  if (kind === 'coll') {
+    const lines = Math.ceil((s.items || []).length / 3);
+    return label + lines * HOME_COLL_H + (lines - 1) * 32;
+  }
+  return label + (kind === 'l' ? HOME_ROW_L_H : HOME_ROW_S_H);
+}
+
+function homeSection(s, kind) {
+  const items = s.items || [];
   const label = `<span class="mv-section-label">${esc(String(s.label || '').toUpperCase())}</span>`;
-  if (items.every((it) => it.kind === 'collection')) {
+  if (kind === 'coll') {
     return `${label}<div class="mv-coll-grid">${items.map(collectionCard).join('')}</div>`;
   }
-  // La première rangée (« Reprendre ») est plus grande, comme sur la maquette.
-  const size = first ? 'l' : 's';
-  return `${label}<div class="mv-row mv-row-${size}">${items.map((it) => homeTile(it, size)).join('')}</div>`;
+  return `${label}<div class="mv-row mv-row-${kind}">${items.map((it) => homeTile(it, kind)).join('')}</div>`;
 }
 
 /** Accueil : salutation selon l'heure, puis les rangées du téléphone. */
 function renderHomeView(view, pause) {
   const greeting = new Date().getHours() < EVENING_HOUR ? 'Bonjour' : 'Bonsoir';
-  const sections = (view.sections || []).filter((s) => (s.items || []).length);
-  const body = sections.map((s, i) => homeSection(s, i === 0)).join('');
+  // Rangées entières seulement : la suivante n'apparaît que si elle tient à l'écran.
+  let room = HOME_ROOM;
+  const shown = [];
+  for (const s of (view.sections || []).filter((x) => (x.items || []).length)) {
+    const kind = homeSectionKind(s);
+    const h = homeSectionHeight(s, kind) + (shown.length ? HOME_GAP : 0);
+    if (h > room && shown.length) break;
+    room -= h;
+    shown.push(homeSection(s, kind));
+  }
+  const body = shown.join('');
   return `<div class="screen view mv-home">
 ${viewHead('ACCUEIL', greeting, { sub: view.subtitle ? `<span>${esc(view.subtitle)}</span>` : '' })}
 ${renderStateCorner(pause)}
@@ -278,12 +320,14 @@ ${side}
 /** Collection : liste par rang autour de l'ancre, repère « n° 412 · 408–419 sur 1000 ». */
 function renderCollectionView(view, pause) {
   const items = (view.items || []).filter((it) => it.kind === 'work');
-  const a = anchorIndex(items, view.anchor);
-  const start = Math.max(0, Math.min(a - 4, items.length - COLLECTION_ROWS));
+  const found = items.findIndex((it) => it.id === view.anchor);
+  const start = Math.max(0, Math.min((found < 0 ? 0 : found) - 4, items.length - COLLECTION_ROWS));
   const shown = items.slice(start, start + COLLECTION_ROWS);
   const p = view.position || {};
-  const ranks = items.map(rankNumber).filter((n) => n != null);
-  const anchorRank = items.length ? (items[a].rank ?? p.index) : p.index;
+  // Rangs extrêmes des lignes affichées ; sans ancre reçue, la première ligne affichée.
+  const ranks = shown.map(rankNumber).filter((n) => n != null);
+  const anchorItem = found < 0 ? shown[0] : items[found];
+  const anchorRank = anchorItem ? (anchorItem.rank ?? p.index) : p.index;
   let marker = '';
   if (anchorRank != null) {
     const range = ranks.length ? `${Math.min(...ranks)}–${Math.max(...ranks)}` : '';
@@ -319,7 +363,7 @@ function personRow(person, query) {
 function foundMeta(it) {
   if (it.kind === 'episode') return it.title || '';
   if (it.kind === 'collection') return collectionCounts(it);
-  return workMeta(it);
+  return joinDot([it.year, KIND[it.type] || '', directorsText(it)]); // « 1979 · Film · Ridley Scott »
 }
 
 function foundRow(it, query) {
@@ -330,11 +374,14 @@ function foundRow(it, query) {
 </div>`;
 }
 
-/** « Aussi connu sous » : le titre original, et l'œuvre qui le porte. */
+/** « Aussi connu sous » : le titre alternatif (à défaut, le titre original) et l'œuvre
+    qui le porte. */
 function akaCard(it, query) {
-  const other = it.kind === 'work' && differs(it.title_vo, it.title_fr);
-  const name = other ? it.title_vo : itemTitle(it);
-  const sub = other ? `Titre original de «${NBSP}${it.title_fr}${NBSP}»` : foundMeta(it);
+  const alt = it.kind !== 'work' ? null
+    : differs(it.title_alt, it.title_fr) ? it.title_alt
+      : differs(it.title_vo, it.title_fr) ? it.title_vo : null;
+  const name = alt || itemTitle(it);
+  const sub = alt ? `Titre original de «${NBSP}${it.title_fr}${NBSP}»` : foundMeta(it);
   return `<div class="mv-aka">
 <span class="mv-aka-title">${highlight(name, query)}</span>
 <span class="mv-found-meta">${esc(sub)}</span>

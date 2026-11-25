@@ -67,6 +67,14 @@ def test_enrich_work_fields(conn):
     assert o["playable"] is True and o["watched"] is False
     assert o["progress_ratio"] == 0.5 and o["remaining_min"] == 45
     assert o["medium"] == "bluray" and o["absent_volume"] is None and o["rank"] is None
+    assert o["directors"] == [] and o["title_alt"] is None
+
+
+def test_enrich_work_directors_and_alt_title(conn):
+    conn.execute("UPDATE work SET directors_json = ?, title_alt = ? WHERE id = ?",
+                 ('["Ridley Scott", "Jim Doe"]', "Alien", B))
+    o = enrich(conn, [{"kind": "work", "id": B}], None)[0]
+    assert o["directors"] == ["Ridley Scott", "Jim Doe"] and o["title_alt"] == "Alien"
 
 
 def test_enrich_absent_volume(conn):
