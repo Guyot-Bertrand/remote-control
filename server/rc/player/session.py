@@ -28,7 +28,7 @@ SAVE_INTERVAL = 10
 POSITION_PUBLISH_INTERVAL = 1  # secondes entre deux événements de simple avancement
 WATCHED_RATIO = 0.9
 
-Screen = Literal["home", "work", "season", "playing", "message"]
+Screen = Literal["home", "work", "season", "view", "playing", "paused", "message"]
 
 
 @dataclass
@@ -37,13 +37,15 @@ class TvState:
     work_id: int | None = None
     season_id: int | None = None
     message: str | None = None
+    view: dict | None = None
+    pause: dict | None = None
 
 
 class TvController:
     def __init__(self, bus: EventBus) -> None:
         self.bus = bus
         self.state = TvState("home")
-        self._last_sheet = TvState("home")
+        self._last_screen = TvState("home")
 
     def show(self, screen: Screen, work_id: int | None = None,
              season_id: int | None = None, force: bool = False) -> bool:
@@ -51,18 +53,36 @@ class TvController:
         retenue : elle apparaîtra à la fin de la lecture."""
         wanted = TvState(screen, work_id, season_id)
         if screen in ("home", "work", "season"):
-            self._last_sheet = wanted
+            self._last_screen = wanted  # une fiche remplace la vue retenue
         if self.state.screen == "playing" and not force:
             return False
         self._set(wanted)
         return True
+
+    def show_view(self, view: dict, pause: dict | None = None) -> None:
+        """Affiche la vue du téléphone (avec la vignette de pause le cas échéant) et la
+        retient comme dernier écran hors lecture."""
+        self._last_screen = TvState("view", view=view)
+        self._set(TvState("view", view=view, pause=pause))
+
+    def show_paused(self, pause: dict) -> None:
+        self._set(TvState("paused", pause=pause))
+
+    def remember_view(self, view: dict) -> None:
+        """Retient la vue sans l'afficher (lecture en cours)."""
+        self._last_screen = TvState("view", view=view)
+
+    def update_pause(self, pause: dict) -> None:
+        """Republie l'écran courant avec une nouvelle `pause` (vue ou pause seulement)."""
+        if self.state.screen in ("view", "paused"):
+            self._set(replace(self.state, pause=pause))
 
     def set_playing(self, work_id: int | None) -> None:
         self._set(TvState("playing", work_id=work_id))
 
     def playback_ended(self, message: str | None) -> None:
         if message is None:
-            self._set(self._last_sheet)
+            self._set(self._last_screen)
         else:
             self._set(TvState("message", message=message))
 

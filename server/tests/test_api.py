@@ -379,7 +379,8 @@ def test_tv_show_and_state(env):
     assert env.client.post("/api/tv/show", json={"screen": "season", "id": 1}).json() == {
         "shown": True}
     assert env.client.get("/api/tv/state").json() == {
-        "screen": "season", "work_id": 5, "season_id": 1, "message": None}
+        "screen": "season", "work_id": 5, "season_id": 1, "message": None,
+        "view": None, "pause": None}
     assert env.client.post("/api/tv/show", json={"screen": "work", "id": 999}).status_code == 404
     r = env.client.post("/api/tv/show", json={"screen": "work"})
     assert r.status_code == 422 and r.json() == error_body("invalid", None)
@@ -394,12 +395,13 @@ def test_ws_hello_then_tv_event(env):
         hello = ws.receive_json()
         assert hello == {"type": "hello", "revision": current_revision(env.conn),
                          "tv": {"screen": "home", "work_id": None, "season_id": None,
-                                "message": None},
+                                "message": None, "view": None, "pause": None},
                          "player": env.client.get("/api/player/state").json()}
         env.client.post("/api/tv/show", json={"screen": "work", "id": 1})
         msg = ws.receive_json()
         assert msg == {"type": "tv", "state": {"screen": "work", "work_id": 1,
-                                               "season_id": None, "message": None}}
+                                               "season_id": None, "message": None,
+                                               "view": None, "pause": None}}
     assert env.playback.bus.subscriber_count == 0  # désabonné à la déconnexion
 
 
