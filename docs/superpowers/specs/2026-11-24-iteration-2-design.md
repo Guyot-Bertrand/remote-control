@@ -1,6 +1,6 @@
 # Remote-Control — Itération 2 — Document de conception
 
-*Date : 2026-11-24 · Statut : en attente de validation · S'appuie sur le design de l'itération 1 (`2026-11-22-remote-control-design.md`) et sur le contrat d'API (`docs/superpowers/plans/2026-11-22-api-contract-rulings.md`, arbitrages 1 à 12).*
+*Date : 2026-11-24 · Statut : validé par l’utilisateur le 2026-11-25 · S'appuie sur le design de l'itération 1 (`2026-11-22-remote-control-design.md`) et sur le contrat d'API (`docs/superpowers/plans/2026-11-22-api-contract-rulings.md`, arbitrages 1 à 12).*
 
 ## 1. Intention
 
