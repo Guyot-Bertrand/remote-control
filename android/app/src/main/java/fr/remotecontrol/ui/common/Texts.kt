@@ -166,6 +166,9 @@ object Texts {
     const val playingOnTv = "En cours sur la télé"
     const val volumeAbsentHelp = "Branchez-le sur le PC, puis réessayez."
     fun notDigitizedOn(medium: String) = "Cette œuvre n'existe qu'en $medium."
+    fun notDigitizedOnHelp(medium: String) = "${notDigitizedOn(medium)} Une fois numérisée, elle deviendra lisible ici."
+    const val mediumSection = "Support"
+    const val firstSyncSaving = "Enregistrement des œuvres…"
     const val firstSyncDownloading = "Téléchargement du catalogue…"
     fun firstSyncWriting(done: Int, total: Int) = "${formatCount(done)} / ${formatCount(total)} œuvres"
     const val notDigitizedHelp = "Cette œuvre n'est pas encore numérisée. Une fois numérisée, elle deviendra lisible ici."
@@ -186,7 +189,8 @@ object Texts {
     const val showLess = "Afficher moins"
 
     /** Mention courte d'une œuvre non lisible : nom du disque débranché, ou « Non numérisé ». */
-    fun unavailableLabel(absentVolume: String?) = absentVolume?.ifEmpty { disk } ?: notDigitized
+    /** Disque débranché (son nom), sinon support d'origine de l'œuvre non numérisée (« DVD »), sinon « Non numérisé ». */
+    fun unavailableLabel(absentVolume: String?, medium: String? = null) = absentVolume?.ifEmpty { disk } ?: medium ?: notDigitized
     const val disk = "Disque"
     fun volumeAbsent(label: String?) = label?.let { "Disque « $it » non branché" } ?: "Disque non branché"
     fun httpError(status: Int) = "Erreur du serveur ($status)"

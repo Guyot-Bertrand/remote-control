@@ -17,6 +17,7 @@ import fr.remotecontrol.player.TrackOption
 import fr.remotecontrol.player.subtitleOptions
 import fr.remotecontrol.player.trackOptions
 import fr.remotecontrol.ui.common.Texts
+import fr.remotecontrol.ui.common.languageName
 import fr.remotecontrol.ui.common.formatClock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -259,7 +260,9 @@ private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, 
         details = Texts.details(
             info?.year?.toString(),
             info?.quality,
-            media?.audio?.firstOrNull { it.index == st.audio }?.lang?.let(Texts::languageName),
+            // Piste choisie inconnue (pistes non lues, langue non étiquetée) : première langue audio du fichier.
+            media?.audio?.firstOrNull { it.index == st.audio }?.lang?.let(Texts::languageName)
+                ?: info?.audioLangs?.firstOrNull()?.let(::languageName),
         ),
     )
 }

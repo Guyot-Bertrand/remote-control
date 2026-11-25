@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -48,6 +47,7 @@ import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.player.Availability
 import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.StartMode
+import fr.remotecontrol.ui.common.LanguagePill
 import fr.remotecontrol.ui.common.MessageBanner
 import fr.remotecontrol.ui.common.NoticeCard
 import fr.remotecontrol.ui.common.NotFound
@@ -209,7 +209,9 @@ private fun PlayActions(
                 action = Texts.retry.takeIf { !state.launching && state.action == SheetAction.Play },
                 onAction = onPlayFromStart,
             )
-            Availability.NotDigitized -> NoticeCard(RcIcons.Disc, Texts.notDigitized, Texts.notDigitizedHelp, warn = false)
+            Availability.NotDigitized -> state.medium?.let {
+                NoticeCard(RcIcons.Disc, Texts.details(Texts.notDigitized, it), Texts.notDigitizedOnHelp(it), warn = false)
+            } ?: NoticeCard(RcIcons.Disc, Texts.notDigitized, Texts.notDigitizedHelp, warn = false)
             Availability.Present, null -> Unit
         }
     }
@@ -299,24 +301,37 @@ private fun OfflineBanner(onRetry: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Maquette 4c : section « Version » (une ligne par version : qualité et résolution, pastilles de langue) ou,
+ * pour une œuvre non numérisée, « Support » (« DVD ») ; puis la mention « Affichée sur la télé ».
+ */
 @Composable
 private fun Versions(state: WorkUi) {
-    if (state.versions.isEmpty() && !state.onTv) return
+    if (state.versions.isEmpty() && state.medium == null && !state.onTv) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (state.versions.isNotEmpty()) {
+            SectionLabel(if (state.versions.size == 1) Texts.version else Texts.versions)
+            state.versions.forEach { VersionPills(it) }
+        } else if (state.medium != null) {
+            SectionLabel(Texts.mediumSection)
+            QualityPill(state.medium)
+        }
+        if (state.onTv) ShownOnTv(Modifier.align(Alignment.End))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VersionPills(v: VersionUi) {
     FlowRow(
-        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = Texts.versions },
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            if (v.absentLabel != null) contentDescription = Texts.versionDescription(v.label, v.absentLabel)
+        },
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        state.versions.forEach { v ->
-            QualityPill(
-                v.label,
-                dimmed = !v.present,
-                modifier = if (v.absentLabel != null) Modifier.semantics { contentDescription = Texts.versionDescription(v.label, v.absentLabel) } else Modifier,
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        if (state.onTv) ShownOnTv()
+        QualityPill(v.label, dimmed = !v.present, detail = v.resolution)
+        v.languages.forEach { LanguagePill(it, dimmed = !v.present) }
     }
 }

@@ -284,7 +284,7 @@ private fun GridCell(work: WorkSummary, onOpen: (WorkSummary) -> Unit) {
             year = work.year,
             progress = work.progress?.toFloat(),
             watched = work.watched,
-            unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
+            unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume, work.medium),
             modifier = Modifier.fillMaxWidth(),
         )
         Column {

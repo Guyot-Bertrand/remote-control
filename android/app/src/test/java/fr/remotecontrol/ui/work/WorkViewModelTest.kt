@@ -1,6 +1,7 @@
 package fr.remotecontrol.ui.work
 
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.MediaFileEntity
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
@@ -186,6 +187,28 @@ class WorkViewModelTest {
         assertEquals("Non numérisé", ui.availabilityLabel)
         assertFalse(ui.canPlay)
         assertNull(ui.resumeLabel)
+    }
+
+    @Test fun work_versions_carry_language_pills_and_resolution() = runBlocking {
+        db.syncDao().upsertMediaFiles(
+            listOf(MediaFileEntity(2, 1, null, "HD", "1.6G", "Films/A/Ava.mp4", "DISK1", true, listOf("en"), listOf("fr"), 624, 352)),
+        )
+        val ui = viewModel(1).await { u -> u.versions.any { it.resolution != null } }
+        val hd = ui.versions.single { it.mediaFileId == 2L }
+        assertEquals(listOf("Anglais", "ST français"), hd.languages)
+        assertEquals("624\u202F×\u202F352", hd.resolution)
+        // Fichier sans langues ni dimensions connues : ni pastille, ni résolution.
+        val fhd = ui.versions.single { it.mediaFileId == 1L }
+        assertEquals(emptyList<String>(), fhd.languages)
+        assertNull(fhd.resolution)
+    }
+
+    @Test fun not_digitized_work_shows_medium() = runBlocking {
+        val dao = db.catalogDao()
+        db.syncDao().upsertWorks(listOf(dao.work(2).first()!!.copy(medium = "DVD"), dao.work(1).first()!!.copy(medium = "DVD")))
+        assertEquals("DVD", viewModel(2).await { it.medium != null }.medium)
+        // Œuvre numérisée : son support d'origine n'est pas mis en avant.
+        assertNull(viewModel(1).await { it.work.medium == "DVD" }.medium)
     }
 
     @Test fun play_success_navigates_to_remote() = runBlocking {

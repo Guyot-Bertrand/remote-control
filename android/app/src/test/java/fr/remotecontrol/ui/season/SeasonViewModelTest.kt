@@ -1,6 +1,9 @@
 package fr.remotecontrol.ui.season
 
 import fr.remotecontrol.data.db.AppDatabase
+import fr.remotecontrol.data.db.EpisodeEntity
+import fr.remotecontrol.data.db.MediaFileEntity
+import fr.remotecontrol.data.db.ProgressEntity
 import fr.remotecontrol.data.sync.SyncWriter
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
@@ -15,6 +18,7 @@ import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.testing.collectNow
+import fr.remotecontrol.testing.seed
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.NavEvent
 import kotlinx.coroutines.CompletableDeferred
@@ -177,15 +181,30 @@ class SeasonViewModelTest {
         val ui = vm.await { it.episodes.size == 2 }
         assertEquals(listOf(false, true), ui.episodes.map { it.selected })
         val second = ui.episodes[1]
-        assertEquals("24 min · reste 19 min", second.details)
+        assertEquals("24 min · reste 19 min", second.durationLine)
         assertEquals(listOf("FHD"), second.qualities)
-        assertNull(ui.episodes[0].details)
+        assertNull(ui.episodes[0].durationLine)
         vm.select(1)
         val picked = vm.await { it.episodes[0].selected }
         assertEquals(listOf(true, false), picked.episodes.map { it.selected })
         // L'épisode à suivre garde sa mise en évidence (repère « En cours »), sans être lancé.
         assertEquals(listOf(false, true), picked.episodes.map { it.highlighted })
         assertFalse(api.calls.any { it.startsWith("play(") })
+    }
+
+    @Test fun season_episode_lines_have_duration() = runBlocking {
+        db.seed(
+            works = emptyList(),
+            episodes = listOf(EpisodeEntity(1, 1, 1, null, durationMin = 43), EpisodeEntity(2, 1, 2, null, durationMin = 41)),
+            progress = listOf(ProgressEntity("episode", 2, 6, 1380.0, 2460.0, false, 1795000100.0)),
+            files = listOf(
+                MediaFileEntity(5, null, 1, "FHD", "383M", "e1.mp4", "DISK1", true, listOf("en"), listOf("fr"), 624, 352),
+                MediaFileEntity(6, null, 2, "FHD", "429M", "e2.mp4", "DISK1", true, listOf("en"), listOf("fr", "en")),
+            ),
+        )
+        val ui = viewModel(1).await { u -> u.episodes.size == 2 && u.episodes[1].durationLine == "41 min · reste 18 min" }
+        assertEquals("43 min", ui.episodes[0].durationLine)
+        assertEquals(listOf("Anglais", "ST français", "ST anglais"), ui.languages)
     }
 
     @Test fun selection_survives_recreation_and_resets_on_another_season() = runBlocking {

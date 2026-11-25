@@ -124,7 +124,7 @@ fun WorkRow(
                 )
             }
         }
-        if (!work.playable) Unavailable(work.absentVolume)
+        if (!work.playable) Unavailable(work.absentVolume, work.medium)
     }
 }
 
@@ -139,9 +139,12 @@ fun highlighted(text: String, query: String?): AnnotatedString {
     }
 }
 
-/** Pourquoi l'œuvre n'est pas lisible : disque débranché (terre cuite, son nom) ou non numérisée (atténué). */
+/**
+ * Pourquoi l'œuvre n'est pas lisible : disque débranché (terre cuite, son nom) ou non numérisée (atténué, son
+ * support d'origine s'il est connu : « DVD »).
+ */
 @Composable
-private fun Unavailable(absentVolume: String?) {
+private fun Unavailable(absentVolume: String?, medium: String?) {
     val color = if (absentVolume != null) RcColors.warn else RcColors.text3
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(
@@ -150,6 +153,6 @@ private fun Unavailable(absentVolume: String?) {
             tint = color,
             modifier = Modifier.size(16.dp),
         )
-        Text(Texts.unavailableLabel(absentVolume), style = MaterialTheme.typography.bodySmall, color = color, maxLines = 1)
+        Text(Texts.unavailableLabel(absentVolume, medium), style = MaterialTheme.typography.bodySmall, color = color, maxLines = 1)
     }
 }

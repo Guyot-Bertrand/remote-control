@@ -114,6 +114,17 @@ class RemoteViewModelTest {
         assertEquals(listOf(1L to 2L), asked)
     }
 
+    @Test fun language_falls_back_to_file_audio_when_track_unknown() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(playing)
+        // Pistes illisibles : la langue vient des langues audio du fichier, dans le catalogue.
+        api.tracksResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope)) { _, _ ->
+            flowOf(PlayingInfo(poster = null, year = 2006, quality = "SD", audioLangs = listOf("en", "fr")))
+        }.also { vms += it }
+        observe(vm, scope)
+        assertEquals("2006 · SD · Anglais", withTimeout(5_000) { vm.state.first { it.details.isNotEmpty() } }.details)
+    }
+
     @Test fun skip_and_restart_commands() = runBlocking {
         api.playerStateResult = ApiResult.Ok(playing)
         val vm = viewModel()

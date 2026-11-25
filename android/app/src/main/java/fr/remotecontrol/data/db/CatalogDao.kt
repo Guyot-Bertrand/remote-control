@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 // Progression propre à l'œuvre (pas aux épisodes) : ratio si entamée et non vue, et drapeau « vu ».
 private const val WORK_PROGRESS = "FROM progress p WHERE p.targetKind = 'work' AND p.targetId = work.id"
 private const val SUMMARY = "work.id, work.type, work.titleFr, work.year, work.poster, work.playable, work.episodic, " +
-    "work.directors, " +
+    "work.directors, work.medium, " +
     "(SELECT MIN(p.position / p.duration, 1.0) $WORK_PROGRESS " +
     "AND p.watched = 0 AND p.position > 0 AND p.duration > 0) AS progress, " +
     "COALESCE((SELECT p.watched $WORK_PROGRESS), 0) AS watched, " +
@@ -16,6 +16,9 @@ private const val SUMMARY = "work.id, work.type, work.titleFr, work.year, work.p
     "LEFT JOIN volume v ON m.volumeUuid = v.uuid WHERE m.present = 0 AND (m.workId = work.id OR m.episodeId IN " +
     "(SELECT e.id FROM episode e JOIN season s ON s.id = e.seasonId WHERE s.workId = work.id)) " +
     "ORDER BY v.label IS NULL, v.label LIMIT 1) END AS absentVolume"
+
+private const val MEDIA_FILE_ROW = "m.id, m.workId, m.episodeId, m.quality, m.size, m.present, v.label AS volumeLabel, " +
+    "m.audioLangs, m.subtitleLangs, m.width, m.height"
 
 @Dao
 interface CatalogDao {
@@ -93,20 +96,20 @@ interface CatalogDao {
     fun season(id: Long): Flow<SeasonEntity?>
 
     @Query(
-        "SELECT m.id, m.workId, m.episodeId, m.quality, m.size, m.present, v.label AS volumeLabel " +
+        "SELECT $MEDIA_FILE_ROW " +
             "FROM media_file m LEFT JOIN volume v ON m.volumeUuid = v.uuid WHERE m.workId = :workId ORDER BY m.id",
     )
     fun mediaFilesOfWork(workId: Long): Flow<List<MediaFileRow>>
 
     @Query(
-        "SELECT m.id, m.workId, m.episodeId, m.quality, m.size, m.present, v.label AS volumeLabel " +
+        "SELECT $MEDIA_FILE_ROW " +
             "FROM media_file m LEFT JOIN volume v ON m.volumeUuid = v.uuid WHERE m.episodeId = :episodeId ORDER BY m.id",
     )
     fun mediaFilesOfEpisode(episodeId: Long): Flow<List<MediaFileRow>>
 
     @Query(
         "SELECT e.id AS id, e.number AS number, e.title AS title, p.position AS position, p.duration AS duration, " +
-            "p.watched AS watched, p.updatedAt AS updatedAt, " +
+            "p.watched AS watched, p.updatedAt AS updatedAt, e.durationMin AS durationMin, " +
             "EXISTS(SELECT 1 FROM media_file m WHERE m.episodeId = e.id AND m.present = 1) AS playable " +
             "FROM episode e LEFT JOIN progress p ON p.targetKind = 'episode' AND p.targetId = e.id " +
             "WHERE e.seasonId = :seasonId ORDER BY e.number",
@@ -117,6 +120,11 @@ interface CatalogDao {
     @Query("SELECT DISTINCT m.quality FROM media_file m JOIN episode e ON m.episodeId = e.id " +
             "WHERE e.seasonId = :seasonId AND m.present = 1")
     fun seasonQualities(seasonId: Long): Flow<List<String>>
+
+    /** Langues des fichiers présents des épisodes d'une saison (pastilles de l'en-tête). */
+    @Query("SELECT m.audioLangs, m.subtitleLangs FROM media_file m JOIN episode e ON m.episodeId = e.id " +
+            "WHERE e.seasonId = :seasonId AND m.present = 1 ORDER BY e.number, m.id")
+    fun seasonLanguages(seasonId: Long): Flow<List<FileLanguages>>
 
     /** Qualités des fichiers présents de chaque épisode d'une saison (carte de l'épisode choisi). */
     @Query("SELECT DISTINCT m.episodeId AS episodeId, m.quality AS quality FROM media_file m JOIN episode e ON m.episodeId = e.id " +
@@ -135,7 +143,8 @@ interface CatalogDao {
 
     @Query(
         "SELECT w.poster AS poster, w.year AS year, w.titleFr AS title, " +
-            "(SELECT m.quality FROM media_file m WHERE m.id = :mediaFileId) AS quality FROM work w WHERE w.id = :workId",
+            "(SELECT m.quality FROM media_file m WHERE m.id = :mediaFileId) AS quality, " +
+            "(SELECT m.audioLangs FROM media_file m WHERE m.id = :mediaFileId) AS audioLangs FROM work w WHERE w.id = :workId",
     )
     fun playingInfo(workId: Long, mediaFileId: Long): Flow<PlayingInfo?>
 

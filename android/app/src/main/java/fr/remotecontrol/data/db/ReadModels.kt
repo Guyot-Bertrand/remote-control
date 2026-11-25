@@ -19,6 +19,8 @@ data class WorkSummary(
      * l'œuvre est lisible ou n'a aucun fichier (non numérisée).
      */
     val absentVolume: String? = null,
+    /** Support d'origine (« DVD ») ; affiché à la place de « Non numérisé » quand il est connu. */
+    val medium: String? = null,
 )
 
 /** Résultat de recherche : l'œuvre, plus les champs qui expliquent la correspondance. */
@@ -70,6 +72,10 @@ data class MediaFileRow(
     val size: String?,
     val present: Boolean,
     val volumeLabel: String?,
+    val audioLangs: List<String>? = null,
+    val subtitleLangs: List<String>? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )
 
 data class EpisodeRow(
@@ -81,10 +87,24 @@ data class EpisodeRow(
     val watched: Boolean?,
     val updatedAt: Double?,
     val playable: Boolean,
+    /** Durée de l'épisode au catalogue, en minutes. */
+    val durationMin: Int? = null,
 )
+
+/** Langues audio et de sous-titres d'un fichier (pastilles de l'en-tête d'une saison). */
+data class FileLanguages(val audioLangs: List<String>?, val subtitleLangs: List<String>?)
 
 /** Qualité d'un fichier présent d'un épisode. */
 data class EpisodeQuality(val episodeId: Long, val quality: String)
 
-/** Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre, qualité du fichier. */
-data class PlayingInfo(val poster: String?, val year: Int?, val quality: String?, val title: String? = null)
+/**
+ * Ce que le catalogue local sait d'une lecture en cours : affiche, année et titre de l'œuvre, qualité et langues
+ * audio du fichier.
+ */
+data class PlayingInfo(
+    val poster: String?,
+    val year: Int?,
+    val quality: String?,
+    val title: String? = null,
+    val audioLangs: List<String>? = null,
+)

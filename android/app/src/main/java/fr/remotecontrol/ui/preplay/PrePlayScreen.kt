@@ -80,7 +80,7 @@ fun PrePlayScreen(
                 state.versions.forEach { v ->
                     OptionRow(
                         label = v.label,
-                        detail = v.absentLabel,
+                        detail = Texts.details(v.resolution, v.absentLabel).ifEmpty { null },
                         badge = state.versionBadges[v.mediaFileId],
                         selected = v.mediaFileId == state.selectedMediaFileId,
                         enabled = v.present,

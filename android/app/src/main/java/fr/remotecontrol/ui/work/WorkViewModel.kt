@@ -29,6 +29,8 @@ import fr.remotecontrol.ui.common.NavEvent
 import fr.remotecontrol.ui.common.PlayAction
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.common.formatDuration
+import fr.remotecontrol.ui.common.languagePills
+import fr.remotecontrol.ui.common.resolutionLabel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +41,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class VersionUi(val mediaFileId: Long, val label: String, val present: Boolean, val absentLabel: String?)
+/** [resolution] : « 1920 × 1080 » si connue ; [languages] : pastilles « Anglais », « ST français ». */
+data class VersionUi(
+    val mediaFileId: Long,
+    val label: String,
+    val present: Boolean,
+    val absentLabel: String?,
+    val resolution: String? = null,
+    val languages: List<String> = emptyList(),
+)
 
 /**
  * [canPlay] : œuvre non épisodique dont au moins un fichier est présent.
@@ -70,6 +80,8 @@ data class WorkUi(
     val action: SheetAction = SheetAction.Play,
     /** Le lecteur n'est pas installé sur le PC (bandeau ; lecture impossible). */
     val playerMissing: Boolean = false,
+    /** Support d'origine (« DVD ») d'une œuvre non numérisée ; nul sinon ou s'il est inconnu. */
+    val medium: String? = null,
 )
 
 private data class Catalog(
@@ -166,6 +178,7 @@ class WorkViewModel(
             resumeProgress = progress?.duration?.takeIf { it > 0 }?.let { (progress.position / it).coerceIn(0.0, 1.0).toFloat() },
             onTv = tv,
             choiceSummary = if (work.episodic) null else choiceSummary(c.files, c.progress),
+            medium = work.medium?.takeIf { availability == Availability.NotDigitized },
         )
     }
 }
@@ -176,4 +189,6 @@ fun MediaFileRow.toVersionUi() = VersionUi(
     label = Texts.versionLabel(quality, size),
     present = present,
     absentLabel = if (present) null else Texts.volumeAbsent(volumeLabel),
+    resolution = resolutionLabel(width, height),
+    languages = languagePills(audioLangs, subtitleLangs),
 )

@@ -77,7 +77,7 @@ fun HomeScreen(
         HomeHeader(state.server, onSettings)
         when (state.banner) {
             HomeBanner.Searching, HomeBanner.Syncing -> {
-                FirstSync(state.server, syncing = state.banner == HomeBanner.Syncing)
+                FirstSync(state, syncing = state.banner == HomeBanner.Syncing)
                 return@Column
             }
             HomeBanner.Empty, HomeBanner.NotSynced -> {
@@ -124,7 +124,7 @@ fun HomeScreen(
                                     hash = work.poster,
                                     title = work.titleFr,
                                     year = work.year,
-                                    unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume),
+                                    unavailableLabel = if (work.playable) null else Texts.unavailableLabel(work.absentVolume, work.medium),
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                                 Text(
@@ -153,9 +153,13 @@ fun HomeScreen(
     }
 }
 
-/** Maquette « Première synchronisation » : marque, barre d'avancement, explication, serveur. */
+/**
+ * Maquettes « Première synchronisation » (3) et « Synchro » (4c) : marque, barre d'avancement, explication,
+ * serveur. Barre indéterminée pendant la recherche du serveur et le téléchargement ; déterminée, avec le compte
+ * des œuvres, pendant l'écriture (une synchro sans œuvre passe directement du téléchargement à la fin).
+ */
 @Composable
-private fun FirstSync(server: ServerState, syncing: Boolean) {
+private fun FirstSync(state: HomeUi, syncing: Boolean) {
     Column(
         Modifier.fillMaxSize().padding(start = 40.dp, end = 40.dp, bottom = 64.dp),
         verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
@@ -166,22 +170,42 @@ private fun FirstSync(server: ServerState, syncing: Boolean) {
             Text(Texts.appName, style = TextStyle(fontFamily = Fraunces, fontWeight = FontWeight.Medium, fontSize = 32.sp))
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Le serveur envoie le catalogue d'un bloc : l'avancement n'est pas connu, la barre est indéterminée.
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = RcColors.accent,
-                trackColor = RcColors.surface3,
-                strokeCap = StrokeCap.Round,
-                gapSize = 0.dp,
-            )
-            Text(
-                if (syncing) Texts.firstSync else Texts.searching,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal),
-                color = RcColors.text2,
-            )
+            val barModifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+            val fraction = state.syncFraction.takeIf { syncing }
+            if (fraction != null) {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = barModifier,
+                    color = RcColors.accent,
+                    trackColor = RcColors.surface3,
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = barModifier,
+                    color = RcColors.accent,
+                    trackColor = RcColors.surface3,
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                )
+            }
+            val caption = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    if (syncing) state.syncLabel ?: Texts.firstSync else Texts.searching,
+                    style = caption,
+                    color = RcColors.text2,
+                    modifier = Modifier.weight(1f),
+                )
+                state.syncCount?.takeIf { syncing }?.let {
+                    Text(it, style = caption.copy(fontFeatureSettings = "tnum"), color = RcColors.text2, maxLines = 1)
+                }
+            }
         }
         Text(Texts.firstSyncHelp, style = body15, color = RcColors.text2, textAlign = TextAlign.Center)
-        (server as? ServerState.Connected)?.let {
+        (state.server as? ServerState.Connected)?.let {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(RcIcons.Server, contentDescription = null, tint = RcColors.text3, modifier = Modifier.size(18.dp))
                 Text(it.address.display, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), color = RcColors.text3)

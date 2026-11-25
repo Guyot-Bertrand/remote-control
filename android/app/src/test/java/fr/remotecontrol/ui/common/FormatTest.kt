@@ -137,6 +137,14 @@ class FormatTest {
     }
 
     @Test
+    fun unavailable_label_names_the_medium() {
+        assertEquals("DVD", Texts.unavailableLabel(null, "DVD"))
+        assertEquals("Non numérisé", Texts.unavailableLabel(null, null))
+        // Disque débranché : son nom prime sur le support.
+        assertEquals("Théâtre", Texts.unavailableLabel("Théâtre", "DVD"))
+    }
+
+    @Test
     fun resolution_label() {
         assertEquals("1920\u202F\u00D7\u202F1080", resolutionLabel(1920, 1080))
         assertEquals(null, resolutionLabel(null, 1080))
