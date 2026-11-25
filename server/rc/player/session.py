@@ -626,7 +626,12 @@ class PlaybackService:
             self._finish(state, None)
             return
         else:
+            moved = state.position != self._state.position
             self._state = state
+            if moved and s.parked == "minimize" and state.paused:
+                # mpv réduit suit les sauts : la vignette de pause aussi. En pause, mpv
+                # ne signale la position qu'à un saut (même rythme que la publication).
+                self.tv.update_pause(self.pause_info())
             changed = state.paused != s.paused
             if changed or self.clock() - s.last_save >= SAVE_INTERVAL:
                 s.paused = state.paused

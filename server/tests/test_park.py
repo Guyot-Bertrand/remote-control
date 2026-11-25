@@ -331,3 +331,14 @@ async def test_unpark_player_failure_ends_session(env):
     assert env.svc.current is None and not env.svc.state.running
     assert env.tv.state.screen == "message"
     assert progress_row(env.conn)["position"] == 1394
+
+
+async def test_seek_while_minimized_updates_pause_tile(env):
+    env.mode = "minimize"
+    await parked(env)
+    env.tv.show_view({"screen": "browse"}, env.svc.pause_info())
+    await env.svc.seek(60, True)
+    emit(env, position=1454.0, duration=6000.0, paused=True, audio=1)  # mpv suit le saut
+    assert env.tv.state.screen == "view"
+    assert env.tv.state.pause["position"] == 1454
+    assert env.tv.state.pause["image"] == "/api/player/pause.jpg?v=1"
