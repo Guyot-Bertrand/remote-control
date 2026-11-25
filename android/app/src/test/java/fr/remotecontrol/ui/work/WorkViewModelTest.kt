@@ -28,6 +28,7 @@ import fr.remotecontrol.net.PlayerStateDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
+import fr.remotecontrol.net.TvViewStateDto
 import fr.remotecontrol.player.TvStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -65,7 +66,7 @@ class WorkViewModelTest {
     }
 
     private fun viewModel(id: Long) =
-        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus).also { vms += it }
+        WorkViewModel(id, db.catalogDao(), PlayLauncher(api), tvStatus).also { vms += it }
 
     // Room répond hors du dispatcher de test : on attend l'état voulu.
     private suspend fun WorkViewModel.await(predicate: (WorkUi) -> Boolean = { true }) =
@@ -75,7 +76,7 @@ class WorkViewModelTest {
     private val playerMissing = MutableStateFlow(false)
 
     private fun liveViewModel(id: Long) =
-        WorkViewModel(id, db.catalogDao(), api, PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
+        WorkViewModel(id, db.catalogDao(), PlayLauncher(api), tvStatus, live, playerMissing).also { vms += it }
 
     private fun playing(current: CurrentDto, ended: Boolean = false) =
         PlayerSnapshotDto(PlayerStateDto(running = true, ended = ended), current)
@@ -111,53 +112,25 @@ class WorkViewModelTest {
 
     @Test fun retry_server_searches_again() = runBlocking {
         val searched = CompletableDeferred<Unit>()
-        val vm = WorkViewModel(1, db.catalogDao(), api, PlayLauncher(api), tvStatus) { searched.complete(Unit) }.also { vms += it }
+        val vm = WorkViewModel(1, db.catalogDao(), PlayLauncher(api), tvStatus) { searched.complete(Unit) }.also { vms += it }
         vm.retryServer()
         withTimeout(5_000) { searched.await() }
     }
 
-    @Test fun tv_label_follows_tv_and_resume_resends_after_drift() = runBlocking {
+    @Test fun tv_label_follows_tv_view_state() = runBlocking {
         val watcher = launch(Dispatchers.Main) { tvStatus.run() }
         while (serverEvents.subscriptionCount.value == 0) yield()
         val vm = viewModel(1)
-        vm.onScreenResumed() // ouverture : déjà envoyée
+        assertFalse(vm.await().onTv)
+        serverEvents.emit(ServerEvent.Tv(TvStateDto("view", view = TvViewStateDto("work", workId = 1))))
         vm.await { it.onTv }
         serverEvents.emit(ServerEvent.Tv(TvStateDto("home")))
         vm.await { !it.onTv }
-        serverEvents.emit(ServerEvent.Player(PlayerSnapshotDto()))
-        vm.onScreenResumed()
-        vm.await { it.onTv }
-        assertEquals(2, api.calls.count { it == "tvShow(work,1)" })
         serverEvents.emit(ServerEvent.Tv(TvStateDto("work", workId = 1)))
-        vm.onScreenResumed()
-        assertEquals(2, api.calls.count { it == "tvShow(work,1)" })
+        vm.await { it.onTv }
+        // La fiche n'est plus envoyée par `tv/show` : c'est l'écran qui publie sa vue.
+        assertEquals(0, api.calls.count { it.startsWith("tvShow") })
         watcher.cancel()
-    }
-
-    @Test fun init_sends_tv_show_once() = runBlocking {
-        val vm = viewModel(1)
-        vm.await()
-        vm.await()
-        assertEquals(1, api.calls.count { it == "tvShow(work,1)" })
-    }
-
-    @Test fun tv_show_failure_is_silent() = runBlocking {
-        api.tvShowResult = ApiResult.Err(ApiError.Unreachable)
-        val ui = viewModel(1).await()
-        assertNull(ui.message)
-        assertEquals("Ava", ui.work.titleFr)
-        assertFalse(ui.onTv)
-    }
-
-    @Test fun tv_show_not_shown_during_playback_is_not_an_error() = runBlocking {
-        api.tvShowResult = ApiResult.Ok(false)
-        val ui = viewModel(1).await()
-        assertNull(ui.message)
-        assertFalse(ui.onTv)
-    }
-
-    @Test fun tv_shown_is_flagged() = runBlocking {
-        assertTrue(viewModel(1).await { it.onTv }.onTv)
     }
 
     @Test fun ava_state() = runBlocking {

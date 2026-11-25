@@ -27,6 +27,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.remoteView
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -90,6 +92,7 @@ fun RemoteScreen(
     onDismissMessage: () -> Unit,
     onBack: () -> Unit,
 ) {
+    PublishTvView(remoteView())
     KeepScreenOn()
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.onTv, server, onBack = onBack, backIcon = RcIcons.ChevronDown, backLabel = Texts.minimize)

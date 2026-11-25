@@ -1,18 +1,16 @@
 package fr.remotecontrol.player
 
-import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.PlayerSnapshotDto
-import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.net.ServerEvent
 import fr.remotecontrol.net.TvStateDto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Dernier état connu de la télé et du lecteur, d'après les événements du serveur. [run] tourne au premier
@@ -49,53 +47,25 @@ class TvStatus(private val events: Flow<ServerEvent>) {
 private fun PlayerSnapshotDto.isPlaying() = state.running && !state.ended
 
 /**
- * Fiche ([screen] `work` ou `season`, d'identifiant [id]) affichée aussi sur la télé : envoyée une fois à
- * l'ouverture, puis [onTv] suit en direct l'état de la télé. Au retour sur l'écran ([onScreenResumed]), si la
- * télé montre autre chose que cette fiche et que rien n'est en lecture, la fiche est renvoyée une fois.
+ * Mention « Affichée sur la télé » d'une fiche ([screen] `work` ou `season`, d'identifiant [id]) : [onTv] suit
+ * en direct l'état de la télé. La fiche n'est pas envoyée ici : l'écran publie sa vue ([fr.remotecontrol.mirror.PublishTvView]).
  */
 class TvSheet(
-    private val scope: CoroutineScope,
-    private val api: RcApi,
-    private val status: TvStatus,
+    scope: CoroutineScope,
+    status: TvStatus,
     private val screen: String,
     private val id: Long,
 ) {
-    private val _onTv = MutableStateFlow(false)
-
     /** La télé affiche cette fiche (faux hors ligne, pendant une lecture ou si elle montre autre chose). */
-    val onTv: StateFlow<Boolean> = _onTv.asStateFlow()
-    private var opened = false
+    val onTv: StateFlow<Boolean> = status.tv.map { it != null && matches(it) }
+        .stateIn(scope, SharingStarted.Eagerly, status.tv.value?.let(::matches) == true)
 
-    init {
-        scope.launch { show() }
-        // Seuls les changements comptent : l'état connu à l'ouverture précède l'envoi de la fiche.
-        scope.launch { status.tv.drop(1).filterNotNull().collect { _onTv.value = matches(it) } }
-    }
-
-    fun onScreenResumed() {
-        // Le premier passage est l'ouverture elle-même, déjà envoyée.
-        if (!opened) {
-            opened = true
-            return
+    /** Vue du téléphone reproduite (arbitrage 15), ou fiche de `tv/show` d'un serveur de l'itération 1. */
+    private fun matches(tv: TvStateDto): Boolean {
+        val (shown, workId, seasonId) = when (tv.screen) {
+            "view" -> tv.view?.let { Triple(it.screen, it.workId, it.seasonId) } ?: return false
+            else -> Triple(tv.screen, tv.workId, tv.seasonId)
         }
-        val tv = status.tv.value ?: return
-        val playing = status.playing.value ?: return
-        if (!matches(tv) && !playing) scope.launch { show() }
-    }
-
-    /**
-     * Échec volontairement silencieux : afficher la fiche sur la télé n'est qu'un accompagnement de la
-     * navigation sur le téléphone (hors ligne, ou télé occupée par une lecture, ce n'est pas une erreur) ;
-     * seule la mention « Affichée sur la télé » en dépend. Les erreurs qui comptent (lecture) ont leur message.
-     */
-    private suspend fun show() {
-        val shown = api.tvShow(screen, id)
-        _onTv.value = shown is ApiResult.Ok && shown.value
-    }
-
-    private fun matches(tv: TvStateDto) = tv.screen == screen && when (screen) {
-        "work" -> tv.workId == id
-        "season" -> tv.seasonId == id
-        else -> false
+        return shown == screen && (if (screen == "season") seasonId else workId) == id
     }
 }

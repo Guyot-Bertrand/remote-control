@@ -26,6 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.seasonView
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -98,6 +100,7 @@ fun SeasonScreen(
     onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
+    PublishTvView(state?.let { s -> seasonView(s.season.id, s.season.workId, s.episodes.firstOrNull { it.selected }?.id) })
     val list = rememberLazyListState()
     val headerVisible by remember { derivedStateOf { list.firstVisibleItemIndex == 0 } }
     Column(Modifier.fillMaxSize()) {

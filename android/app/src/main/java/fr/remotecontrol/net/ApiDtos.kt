@@ -202,12 +202,37 @@ data class PlayerSnapshotDto(
     val current: CurrentDto? = null,
 )
 
+/**
+ * État de la télé (arbitrage 15) : `screen` ∈ home, work, season, view, playing, paused, message. [view] : la vue
+ * du téléphone reproduite (`screen` `view`) ; [pause] : la vidéo en pause mise de côté. Un serveur de l'itération 1
+ * n'envoie que `screen`, `work_id`, `season_id` et `message`.
+ */
 @Serializable
 data class TvStateDto(
     val screen: String,
     @SerialName("work_id") val workId: Long? = null,
     @SerialName("season_id") val seasonId: Long? = null,
     val message: String? = null,
+    val view: TvViewStateDto? = null,
+    val pause: PauseDto? = null,
+)
+
+/** Vue reproduite par la télé, telle que renvoyée par le serveur ; seuls l'écran et la fiche montrée servent ici. */
+@Serializable
+data class TvViewStateDto(
+    val screen: String,
+    @SerialName("work_id") val workId: Long? = null,
+    @SerialName("season_id") val seasonId: Long? = null,
+)
+
+/** Vidéo en pause mise de côté ; [image] est nulle si la capture a échoué. */
+@Serializable
+data class PauseDto(
+    val image: String? = null,
+    val title: String? = null,
+    val position: Double? = null,
+    val duration: Double? = null,
+    @SerialName("work_id") val workId: Long? = null,
 )
 
 @Serializable

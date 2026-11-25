@@ -24,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.workView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -92,6 +94,7 @@ fun WorkScreen(
     onRetryPlayer: () -> Unit,
     onBack: () -> Unit,
 ) {
+    PublishTvView(state?.let { workView(it.work.id) })
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(title = null, server = server, onBack = onBack)
         if (state == null) {

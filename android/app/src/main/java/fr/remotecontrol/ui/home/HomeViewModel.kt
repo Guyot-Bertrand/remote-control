@@ -91,6 +91,8 @@ data class HomeUi(
     val syncCount: String? = null,
     /** Avancement de l'écriture (0 à 1) ; nul quand il n'est pas connu (barre indéterminée). */
     val syncFraction: Float? = null,
+    /** La base a répondu (l'état initial, vide, n'est pas publié sur la télé). */
+    val loaded: Boolean = false,
 )
 
 /** Libellé, compte et avancement de la barre de la première synchronisation. */
@@ -151,6 +153,7 @@ class HomeViewModel(
             server = server,
             banner = homeBanner(server, count == 0, everSynced, syncing),
             message = msg.takeIf { count == 0 },
+            loaded = true,
         ).withProgress(progress)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 

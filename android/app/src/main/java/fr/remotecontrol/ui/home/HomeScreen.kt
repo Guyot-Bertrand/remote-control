@@ -38,6 +38,8 @@ import fr.remotecontrol.ui.theme.Inter
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.homeView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,6 +74,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onResync: () -> Unit,
 ) {
+    PublishTvView(if (state.loaded) homeView(state) else null)
     Column(Modifier.fillMaxSize().background(RcColors.bg)) {
         // L'en-tête (et son accès aux réglages) reste visible dans tous les états.
         HomeHeader(state.server, onSettings)

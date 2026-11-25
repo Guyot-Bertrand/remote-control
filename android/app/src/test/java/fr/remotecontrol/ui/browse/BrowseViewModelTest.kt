@@ -9,12 +9,14 @@ import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
+import fr.remotecontrol.testing.collectNow
 import fr.remotecontrol.testing.testDb
 import fr.remotecontrol.ui.common.BrowseRoute
 import fr.remotecontrol.ui.common.SORT_RECENT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -150,5 +152,35 @@ class BrowseViewModelTest {
         // Room doit invalider la requête via la sous-requête sur `progress`.
         vm.await { ui -> ui.works.any { it.id == 3L && it.watched } }
         Unit
+    }
+
+    @Test fun browse_publishes_on_anchor_change_only() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute())
+        vm.await { it.loaded && it.works.size == 5 }
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 2L } } // première œuvre : Alien
+        val seen = collectNow(vm.tvView.filterNotNull())
+        vm.onFirstVisible(3)
+        vm.onFirstVisible(3)
+        vm.onFirstVisible(4)
+        withTimeout(5_000) { vm.tvView.first { it?.anchor == 4L } }
+        seen.stop()
+        // Alien, Ava, Back to Life, Le Prénom (3 puis 4) : ancres 3 puis 4, la vue de départ comprise.
+        assertEquals(listOf(2L, 3L, 4L), seen.items.map { it.anchor })
+        val last = seen.items.last()
+        assertEquals("browse", last.screen)
+        assertEquals("Toutes les œuvres", last.title)
+        assertEquals(5, last.position?.index)
+        assertEquals(listOf(2L, 1L, 5L, 3L, 4L), last.items.map { it.id })
+    }
+
+    @Test fun collection_view_follows_first_visible() = runBlocking {
+        filter.playableOnly.value = false
+        val vm = viewModel(BrowseRoute(collectionId = 2))
+        vm.await { it.works.isNotEmpty() && it.title.isNotEmpty() }
+        val v = withTimeout(5_000) { vm.tvView.first { it?.title == "Alien [1979-]" } }!!
+        assertEquals("collection", v.screen)
+        assertEquals(2L, v.collectionId)
+        assertEquals(listOf(2L), v.items.map { it.id })
     }
 }

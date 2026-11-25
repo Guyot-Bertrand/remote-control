@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.createSavedStateHandle
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -39,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import fr.remotecontrol.discovery.ServerState
+import fr.remotecontrol.mirror.LocalTvMirror
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.TargetKind
 import fr.remotecontrol.ui.browse.BrowseScreen
@@ -91,7 +91,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val server by container.locator.state.collectAsStateWithLifecycle()
             RcTheme {
-                CompositionLocalProvider(LocalServerBaseUrl provides (server as? ServerState.Connected)?.address?.baseUrl) {
+                CompositionLocalProvider(
+                    LocalServerBaseUrl provides (server as? ServerState.Connected)?.address?.baseUrl,
+                    LocalTvMirror provides container.tvMirror,
+                ) {
                     Surface(Modifier.fillMaxSize(), color = RcColors.bg, contentColor = RcColors.text) {
                         RcScaffold(container)
                     }
@@ -205,13 +208,16 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             val route = entry.toRoute<BrowseRoute>()
             val vm = viewModel { BrowseViewModel(route, c.catalogDao, c.filter) }
             val state by vm.state.collectAsStateWithLifecycle()
+            val tvView by vm.tvView.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
             BrowseScreen(
                 state = state,
+                tvView = tvView,
                 server = server,
                 onPlayableOnly = vm::setPlayableOnly,
                 onType = vm::setType,
                 onToggleSort = vm::toggleSort,
+                onFirstVisible = vm::onFirstVisible,
                 onOpen = { nav.navigate(WorkRoute(it.id)) },
                 onBack = { nav.popBackStack() },
             )
@@ -230,11 +236,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<WorkRoute> { entry ->
             val id = entry.toRoute<WorkRoute>().id
-            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing) { c.locator.locate(force = true) } }
-            LifecycleResumeEffect(vm) {
-                vm.onScreenResumed()
-                onPauseOrDispose {}
-            }
+            val vm = viewModel { WorkViewModel(id, c.catalogDao, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing) { c.locator.locate(force = true) } }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
@@ -257,11 +259,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
         }
         composable<SeasonRoute> { entry ->
             val id = entry.toRoute<SeasonRoute>().id
-            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.api, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing, createSavedStateHandle()) }
-            LifecycleResumeEffect(vm) {
-                vm.onScreenResumed()
-                onPauseOrDispose {}
-            }
+            val vm = viewModel { SeasonViewModel(id, c.catalogDao, c.playLauncher, c.tvStatus, c.liveForSheets, c.locator.playerMissing, createSavedStateHandle()) }
             val state by vm.state.collectAsStateWithLifecycle()
             val missing by vm.missing.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
@@ -302,6 +300,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             }
             PrePlayScreen(
                 state = state,
+                target = args.target,
                 server = server,
                 playerMissing = c.playerMissing(),
                 onRetryPlayer = c::retryPlayer,

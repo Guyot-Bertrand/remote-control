@@ -24,6 +24,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import fr.remotecontrol.mirror.PublishTvView
+import fr.remotecontrol.mirror.preplayView
+import fr.remotecontrol.player.PlayTarget
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -61,6 +64,8 @@ import java.util.Locale
 @Composable
 fun PrePlayScreen(
     state: PrePlayUi,
+    /** Œuvre ou épisode à lire, montré sur la télé avec les choix en cours. */
+    target: PlayTarget,
     server: ServerState,
     /** Le lecteur n'est pas installé sur le PC : bandeau, et « Lire sur la télé » désactivé. */
     playerMissing: Boolean,
@@ -72,6 +77,7 @@ fun PrePlayScreen(
     onConfirm: () -> Unit,
     onClose: () -> Unit,
 ) {
+    PublishTvView(if (state.loading) null else preplayView(target, state.selectedMediaFileId, state.selectedAudio, state.selectedSubtitle))
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(Texts.prePlayTitle, server, onBack = onClose, backIcon = RcIcons.Clear, backLabel = Texts.close)
         if (playerMissing) PlayerMissingBanner(onRetryPlayer, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))

@@ -11,7 +11,6 @@ import fr.remotecontrol.data.db.SeasonEntity
 import fr.remotecontrol.data.db.WorkEntity
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.PlayerSnapshotDto
-import fr.remotecontrol.net.RcApi
 import fr.remotecontrol.player.SheetAction
 import fr.remotecontrol.player.live
 import fr.remotecontrol.player.playsEpisode
@@ -100,7 +99,6 @@ private data class Catalog(
 class SeasonViewModel(
     private val seasonId: Long,
     dao: CatalogDao,
-    api: RcApi,
     launcher: PlayLauncher,
     tvStatus: TvStatus,
     /** Lecture en cours sur la télé ([fr.remotecontrol.player.RemoteController.snapshot]). */
@@ -115,8 +113,8 @@ class SeasonViewModel(
 
     private val playAction = PlayAction(viewModelScope, launcher)
 
-    /** Envoyée à la télé une fois à l'ouverture (hors ligne, l'échec est ignoré), puis suivie en direct. */
-    private val tvSheet = TvSheet(viewModelScope, api, tvStatus, "season", seasonId)
+    /** Mention « Affichée sur la télé », suivie en direct ; l'écran publie lui-même sa vue. */
+    private val tvSheet = TvSheet(viewModelScope, tvStatus, "season", seasonId)
 
     /** Navigation demandée (télécommande après un lancement) ; livrée seulement si l'écran l'écoute. */
     val events: Flow<NavEvent> = playAction.events
@@ -149,16 +147,12 @@ class SeasonViewModel(
     val missing: StateFlow<Boolean> = dao.season(seasonId).map { it == null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-
     /** Déplie [episodeId] en carte (actions et détails), sans lancer la lecture. */
     fun select(episodeId: Long) {
         savedState[selectionKey] = episodeId
     }
 
     fun play(episodeId: Long, mode: StartMode) = playAction.launch(PlayTarget(TargetKind.Episode, episodeId), mode)
-
-    /** Retour sur l'écran : renvoie la fiche à la télé si elle montre autre chose et que rien n'est en lecture. */
-    fun onScreenResumed() = tvSheet.onScreenResumed()
 
     fun clearMessage() {
         playAction.message.value = null

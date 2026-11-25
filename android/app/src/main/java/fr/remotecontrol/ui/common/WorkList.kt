@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,10 +51,11 @@ fun WorkList(
     onOpen: (WorkSummary) -> Unit,
     modifier: Modifier = Modifier,
     ranks: Map<Long, String> = emptyMap(),
+    state: LazyListState = rememberLazyListState(),
     header: LazyListScope.() -> Unit = {},
 ) {
     val ranked = ranks.isNotEmpty()
-    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(modifier, state = state, contentPadding = PaddingValues(bottom = 16.dp)) {
         header()
         items(works, key = { it.id }, contentType = { "work" }) { work ->
             WorkRow(work, if (ranked) ranks[work.id].orEmpty() else null, onOpen)
