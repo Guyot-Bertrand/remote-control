@@ -529,7 +529,7 @@ def test_v1_database_migrates_and_reimports(setup):
         assert restored.conn.execute(
             "SELECT value FROM meta WHERE key='needs_reimport'").fetchone() is None
         expected = len(parse_catalog(FIXTURE.read_text(encoding="utf-8")).works)
-        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 3
         assert restored.conn.execute(
             "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
         assert works(restored) == expected
@@ -545,12 +545,25 @@ def test_v1_database_migrates_and_reimports(setup):
 def test_create_app_wires_mirror(tmp_path, caplog):
     config = Config(data_dir=tmp_path / "data", scan_roots=[tmp_path / "vide"],
                     dev_dir_volumes=True, mdns=False, poll_interval=3600,
-                    allowed_hosts=["testserver"], pause_background="bizarre")
+                    allowed_hosts=["testserver"], pause_background="bidule")
     with caplog.at_level(logging.WARNING):
         app = create_app(config, player=FakePlayer())
     assert (config.data_dir / "pause").is_dir()
-    assert any("pause_background" in r.getMessage() for r in caplog.records)
+    assert any("pause_background" in r.getMessage() and "« hide »" in r.getMessage()
+               for r in caplog.records)
     playback = app.state.rc.playback
-    assert playback.pause_mode() == "restart"
+    assert playback.pause_mode() == "hide"
     assert playback.on_pause_change.__self__.__class__.__name__ == "MirrorService"
+    app.state.rc.conn.close()
+
+
+@pytest.mark.parametrize("value, expected", [(None, "hide"), ("restart", "restart"),
+                                             ("minimize", "minimize"), ("hide", "hide")])
+def test_create_app_pause_mode(tmp_path, value, expected):
+    extra = {} if value is None else {"pause_background": value}
+    config = Config(data_dir=tmp_path / "data", scan_roots=[tmp_path / "vide"],
+                    dev_dir_volumes=True, mdns=False, poll_interval=3600,
+                    allowed_hosts=["testserver"], **extra)
+    app = create_app(config, player=FakePlayer())
+    assert app.state.rc.playback.pause_mode() == expected
     app.state.rc.conn.close()

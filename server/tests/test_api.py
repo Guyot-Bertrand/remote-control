@@ -377,21 +377,6 @@ def test_player_idle_409(env):
     assert env.client.get("/api/player/state").json()["current"] is None
 
 
-def test_tv_show_and_state(env):
-    assert env.client.post("/api/tv/show", json={"screen": "season", "id": 1}).json() == {
-        "shown": True}
-    assert env.client.get("/api/tv/state").json() == {
-        "screen": "season", "work_id": 5, "season_id": 1, "message": None,
-        "view": None, "pause": None}
-    assert env.client.post("/api/tv/show", json={"screen": "work", "id": 999}).status_code == 404
-    r = env.client.post("/api/tv/show", json={"screen": "work"})
-    assert r.status_code == 422 and r.json() == error_body("invalid", None)
-    env.client.post("/api/play", json={"target_kind": "work", "target_id": 1, "start": "start"})
-    assert env.client.post("/api/tv/show", json={"screen": "home"}).json() == {"shown": False}
-    assert env.client.post("/api/tv/show", json={"screen": "home", "force": True}).json() == {
-        "shown": True}
-
-
 def test_ws_hello_then_tv_event(env):
     with env.client.websocket_connect("/api/events") as ws:
         hello = ws.receive_json()
@@ -399,11 +384,10 @@ def test_ws_hello_then_tv_event(env):
                          "tv": {"screen": "home", "work_id": None, "season_id": None,
                                 "message": None, "view": None, "pause": None},
                          "player": env.client.get("/api/player/state").json()}
-        env.client.post("/api/tv/show", json={"screen": "work", "id": 1})
+        env.client.post("/api/tv/view", json=VIEW)
         msg = ws.receive_json()
-        assert msg == {"type": "tv", "state": {"screen": "work", "work_id": 1,
-                                               "season_id": None, "message": None,
-                                               "view": None, "pause": None}}
+        assert msg["type"] == "tv" and msg["state"]["screen"] == "view"
+        assert msg["state"]["view"]["title"] == "Films"
     assert env.playback.bus.subscriber_count == 0  # désabonné à la déconnexion
 
 
@@ -431,7 +415,7 @@ def test_ws_unserialisable_event_is_logged_and_skipped(env, caplog):
         with env.client.websocket_connect("/api/events") as ws:
             ws.receive_json()  # hello
             env.client.portal.call(env.playback.bus.publish, {"type": "x", "bad": object()})
-            env.client.post("/api/tv/show", json={"screen": "work", "id": 1})
+            env.client.post("/api/tv/view", json=VIEW)
             assert ws.receive_json()["type"] == "tv"  # connexion toujours active
     assert any("non sérialisable" in r.getMessage() for r in caplog.records)
     assert env.client.get("/api/info").status_code == 200
@@ -455,20 +439,20 @@ FORBIDDEN = error_body("forbidden", None)
 
 
 def test_post_foreign_origin_refused(env):
-    r = env.client.post("/api/tv/show", json={"screen": "home"},
+    r = env.client.post("/api/tv/view", json=VIEW,
                         headers={"Origin": "http://malveillant.example"})
     assert r.status_code == 403
     assert r.json() == FORBIDDEN
-    r = env.client.post("/api/tv/show", json={"screen": "home"}, headers={"Origin": "null"})
+    r = env.client.post("/api/tv/view", json=VIEW, headers={"Origin": "null"})
     assert r.status_code == 403
 
 
 def test_post_same_origin_or_none_allowed(env):
     # TestClient envoie Host: testserver ; la page /tv a donc l'origine http://testserver.
-    r = env.client.post("/api/tv/show", json={"screen": "home"},
+    r = env.client.post("/api/tv/view", json=VIEW,
                         headers={"Origin": "http://testserver"})
     assert r.status_code == 200
-    assert env.client.post("/api/tv/show", json={"screen": "home"}).status_code == 200
+    assert env.client.post("/api/tv/view", json={**VIEW, "seq": 11}).status_code == 200
     # Lecture seule : pas de vérification.
     r = env.client.get("/api/info", headers={"Origin": "http://malveillant.example"})
     assert r.status_code == 200
@@ -510,7 +494,7 @@ def test_rebinding_host_refused(env):
                                   socket.gethostname(), "testserver"])
 def test_allowed_hosts_pass(env, host):
     assert env.client.get("/api/info", headers={"Host": host}).status_code == 200
-    r = env.client.post("/api/tv/show", json={"screen": "home"},
+    r = env.client.post("/api/tv/view", json=VIEW,
                         headers={"Host": host, "Origin": f"http://{host}"})
     assert r.status_code == 200
     with env.client.websocket_connect("/api/events", headers={"Host": host}) as ws:
@@ -520,7 +504,7 @@ def test_allowed_hosts_pass(env, host):
 def test_origin_host_must_be_allowed(env):
     # Origin identique à Host, mais Host est déjà refusé ; et une Origin d'un autre hôte
     # autorisé reste refusée (même hôte exigé).
-    r = env.client.post("/api/tv/show", json={"screen": "home"},
+    r = env.client.post("/api/tv/view", json=VIEW,
                         headers={"Host": "localhost:8765", "Origin": "http://127.0.0.1:8765"})
     assert r.status_code == 403
 
@@ -708,3 +692,33 @@ def test_hello_includes_view_and_pause_keys(env):
     with env.client.websocket_connect("/api/events") as ws:
         tv = ws.receive_json()["tv"]
     assert tv["view"] is None and tv["pause"] is None
+
+
+def _home_view(*kinds):
+    return {**VIEW, "screen": "home",
+            "sections": [{"label": f"S{i}", "kind": k} for i, k in enumerate(kinds)]}
+
+
+def test_tv_view_section_kind_passes_through(env):
+    r = env.client.post("/api/tv/view", json=_home_view("resume", "collections"))
+    assert r.json() == {"accepted": True}
+    sections = env.client.get("/api/tv/state").json()["view"]["sections"]
+    assert [s["kind"] for s in sections] == ["resume", "collections"]
+
+
+def test_tv_view_section_kind_null_or_absent_accepted(env):
+    body = {**VIEW, "screen": "home",
+            "sections": [{"label": "A", "kind": None}, {"label": "B"}]}
+    assert env.client.post("/api/tv/view", json=body).json() == {"accepted": True}
+    sections = env.client.get("/api/tv/state").json()["view"]["sections"]
+    assert [s["kind"] for s in sections] == [None, None]
+
+
+def test_tv_view_unknown_section_kind_is_422(env):
+    r = env.client.post("/api/tv/view", json=_home_view("bidule"))
+    assert r.status_code == 422 and r.json() == error_body("invalid", None)
+
+
+def test_tv_show_route_removed(env):
+    r = env.client.post("/api/tv/show", json={"screen": "home"})
+    assert r.status_code == 404

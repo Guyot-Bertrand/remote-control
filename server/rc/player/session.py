@@ -202,6 +202,24 @@ def _quality_rank(quality: str) -> int:
     return QUALITY_ORDER.index(quality) if quality in QUALITY_ORDER else len(QUALITY_ORDER)
 
 
+def pause_detail(conn: sqlite3.Connection, current: dict) -> str | None:
+    """Ligne de détail de la pause : « titre d'épisode · qualité résolution », parties
+    inconnues omises ; None si tout l'est (arbitrage 20)."""
+    row = conn.execute("SELECT quality, width, height FROM media_file WHERE id = ?",
+                       (current["media_file_id"],)).fetchone()
+    title = None
+    if current["target_kind"] == "episode":
+        ep = conn.execute("SELECT title FROM episode WHERE id = ?",
+                          (current["target_id"],)).fetchone()
+        title = (ep[0] or "").strip() if ep else None
+    quality, width, height = (row[0], row[1], row[2]) if row else ("", None, None)
+    parts = [quality or ""]
+    if width and height and width > 0 and height > 0:
+        parts.append(f"{width}\u202f×\u202f{height}")
+    group = " ".join(p for p in parts if p)
+    return " · ".join(p for p in (title, group) if p) or None
+
+
 @dataclass
 class _Session:
     current: dict
@@ -211,9 +229,10 @@ class _Session:
     tracks: MediaTracks
     path: Path
     paused: bool = False
-    # Vidéo mise de côté : "minimize" (mpv réduit) ou "restart" (mpv arrêté, relancé à
-    # la reprise ; position, durée et volume gardés dans l'état publié).
-    parked: Literal["minimize", "restart"] | None = None
+    # Vidéo mise de côté : "hide" (piste vidéo de mpv retirée, fenêtre fermée),
+    # "minimize" (mpv réduit) ou "restart" (mpv arrêté, relancé à la reprise ; position,
+    # durée et volume gardés dans l'état publié).
+    parked: Literal["hide", "minimize", "restart"] | None = None
     image: str | None = None  # adresse de la capture de cette pause
 
 
@@ -224,7 +243,7 @@ class PlaybackService:
                  on_catalog: Callable[[int], None] | None = None,
                  player_available: Callable[[], bool] = lambda: True,
                  pause_image: Path | None = None,
-                 pause_mode: Callable[[], str] = lambda: "restart") -> None:
+                 pause_mode: Callable[[], str] = lambda: "hide") -> None:
         self.conn, self.player, self.tv, self.bus = conn, player, tv, bus
         self.player_available = player_available  # exécutable du lecteur présent ?
         self.indexes_getter, self.clock = indexes_getter, clock
@@ -265,9 +284,15 @@ class PlaybackService:
         s = self._session
         if s is None or not self._state.paused:
             return None
-        return {"image": s.image, "title": s.current["title"],
+        return self._pause_dict(s, s.image)
+
+    def _pause_dict(self, s: _Session, image: str | None) -> dict:
+        """Objet `pause` de l'état télé, calculé à chaque appel (la résolution d'une
+        analyse arrivée pendant la pause apparaît)."""
+        return {"image": image, "title": s.current["title"],
                 "position": float(self._state.position),
-                "duration": self._state.duration, "work_id": s.current["work_id"]}
+                "duration": self._state.duration, "work_id": s.current["work_id"],
+                "detail": pause_detail(self.conn, s.current)}
 
     # -- lancement ------------------------------------------------------
 
@@ -282,10 +307,13 @@ class PlaybackService:
             return
         if self._is_current(req):
             try:
-                if self._session.parked == "minimize":
-                    self._check_tracks(self._session, req.audio, req.subtitle)
-                    await self._unminimize()
-                if await self._rejoin(req):
+                s = self._session
+                unparked = s.parked in ("hide", "minimize")
+                image = s.image  # effacée par la reprise, montrée jusqu'au retour
+                if unparked:
+                    self._check_tracks(s, req.audio, req.subtitle)
+                    await self._restore_video()
+                if await self._rejoin(req, unparked, image):
                     return
             except PlayError:
                 raise
@@ -324,13 +352,15 @@ class PlaybackService:
                 and s.current["target_id"] == req.target_id
                 and req.media_file_id in (None, s.current["media_file_id"]))
 
-    async def _rejoin(self, req: PlayRequest) -> bool:
+    async def _rejoin(self, req: PlayRequest, unparked: bool = False,
+                      image: str | None = None) -> bool:
         """Lecture demandée du média déjà en cours : pas de relance du lecteur (la télé
         ne clignote pas). « start » revient au début, « resume » garde la position ;
         pistes demandées appliquées (refusées si inconnues), pause levée.
 
         Faux si la lecture s'est terminée entre-temps (fin de fichier pendant une
-        commande) : l'appelant relance alors normalement."""
+        commande) : l'appelant relance alors normalement. Après une mise de côté
+        (`unparked`), la télé garde la capture `image` jusqu'au retour de la vidéo."""
         s = self._session
         assert s is not None
         self._check_tracks(s, req.audio, req.subtitle)
@@ -346,7 +376,10 @@ class PlaybackService:
             await self.player.set_pause(False)
         if self._session is not s:
             return False
-        if self.tv.state.screen != "playing":
+        if unparked:
+            self._await_video(s, image)
+            self._publish()
+        elif self.tv.state.screen != "playing":
             self.tv.set_playing(s.current["work_id"])
         return True
 
@@ -493,8 +526,9 @@ class PlaybackService:
     # -- mise de côté ---------------------------------------------------
 
     async def park(self) -> dict | None:
-        """Met de côté la vidéo en pause : capture, puis mpv réduit (`minimize`) ou
-        arrêté et relancé à la reprise (`restart`). None s'il n'y a rien à faire."""
+        """Met de côté la vidéo en pause : capture, puis piste vidéo retirée (`hide`),
+        mpv réduit (`minimize`) ou arrêté et relancé à la reprise (`restart`). None s'il
+        n'y a rien à faire."""
         async with self._lock:
             s = self._session
             if s is None or s.parked is not None or not self._state.paused:
@@ -510,7 +544,15 @@ class PlaybackService:
         s.image = await self._capture()
         if self._session is not s or not self._state.paused:  # fin pendant la capture
             return None
-        if self.pause_mode() == "minimize":
+        mode = self.pause_mode()
+        if mode == "hide":
+            try:
+                await self.player.set_video(False)
+                s.parked = "hide"
+            except Exception:
+                log.warning("masquage de la vidéo impossible, arrêt du lecteur",
+                            exc_info=True)
+        elif mode == "minimize":
             try:
                 await self.player.set_minimized(True)
                 s.parked = "minimize"
@@ -554,22 +596,28 @@ class PlaybackService:
         if req.subtitle is not None:
             s.subtitle = req.subtitle
 
-    async def _unminimize(self) -> None:
+    async def _restore_video(self) -> None:
+        """Rend la vidéo masquée (`hide`) ou réduite (`minimize`) ; un échec est
+        journalisé et la reprise continue."""
         s = self._session
         assert s is not None
+        mode = s.parked
         s.parked, s.image = None, None
         try:
-            await self.player.set_minimized(False)
+            if mode == "hide":
+                await self.player.set_video(True)
+            else:
+                await self.player.set_minimized(False)
         except Exception:
-            log.warning("restauration de la fenêtre impossible", exc_info=True)
+            log.warning("restauration de la vidéo impossible", exc_info=True)
 
     async def _unpark_locked(self) -> None:
         """Ramène la vidéo mise de côté, en plein écran et en lecture."""
         s = self._session
         assert s is not None and s.parked is not None
         image = s.image  # effacée par la reprise, montrée jusqu'au retour de la vidéo
-        if s.parked == "minimize":
-            await self._unminimize()
+        if s.parked in ("hide", "minimize"):
+            await self._restore_video()
             await self.player.set_pause(False)
         elif not await self._restart(s):
             return
@@ -581,9 +629,7 @@ class PlaybackService:
         celle que mpv va afficher) et ne passe en « lecture » qu'une fois mpv reparti,
         sous sa fenêtre plein écran : pas d'écran intermédiaire visible."""
         self._cancel_resuming()
-        info = {"image": image, "title": s.current["title"],
-                "position": self._state.position, "duration": self._state.duration,
-                "work_id": s.current["work_id"]}
+        info = self._pause_dict(s, image)
         if self.tv.state.screen != "paused" or self.tv.state.pause != info:
             self.tv.show_paused(info)
         timer = asyncio.get_running_loop().call_later(
@@ -687,8 +733,8 @@ class PlaybackService:
             self._state = state
             if moved:
                 self._video_moved(state)
-            if moved and s.parked == "minimize" and state.paused:
-                # mpv réduit suit les sauts : la vignette de pause aussi. En pause, mpv
+            if moved and s.parked in ("hide", "minimize") and state.paused:
+                # mpv masqué ou réduit suit les sauts : la vignette de pause aussi. En pause, mpv
                 # ne signale la position qu'à un saut (même rythme que la publication).
                 self.tv.update_pause(self.pause_info())
             changed = state.paused != s.paused

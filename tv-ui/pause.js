@@ -2,8 +2,8 @@
    - renderStateCorner(pause) : coin d'état en haut à droite (448×252) ; l'horloge
      sans pause, la vignette de la vidéo en pause sinon.
    - renderPausedFull(pause) : image en pause en plein écran (télécommande ouverte).
-   Chargé avant views.js et app.js ; utilise esc, fmtClock, clockText et dateText d'app.js
-   au moment du rendu. */
+   Chargé après common.js, avant sheets.js, views.js et app.js ; utilise esc, fmtClock,
+   clockText et dateText de common.js au moment du rendu. */
 'use strict';
 
 function pauseIcon(size) {
@@ -64,6 +64,7 @@ function renderPausedFull(pause) {
 <div class="paused-text">
 <span class="paused-head">EN PAUSE</span>
 <span class="paused-title">${esc(pauseTitle(pause.title))}</span>
+${pause.detail ? `<span class="paused-detail">${esc(pause.detail)}</span>` : ''}
 </div>
 <span class="paused-time" data-pause-time>${pauseTime(pause.position, pause.duration)}</span>
 </div>
@@ -89,6 +90,9 @@ function refreshPausedFull(root, pause) {
   if (!pause || !screen || !screen.classList.contains('paused-full')) return false;
   const img = screen.querySelector('.paused-art img');
   if ((img ? img.getAttribute('src') : null) !== (pause.image || null)) return false;
+  const detail = screen.querySelector('.paused-detail');
+  if (!!detail !== !!pause.detail) return false;
+  if (detail) detail.textContent = pause.detail;
   screen.querySelector('.paused-title').textContent = pauseTitle(pause.title);
   screen.querySelector('[data-pause-time]').textContent = pauseTime(pause.position, pause.duration);
   screen.querySelector('[data-pause-progress]').style.transform = `scaleX(${pauseRatio(pause.position, pause.duration)})`;

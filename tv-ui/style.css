@@ -367,6 +367,10 @@ svg { flex-shrink: 0; display: block; }
   font-family: var(--rc-font-display); font-weight: 500; font-size: 76px; line-height: 1.02; text-wrap: balance;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
+.paused-detail {
+  font-size: 32px; font-weight: 400; color: var(--rc-text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .paused-time {
   margin-left: auto; align-self: flex-end; white-space: nowrap;
   font-size: 44px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--rc-text);

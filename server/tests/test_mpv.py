@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 from rc.player import mpv as mpv_mod
-from rc.player.mpv import MpvClient, MpvError, MpvPlayer, MpvTimeout
+import rc.player.mpv as mpv_mod
+from rc.player.mpv import MpvClient, MpvError, MpvPlayer, MpvTimeout, volume_bar_ass
 from tests.fake_mpv import FakeMpv
 
 FAKE = Path(__file__).parent / "fake_mpv.py"
@@ -246,6 +247,30 @@ async def test_minimize_sets_window_minimized_only(make_player, tmp_path):
     await p.stop()
 
 
+async def test_set_video_keeps_and_restores_track(make_player, tmp_path):
+    p, states, log = make_player([], props={"vid": 2})
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_video(False)
+    cmds = logged(log)
+    assert ["get_property", "vid"] in cmds
+    assert cmds[-1] == ["set_property", "vid", "no"]
+    await p.set_video(True)
+    cmds = logged(log)
+    assert cmds[-2:] == [["set_property", "vid", 2], ["set_property", "fullscreen", True]]
+    await p.stop()
+
+
+async def test_set_video_restores_auto_when_unreadable(make_player, tmp_path):
+    p, states, log = make_player([], fail=["get_property"])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_video(False)
+    assert logged(log)[-1] == ["set_property", "vid", "no"]
+    await p.set_video(True)
+    cmds = logged(log)
+    assert cmds[-2:] == [["set_property", "vid", "auto"], ["set_property", "fullscreen", True]]
+    await p.stop()
+
+
 async def test_unminimize_restores_fullscreen(make_player, tmp_path):
     p, states, log = make_player([])
     await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
@@ -254,3 +279,42 @@ async def test_unminimize_restores_fullscreen(make_player, tmp_path):
     assert ["set_property", "window-minimized", False] in cmds
     assert ["set_property", "fullscreen", True] in cmds
     await p.stop()
+
+
+
+async def test_set_volume_draws_vertical_bar_then_hides_it(make_player, tmp_path, monkeypatch):
+    # Retour visuel sur la vidéo : barre verticale dessinée (osd-overlay), retirée après le délai.
+    monkeypatch.setattr(mpv_mod, "VOLUME_BAR_SECONDS", 0.2)
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_volume(70)
+    cmds = logged(log)
+    assert ["set_property", "volume", 70] in cmds
+    assert cmds[-1] == ["osd-overlay", mpv_mod.VOLUME_OVERLAY_ID, "ass-events", volume_bar_ass(70),
+                        1920, 1080]
+    argv = next(c for c in cmds if c[0] == "argv")
+    assert "--volume-max=100" in argv
+    await wait_for(lambda: logged(log)[-1][:3] == ["osd-overlay", mpv_mod.VOLUME_OVERLAY_ID, "none"])
+    await p.stop()
+
+
+async def test_new_volume_restarts_bar_delay(make_player, tmp_path, monkeypatch):
+    monkeypatch.setattr(mpv_mod, "VOLUME_BAR_SECONDS", 0.3)
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_volume(70)
+    await asyncio.sleep(0.2)
+    await p.set_volume(75)
+    await asyncio.sleep(0.2)  # 0,4 s après le premier appui, 0,2 s après le second
+    assert not any(c[:3] == ["osd-overlay", mpv_mod.VOLUME_OVERLAY_ID, "none"] for c in logged(log))
+    await wait_for(lambda: logged(log)[-1][:3] == ["osd-overlay", mpv_mod.VOLUME_OVERLAY_ID, "none"])
+    await p.stop()
+
+
+def test_volume_bar_geometry():
+    # Barre verticale à 6 % du bord droit (repère 1920 × 1080), remplie depuis le bas.
+    full, half, empty = volume_bar_ass(100), volume_bar_ass(50), volume_bar_ass(0)
+    assert full.count("\\p1") == 2 and half.count("\\p1") == 2
+    assert empty.count("\\p1") == 1  # piste seule, pas de remplissage
+    assert " 1805 " in full  # bord droit de la barre : 1920 × 0,94
+    assert half != full

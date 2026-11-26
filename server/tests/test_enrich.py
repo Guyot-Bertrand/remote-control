@@ -1,6 +1,6 @@
 import pytest
 
-from rc.api.serialize import enrich
+from rc.api.serialize import _AVAILABILITY_QUERIES, _availability, enrich
 from rc.db import open_db
 
 
@@ -115,3 +115,34 @@ def test_remaining_never_negative(conn):
     conn.execute("UPDATE progress SET position = 6000.0 WHERE target_kind = 'work'")
     o = enrich(conn, [{"kind": "work", "id": A}], None)[0]
     assert o["remaining_min"] == 0
+
+
+def _serie_absent(conn):
+    """Série D toute absente : premier fichier (plus petit id) sur ARCH, second sur VIDEOS ;
+    œuvre E sans fichier."""
+    conn.execute("INSERT INTO volume (uuid, label, present, rev) VALUES ('U3', 'ARCH', 0, 1)")
+    _work(conn, 4, "Delta", episodic=1, type_="serie")
+    conn.execute("INSERT INTO season_identity (id, work_id, number) VALUES (11, 4, 1)")
+    conn.execute("INSERT INTO season (id, work_id, number, rev) VALUES (11, 4, 1, 1)")
+    for eid, vol in ((21, "U3"), (22, "U2")):
+        conn.execute("INSERT INTO episode_identity (id, season_id, number) VALUES (?, 11, ?)",
+                     (eid, eid))
+        conn.execute("INSERT INTO episode (id, season_id, number, rev) VALUES (?, 11, ?, 1)",
+                     (eid, eid))
+        _file(conn, episode=eid, volume=vol, present=0, rel=f"d{eid}.mkv")
+    _work(conn, 5, "Echo")
+
+
+def test_availability_same_as_before(conn):
+    _serie_absent(conn)
+    assert _availability(conn, [A, B, C, 4, 5, 999]) == {
+        A: (True, None), B: (False, "VIDEOS"), C: (True, None),
+        4: (False, "ARCH"), 5: (False, None), 999: (False, None)}
+    assert _availability(conn, []) == {}
+
+
+def test_availability_uses_indexes(conn):
+    for sql in _AVAILABILITY_QUERIES:
+        plan = " | ".join(r[3] for r in conn.execute("EXPLAIN QUERY PLAN " + sql.format(marks="?,?"),
+                                                      [1, 2]))
+        assert "SCAN media_file" not in plan and "SCAN mf" not in plan, plan

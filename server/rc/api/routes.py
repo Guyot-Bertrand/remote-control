@@ -77,12 +77,6 @@ class SubSelBody(RootModel[SubSelModel]):
     pass
 
 
-class TvShowBody(BaseModel):
-    screen: Literal["home", "work", "season"]
-    id: int | None = None
-    force: bool = False
-
-
 class ItemRef(BaseModel):
     kind: Literal["work", "episode", "collection"]
     id: int
@@ -96,6 +90,7 @@ class Person(BaseModel):
 
 class Section(BaseModel):
     label: str
+    kind: Literal["resume", "recent", "collections", "people", "works", "aka"] | None = None
     people: list[Person] = Field(default_factory=list, max_length=40)
     items: list[ItemRef] = Field(default_factory=list, max_length=40)
 
@@ -253,22 +248,6 @@ def build_router(services: Services) -> APIRouter:
             return not_found()
         return FileResponse(path, media_type="image/jpeg",
                             headers={"Cache-Control": CACHE_IMMUTABLE})
-
-    @router.post("/tv/show")
-    async def tv_show(body: TvShowBody):
-        if body.screen == "home":
-            return {"shown": s.tv.show("home", force=body.force)}
-        if body.id is None:
-            return invalid()
-        if body.screen == "work":
-            if s.conn.execute("SELECT 1 FROM work WHERE id = ?", (body.id,)).fetchone() is None:
-                return not_found()
-            return {"shown": s.tv.show("work", work_id=body.id, force=body.force)}
-        r = s.conn.execute("SELECT work_id FROM season WHERE id = ?", (body.id,)).fetchone()
-        if r is None:
-            return not_found()
-        return {"shown": s.tv.show("season", work_id=r["work_id"], season_id=body.id,
-                                   force=body.force)}
 
     @router.get("/tv/home")
     async def tv_home():

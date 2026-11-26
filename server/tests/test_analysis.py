@@ -1,3 +1,5 @@
+import asyncio
+import os
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -5,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from rc import analysis
-from rc.analysis import analysis_loop, analyze_file, pending_files
+from rc.analysis import (analysis_loop, analyze_file, pending_files, recheck_candidates,
+                         stale_files)
 from rc.api.serialize import row
 from rc.app import AppState
 from rc.config import Config
@@ -87,7 +90,7 @@ def test_probe_failure_marks_file_and_is_not_retried(conn, tmp_path, monkeypatch
     assert "f.mp4" in caplog.text
     conn.execute("UPDATE media_file SET volume_uuid = 'u'")
     monkeypatch.setattr(analysis, "resolve_media_path", lambda c, i, ix: tmp_path / "f.mp4")
-    assert pending_files(conn, {"u": {}}, recheck=False) == []
+    assert pending_files(conn, {"u": {}}) == []
     d = row(conn.execute("SELECT * FROM media_file WHERE id = 1").fetchone())
     assert d["width"] is None and d["height"] is None
     assert d["duration_s"] is None and d["audio_langs"] is None
@@ -97,12 +100,54 @@ def test_pending_files(conn, tmp_path, monkeypatch):
     conn.execute("UPDATE media_file SET volume_uuid = 'u'")
     p = tmp_path / "f.mp4"
     monkeypatch.setattr(analysis, "resolve_media_path", lambda c, i, ix: p)
-    assert pending_files(conn, {"u": {}}, recheck=False) == [(1, p)]
+    assert pending_files(conn, {"u": {}}) == [(1, p)]
     conn.execute("UPDATE media_file SET width = 10")
-    assert pending_files(conn, {"u": {}}, recheck=False) == []
-    assert pending_files(conn, {"u": {}}, recheck=True) == [(1, p)]
+    assert pending_files(conn, {"u": {}}) == []
+    conn.execute("UPDATE media_file SET width = NULL, present = 0")
+    assert pending_files(conn, {"u": {}}) == []
+
+
+def stat_of(p):
+    st = os.stat(p)
+    return st.st_mtime, st.st_size
+
+
+def test_recheck_skips_files_matching_probe_cache(tmp_path):
+    p = tmp_path / "f.mp4"
+    p.write_bytes(b"abc")
+    m, sz = stat_of(p)
+    assert stale_files([(1, p, m, sz)]) == []
+
+
+def test_recheck_keeps_modified_files(tmp_path):
+    p = tmp_path / "f.mp4"
+    p.write_bytes(b"abc")
+    m, sz = stat_of(p)
+    assert stale_files([(1, p, m, sz + 1)]) == [(1, p)]
+    assert stale_files([(1, p, m + 1, sz)]) == [(1, p)]
+
+
+def test_recheck_keeps_files_without_cache(tmp_path):
+    p = tmp_path / "f.mp4"
+    p.write_bytes(b"abc")
+    assert stale_files([(1, p, None, None)]) == [(1, p)]
+
+
+def test_recheck_keeps_files_that_cannot_be_stat(tmp_path):
+    p = tmp_path / "gone.mp4"
+    assert stale_files([(1, p, 1.0, 3)]) == [(1, p)]
+
+
+def test_recheck_candidates_reads_cache_without_stat(conn, tmp_path, monkeypatch):
+    conn.execute("UPDATE media_file SET volume_uuid = 'u'")
+    p = tmp_path / "missing.mp4"
+    monkeypatch.setattr(analysis, "resolve_media_path", lambda c, i, ix: p)
+    assert recheck_candidates(conn, {"u": {}}) == [(1, p, None, None)]
+    conn.execute("INSERT INTO probe_cache (media_file_id, mtime, size, tracks_json)"
+                 " VALUES (1, 5.5, 9, '{}')")
+    assert recheck_candidates(conn, {"u": {}}) == [(1, p, 5.5, 9)]
     conn.execute("UPDATE media_file SET present = 0")
-    assert pending_files(conn, {"u": {}}, recheck=True) == []
+    assert recheck_candidates(conn, {"u": {}}) == []
 
 
 # -- boucle ----------------------------------------------------------------
@@ -139,7 +184,7 @@ def patch_loop(monkeypatch, state, step):
     analyzed = []
     files = [(i, Path(f"/x/f{i}.mp4")) for i in (1, 2, 3)]
     monkeypatch.setattr(analysis, "pending_files",
-                        lambda conn, ix, recheck: [f for f in files if f[0] not in analyzed])
+                        lambda conn, ix: [f for f in files if f[0] not in analyzed])
 
     def fake(db_file, mf_id, path):
         analyzed.append(mf_id)
@@ -194,8 +239,9 @@ async def test_loop_announces_again_after_30s(state, monkeypatch):
 
 async def test_loop_rechecks_after_new_full_index(state, monkeypatch):
     seen = []
-    monkeypatch.setattr(analysis, "pending_files",
-                        lambda conn, ix, recheck: seen.append(recheck) or [])
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: seen.append(False) or [])
+    monkeypatch.setattr(analysis, "recheck_candidates", lambda conn, ix: [])
+    monkeypatch.setattr(analysis, "stale_files", lambda c: seen.append(True) or [])
     state.last_full_index = 100.0
     sleeps = []
 
@@ -211,15 +257,46 @@ async def test_loop_rechecks_after_new_full_index(state, monkeypatch):
     assert seen == [True, False, True]
 
 
+async def test_loop_recheck_stats_in_thread(state, monkeypatch):
+    files = [(i, Path(f"/x/f{i}.mp4")) for i in (1, 2, 3)]
+    cands = [(i, p, 1.0, 1) for i, p in files]
+    monkeypatch.setattr(analysis, "recheck_candidates", lambda conn, ix: cands)
+    def fake_stale(c):
+        return [f for f in files if f[0] == 2]
+
+    monkeypatch.setattr(analysis, "stale_files", fake_stale)
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    threaded = []
+    real_to_thread = asyncio.to_thread
+
+    async def spy(fn, *a, **k):
+        threaded.append(fn)
+        return await real_to_thread(fn, *a, **k)
+
+    monkeypatch.setattr(analysis.asyncio, "to_thread", spy)
+    analyzed = []
+
+    def fake(db_file, mf_id, path):
+        analyzed.append(mf_id)
+        return False
+
+    monkeypatch.setattr(analysis, "_analyze_in_thread", fake)
+    state.last_full_index = 100.0
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=stop_sleep)
+    assert fake_stale in threaded
+    assert analyzed == [2]
+
+
 async def test_loop_survives_transient_errors(state, monkeypatch, caplog):
     analyzed = patch_loop(monkeypatch, state, 3.0)
     real_pending = analysis.pending_files
     fail = {"pending": True}
 
-    def flaky_pending(conn, ix, recheck):
+    def flaky_pending(conn, ix):
         if fail.pop("pending", False):
             raise RuntimeError("liste indisponible")
-        return real_pending(conn, ix, recheck)
+        return real_pending(conn, ix)
 
     monkeypatch.setattr(analysis, "pending_files", flaky_pending)
     import rc.app
@@ -320,3 +397,38 @@ def test_nan_or_infinite_duration_is_ignored(conn, monkeypatch, tmp_path):
         assert r["duration_s"] is None and r["width"] == 624
         assert conn.execute("SELECT duration_min FROM episode").fetchone()[0] is None
         json.dumps(row(r), allow_nan=False)
+
+
+async def test_loop_rechecks_playback_after_stale_files(state, monkeypatch):
+    """Une lecture lancée pendant la vérification des fichiers suspend l'analyse : la
+    file est gardée et reprise après la lecture."""
+    files = [(i, Path(f"/x/f{i}.mp4")) for i in (1, 2)]
+    monkeypatch.setattr(analysis, "recheck_candidates",
+                        lambda conn, ix: [(i, p, 1.0, 1) for i, p in files])
+
+    def fake_stale(c):
+        state.playback.current = {"id": 1}  # lecture lancée pendant le thread
+        return list(files)
+
+    monkeypatch.setattr(analysis, "stale_files", fake_stale)
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    analyzed = []
+    monkeypatch.setattr(analysis, "_analyze_in_thread",
+                        lambda db, mf_id, path: analyzed.append(mf_id) or False)
+    state.last_full_index = 100.0
+    sleeps = []
+    seen = []  # fichiers analysés à chaque attente
+
+    async def sleep(s):
+        sleeps.append(s)
+        seen.append(list(analyzed))
+        if len(sleeps) == 2:
+            state.playback.current = None  # fin de la lecture
+        if len(sleeps) == 3:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert sleeps[:2] == [7.0, 7.0]
+    assert seen[:2] == [[], []]  # rien d'analysé pendant la lecture
+    assert analyzed == [1, 2]

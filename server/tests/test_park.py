@@ -12,7 +12,8 @@ from rc.events import EventBus
 from rc.fake_tree import make_fake_tree
 from rc.player import session as session_mod
 from rc.player.base import PlayerState
-from rc.player.session import PlaybackService, PlayError, PlayRequest, TvController
+from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
+                               pause_detail)
 from rc.probe import MediaTracks, Track
 from rc.volumes import Volume, build_index, locate_files
 
@@ -99,7 +100,8 @@ async def test_park_restart_captures_saves_and_stops(env):
     assert ("stop",) in env.player.calls
     assert info["position"] == 1394 and info["image"].endswith("v=1")
     assert info == {"image": "/api/player/pause.jpg?v=1", "title": "Ava",
-                    "position": 1394.0, "duration": 6000.0, "work_id": 1}
+                    "position": 1394.0, "duration": 6000.0, "work_id": 1,
+                    "detail": pause_detail(env.conn, env.svc.current)}
     assert env.svc.parked
     assert env.svc.state.running and env.svc.state.paused
     assert env.svc.state.position == 1394
@@ -271,6 +273,10 @@ async def test_play_same_media_while_minimized_unparks(env):
     assert env.player.calls[0] == ("set_minimized", False)
     assert ("set_pause", False) in env.player.calls
     assert env.player.starts() == [] and not env.svc.parked
+    # pas d'écran « lecture » intermédiaire pendant que mpv revient
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert env.tv.state.screen == "playing"
 
 
 async def test_minimize_failure_falls_back_to_restart(env):
@@ -401,3 +407,145 @@ async def test_resume_falls_back_to_playing_without_player_event(env, monkeypatc
     await env.svc.pause(False)
     await asyncio.sleep(0.01)
     assert env.tv.state.screen == "playing"
+
+
+async def test_park_hide_keeps_player_running(env):
+    env.mode = "hide"
+    info = await parked(env)
+    assert ("set_video", False) in env.player.calls
+    assert ("stop",) not in env.player.calls
+    assert info["image"] == "/api/player/pause.jpg?v=1"
+    assert env.svc.parked
+    st = env.svc.state
+    assert st.running and st.paused and st.position == 1394
+    env.player.calls.clear()
+    await env.svc.pause(False)
+    assert env.player.calls == [("set_video", True), ("set_pause", False)]
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert not env.svc.parked and env.tv.state.screen == "playing"
+
+
+async def test_play_same_media_while_hidden_unparks(env):
+    env.mode = "hide"
+    await parked(env)
+    env.player.calls.clear()
+    await env.svc.play(PlayRequest("work", 1, "resume"))
+    assert env.player.calls[0] == ("set_video", True)
+    assert ("set_pause", False) in env.player.calls
+    assert env.player.starts() == [] and not env.svc.parked
+    # pas d'écran « lecture » intermédiaire pendant que mpv rouvre sa fenêtre
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert env.tv.state.screen == "playing"
+
+
+async def test_hide_failure_falls_back_to_restart(env):
+    env.mode = "hide"
+    env.player.video_error = RuntimeError("pas de vidéo")
+    await parked(env)
+    calls = env.player.calls
+    assert ("set_video", False) in calls and ("stop",) in calls
+    assert calls.index(("set_video", False)) < calls.index(("stop",))
+    assert env.svc._session.parked == "restart" and env.svc.current is not None
+    env.player.calls.clear()
+    await env.svc.pause(False)
+    assert env.player.starts()[-1]["start_at"] == 1394
+    assert ("set_video", True) not in env.player.calls
+
+
+async def test_seek_while_hidden_updates_pause_tile(env):
+    env.mode = "hide"
+    await parked(env)
+    env.tv.show_view({"screen": "browse"}, env.svc.pause_info())
+    await env.svc.seek(1500, False)
+    assert ("seek", 1500, False) in env.player.calls
+    emit(env, position=1500.0, duration=6000.0, paused=True, audio=1)  # mpv suit le saut
+    assert env.tv.state.screen == "view"
+    assert env.tv.state.pause["position"] == 1500
+
+
+async def test_volume_and_tracks_while_hidden_go_to_player(env):
+    env.mode = "hide"
+    await parked(env)
+    await env.svc.set_volume(40)
+    await env.svc.set_audio(2)
+    assert ("set_volume", 40) in env.player.calls
+    assert ("set_audio", 2) in env.player.calls
+    assert env.svc.parked
+
+
+async def test_stop_while_hidden_stops_player(env):
+    env.mode = "hide"
+    await parked(env)
+    await env.svc.stop()
+    assert env.player.calls.count(("stop",)) == 1
+    assert env.svc.current is None and not env.svc.parked
+    assert env.tv.state.screen != "paused"
+
+
+async def test_restore_video_failure_still_resumes(env, caplog):
+    env.mode = "hide"
+    await parked(env)
+    env.player.video_error = RuntimeError("piste vidéo introuvable")
+    env.player.calls.clear()
+    with caplog.at_level("WARNING"):
+        await env.svc.pause(False)
+    assert ("set_pause", False) in env.player.calls
+    assert env.svc.current is not None and not env.svc.parked
+    assert any(r.levelname == "WARNING"
+               and "restauration de la vidéo impossible" in r.getMessage()
+               for r in caplog.records)
+
+
+# -- ligne de détail de la pause (arbitrage 20) ---------------------------------
+
+def _episode_current(conn, title, quality, width, height):
+    row = conn.execute("SELECT id FROM episode LIMIT 1").fetchone()
+    conn.execute("UPDATE episode SET title = ? WHERE id = ?", (title, row[0]))
+    mf = conn.execute("SELECT id FROM media_file WHERE episode_id = ? LIMIT 1",
+                      (row[0],)).fetchone()
+    if mf is None:
+        conn.execute("INSERT INTO media_file (episode_id, quality, relpath, subtitles_json)"
+                     " VALUES (?, ?, 'x', '[]')", (row[0], quality))
+        mf = conn.execute("SELECT last_insert_rowid()").fetchone()
+    conn.execute("UPDATE media_file SET quality = ?, width = ?, height = ? WHERE id = ?",
+                 (quality, width, height, mf[0]))
+    return {"target_kind": "episode", "target_id": row[0], "media_file_id": mf[0]}
+
+
+def _film_current(conn, quality, width, height):
+    mf = conn.execute("SELECT id FROM media_file WHERE work_id = 1 LIMIT 1").fetchone()
+    conn.execute("UPDATE media_file SET quality = ?, width = ?, height = ? WHERE id = ?",
+                 (quality, width, height, mf[0]))
+    return {"target_kind": "work", "target_id": 1, "media_file_id": mf[0]}
+
+
+def test_pause_detail_episode(env):
+    cur = _episode_current(env.conn, "Hiros", "SD", 624, 352)
+    assert pause_detail(env.conn, cur) == "Hiros · SD 624\u202f×\u202f352"
+
+
+def test_pause_detail_film_without_analysis(env):
+    assert pause_detail(env.conn, _film_current(env.conn, "FHD", None, None)) == "FHD"
+
+
+def test_pause_detail_omits_empty_episode_title_and_zero_width(env):
+    cur = _episode_current(env.conn, "", "SD", 0, 0)
+    assert pause_detail(env.conn, cur) == "SD"
+
+
+def test_pause_detail_none_when_nothing_known(env):
+    assert pause_detail(env.conn, _film_current(env.conn, "", None, None)) is None
+
+
+async def test_pause_info_carries_detail(env):
+    await paused_at_1394(env)
+    cur = env.svc.current
+    env.conn.execute("UPDATE media_file SET quality = 'HD', width = 1280, height = 720"
+                     " WHERE id = ?", (cur["media_file_id"],))
+    info = await env.svc.park()
+    assert info["detail"] == pause_detail(env.conn, cur)
+    assert info["detail"] is not None and "HD" in info["detail"]
+    await env.svc.pause(False)  # reprise : l'objet de _await_video le porte aussi
+    assert env.tv.state.pause["detail"] == info["detail"]

@@ -18,6 +18,32 @@ log = logging.getLogger("rc.player.mpv")
 OBSERVED = ("time-pos", "duration", "pause", "volume", "aid", "sid", "eof-reached")
 COMMAND_TIMEOUT = 5  # secondes : au-delà, mpv est considéré comme figé
 
+# Barre de volume dessinée sur la vidéo à chaque réglage (calque ASS de mpv, repère 1920 × 1080).
+VOLUME_OVERLAY_ID = 1
+VOLUME_BAR_SECONDS = 5.0
+_OSD_W, _OSD_H = 1920, 1080
+
+
+def _rect(x0: int, y0: int, x1: int, y1: int) -> str:
+    return f"m {x0} {y0} l {x1} {y0} {x1} {y1} {x0} {y1}"
+
+
+def volume_bar_ass(level: int) -> str:
+    """Barre verticale à 6 % du bord droit, 40 % de la hauteur, remplie depuis le bas."""
+    w, h = 24, round(_OSD_H * 0.40)
+    x1 = round(_OSD_W * 0.94)
+    x0, y0 = x1 - w, (_OSD_H - h) // 2
+    y1 = y0 + h
+    head = "{\\an7\\pos(0,0)\\shad0"
+    # Piste : blanc translucide, liseré sombre pour rester lisible sur une image claire.
+    track = f"{head}\\bord2\\1c&HFFFFFF&\\1a&HB0&\\3c&H000000&\\3a&H60&\\p1}}{_rect(x0, y0, x1, y1)}{{\\p0}}"
+    level = max(0, min(100, level))
+    if level == 0:
+        return track
+    fy = y1 - round(h * level / 100)
+    fill = f"{head}\\bord0\\1c&HFFFFFF&\\1a&H00&\\p1}}{_rect(x0, fy, x1, y1)}{{\\p0}}"
+    return f"{track}\n{fill}"
+
 
 class MpvError(Exception):
     pass
@@ -149,6 +175,8 @@ class MpvPlayer:
         self._audio: int | None = None
         self._subtitle: SubSel = {"kind": "none"}
         self._stopping = False
+        self._vid_kept: Any = None  # piste vidéo retirée par set_video(False)
+        self._volume_bar_timer: asyncio.TimerHandle | None = None  # retrait de la barre de volume
 
     # -- cycle de vie ---------------------------------------------------
 
@@ -160,11 +188,13 @@ class MpvPlayer:
         self._embedded = 0
         self._audio, self._subtitle = audio, subtitle
         self._stopping = False
+        self._vid_kept = None
         self.state = PlayerState(running=True)
         args = [
             self.mpv_path, "--fs", "--no-terminal", "--idle=no",
             f"--input-ipc-server={self._sock}", "--hwdec=auto-safe",
             "--alang=fr,fre,fra", "--slang=fr,fre,fra", f"--start={start_at}",
+            "--volume-max=100",  # bornes de l'API (0 à 100)
             *("--sub-file=" + str(p) for p in self._external),
             *self.extra_args, str(path),
         ]
@@ -282,7 +312,27 @@ class MpvPlayer:
         await self._c().command("seek", seconds, "relative" if relative else "absolute")
 
     async def set_volume(self, level: int) -> None:
-        await self._c().set_property("volume", level)
+        client = self._c()
+        await client.set_property("volume", level)
+        # Retour visuel : barre verticale sur la vidéo, retirée VOLUME_BAR_SECONDS après le
+        # dernier réglage. Le calque appartient à cette connexion IPC (gardée ouverte).
+        with contextlib.suppress(Exception):
+            await client.command("osd-overlay", VOLUME_OVERLAY_ID, "ass-events",
+                                 volume_bar_ass(level), _OSD_W, _OSD_H)
+            self._cancel_volume_bar()
+            self._volume_bar_timer = asyncio.get_running_loop().call_later(
+                VOLUME_BAR_SECONDS, lambda: asyncio.ensure_future(self._hide_volume_bar(client)))
+
+    def _cancel_volume_bar(self) -> None:
+        if self._volume_bar_timer is not None:
+            self._volume_bar_timer.cancel()
+            self._volume_bar_timer = None
+
+    async def _hide_volume_bar(self, client: "MpvClient") -> None:
+        self._volume_bar_timer = None
+        if client is self._client:
+            with contextlib.suppress(Exception):
+                await client.command("osd-overlay", VOLUME_OVERLAY_ID, "none", "")
 
     async def set_audio(self, index: int | None) -> None:
         await self._c().set_property("aid", "auto" if index is None else index)
@@ -299,8 +349,23 @@ class MpvPlayer:
         if not minimized:
             await self._c().set_property("fullscreen", True)
 
+    async def set_video(self, enabled: bool) -> None:
+        """Retire la piste vidéo (mpv ferme sa fenêtre) ou la rend, en plein écran."""
+        client = self._c()
+        if not enabled:
+            try:
+                vid = await client.command("get_property", "vid")
+            except MpvError:
+                vid = None
+            self._vid_kept = None if vid is False or vid == "no" else vid
+            await client.set_property("vid", "no")
+            return
+        await client.set_property("vid", self._vid_kept if self._vid_kept is not None else "auto")
+        await client.set_property("fullscreen", True)
+
     async def stop(self) -> None:
         self._stopping = True
+        self._cancel_volume_bar()
         if self._client is not None and self._proc and self._proc.returncode is None:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(self._client.command("quit"), 1)
