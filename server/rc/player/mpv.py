@@ -312,7 +312,7 @@ class MpvPlayer:
             self._vid_kept = None if vid is False or vid == "no" else vid
             await client.set_property("vid", "no")
             return
-        await client.set_property("vid", self._vid_kept or "auto")
+        await client.set_property("vid", self._vid_kept if self._vid_kept is not None else "auto")
         await client.set_property("fullscreen", True)
 
     async def stop(self) -> None:

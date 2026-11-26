@@ -434,7 +434,9 @@ async def test_hide_failure_falls_back_to_restart(env):
     env.mode = "hide"
     env.player.video_error = RuntimeError("pas de vidéo")
     await parked(env)
-    assert ("stop",) in env.player.calls
+    calls = env.player.calls
+    assert ("set_video", False) in calls and ("stop",) in calls
+    assert calls.index(("set_video", False)) < calls.index(("stop",))
     assert env.svc._session.parked == "restart" and env.svc.current is not None
     env.player.calls.clear()
     await env.svc.pause(False)
@@ -481,4 +483,6 @@ async def test_restore_video_failure_still_resumes(env, caplog):
         await env.svc.pause(False)
     assert ("set_pause", False) in env.player.calls
     assert env.svc.current is not None and not env.svc.parked
-    assert any(r.levelname == "WARNING" for r in caplog.records)
+    assert any(r.levelname == "WARNING"
+               and "restauration de la vidéo impossible" in r.getMessage()
+               for r in caplog.records)
