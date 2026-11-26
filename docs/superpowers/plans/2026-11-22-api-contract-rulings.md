@@ -73,3 +73,17 @@ Complète la Task 10 du plan serveur ; fait foi pour le serveur et l'appli Andro
     - les commandes `seek`, `volume`, `audio`, `subtitle` sont acceptées (200) et appliquées à la relance ;
     - `pause` `false` (ou une demande de lecture du même média) relance la vidéo ;
     - `stop` termine la lecture.
+
+## Ajouts (2026-11-26, étape 3)
+
+20. **`pause.detail`** (état télé, objet `pause`) : texte prêt à afficher, ou `null`. Le serveur le compose à partir du fichier en lecture :
+    - épisode : « titre de l'épisode · qualité résolution », par exemple « Hiros · SD 624 × 352 » ;
+    - film : « qualité résolution », par exemple « FHD 1920 × 1080 » ;
+    - la qualité est le code du catalogue (`media_file.quality`), la résolution vient de l'analyse (`width` × `height`, avec une espace fine insécable U+202F de chaque côté du « × ») ;
+    - une partie inconnue (titre d'épisode vide, résolution non analysée ou nulle) est omise ; `detail` vaut `null` si tout l'est.
+    La télé l'affiche sous le titre, en plein écran (`paused`) seulement.
+21. **`sections[].kind`** (vue du téléphone, `POST /api/tv/view`) : `resume`, `recent`, `collections`, `people`, `works` ou `aka`, facultatif (`null` accepté). Toute autre valeur donne 422 `invalid`. Le serveur le transmet tel quel dans `view.sections`. La télé choisit la mise en page de la section selon `kind`, et sans `kind` selon la règle précédente (titre et contenu).
+    - accueil : « Reprendre » → `resume`, « Récemment ajoutés » → `recent`, « Collections » → `collections` ;
+    - recherche : « Personnes » → `people`, « Œuvres » → `works`, « Aussi connu sous » → `aka`.
+22. **`POST /api/tv/show` est retirée** (404). Les écrans `home`, `work` et `season` de l'état télé restent : la veille utilise `home`.
+23. **`pause_background`** (config serveur) vaut `hide` par défaut : la piste vidéo de mpv est retirée pendant la pause (fenêtre fermée, mpv lancé et en pause), puis rendue à la reprise. Les commandes `seek`, `volume`, `audio`, `subtitle` et `pause` vont directement à mpv, comme en `minimize`. Valeurs : `hide`, `restart`, `minimize` ; une valeur inconnue donne `hide`.
