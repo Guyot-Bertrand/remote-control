@@ -14,13 +14,13 @@ import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.ui.common.FilePills
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -184,96 +184,37 @@ class RemoteViewModelTest {
 
     private fun withVolume(level: Int) = playing.copy(state = playing.state.copy(volume = level))
 
-    @Test fun volume_step_moves_slider_immediately() = runBlocking {
+    @Test fun slider_follows_volume_keys_pending_value() = runBlocking {
         api.playerStateResult = ApiResult.Ok(withVolume(50))
-        val vm = viewModel()
-        vm.volumeStep(true)
-        assertEquals(55, vm.state.value.volume)
-    }
-
-    @Test fun volume_step_clamps() = runBlocking {
-        api.playerStateResult = ApiResult.Ok(withVolume(98))
-        val vm = viewModel()
-        vm.volumeStep(true)
-        // 98 est à la tolérance de 100 : le curseur est déjà relâché, la cible envoyée le prouve.
-        assertEquals(listOf("volume(100)"), commands("volume"))
-    }
-
-    @Test fun volume_step_clamps_at_zero() = runBlocking {
-        api.playerStateResult = ApiResult.Ok(withVolume(3))
-        val vm = viewModel()
-        vm.volumeStep(false)
-        assertEquals(listOf("volume(0)"), commands("volume"))
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun volume_keys_coalesced_last_value_wins() = virtualTest { vt ->
-        api.playerStateResult = ApiResult.Ok(withVolume(50))
-        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 200L).also { vms += it }
-        observe(vm, vt)
-        repeat(6) { vm.volumeStep(true) }
-        advanceTimeBy(50)
-        advanceTimeBy(300)
-        assertEquals(listOf("volume(55)", "volume(80)"), commands("volume"))
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun volume_sends_are_serialised_on_slow_network() = virtualTest { vt ->
-        api.playerStateResult = ApiResult.Ok(withVolume(50))
-        val gate = CompletableDeferred<Unit>()
-        api.volumeGate = gate
-        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 200L).also { vms += it }
-        observe(vm, vt)
-        vm.volumeStep(true)
-        advanceTimeBy(50)
-        repeat(3) { vm.volumeStep(true) }
-        advanceTimeBy(1_000)
-        assertEquals(listOf("volume(55)"), commands("volume")) // la réponse n'est pas venue : pas de second envoi
-        gate.complete(Unit)
-        advanceTimeBy(300)
-        assertEquals(listOf("volume(55)", "volume(70)"), commands("volume"))
-    }
-
-    @Test fun volume_key_failure_shows_message() = runBlocking {
-        api.playerStateResult = ApiResult.Ok(withVolume(50))
-        api.volumeResult = ApiResult.Err(ApiError.Unreachable)
-        val vm = viewModel()
-        vm.volumeStep(true)
-        assertEquals("Serveur injoignable", withTimeout(5_000) { vm.state.first { it.message != null } }.message)
-        assertEquals(50, withTimeout(5_000) { vm.state.first { it.volume == 50 } }.volume)
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun volume_same_level_retargeted_is_still_sent() = virtualTest { vt ->
-        api.playerStateResult = ApiResult.Ok(withVolume(50))
-        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 250L).also { vms += it }
-        observe(vm, vt)
-        vm.volumeStep(true)
-        advanceTimeBy(10)
-        push(withVolume(55))
-        advanceTimeBy(300) // envoi de 55 fini, tenue relâchée, cible effacée
-        // Le serveur redescend à 50 ; + puis − puis + dans l'intervalle : 55, 50, 55.
-        push(withVolume(50))
-        vm.volumeStep(true)
-        vm.volumeStep(false)
-        vm.volumeStep(true)
-        advanceTimeBy(10)
-        assertEquals(listOf("volume(55)", "volume(55)"), commands("volume"))
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun volume_same_level_after_failure_returns_slider() = virtualTest { vt ->
-        api.playerStateResult = ApiResult.Ok(withVolume(50))
-        api.volumeResult = ApiResult.Err(ApiError.Unreachable)
-        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 250L).also { vms += it }
-        observe(vm, vt)
-        vm.volumeStep(true)
-        advanceTimeBy(300)
+        val pending = MutableStateFlow<Int?>(null)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), pendingVolume = pending).also { vms += it }
+        observe(vm, scope)
         assertEquals(50, vm.state.value.volume)
-        vm.volumeStep(true) // même cible 55 que l'envoi échoué
-        advanceTimeBy(300)
-        assertEquals(listOf("volume(55)", "volume(55)"), commands("volume"))
+        pending.value = 65
+        assertEquals(65, vm.state.value.volume)
+        pending.value = null
         assertEquals(50, vm.state.value.volume)
+    }
+
+    @Test fun finger_keeps_priority_over_volume_keys() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val pending = MutableStateFlow<Int?>(65)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), pendingVolume = pending).also { vms += it }
+        observe(vm, scope)
+        vm.onVolumeDrag(30)
+        assertEquals(30, vm.state.value.volume)
+        pending.value = 70
+        assertEquals(30, vm.state.value.volume)
+    }
+
+    @Test fun volume_keys_failure_shows_message() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val failures = MutableSharedFlow<ApiError>()
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), volumeFailures = failures).also { vms += it }
+        observe(vm, scope)
+        failures.subscriptionCount.first { it > 0 }
+        failures.emit(ApiError.Unreachable)
+        assertEquals("Serveur injoignable", vm.state.value.message)
     }
 
     @Test fun idle_error_message() = runBlocking {

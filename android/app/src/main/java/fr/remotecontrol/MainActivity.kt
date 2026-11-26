@@ -22,11 +22,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -38,8 +41,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import kotlinx.coroutines.launch
 import fr.remotecontrol.discovery.ServerState
 import fr.remotecontrol.mirror.LocalTvMirror
+import fr.remotecontrol.net.messageFr
 import fr.remotecontrol.player.PlayTarget
 import fr.remotecontrol.player.TargetKind
 import fr.remotecontrol.ui.browse.BrowseScreen
@@ -72,7 +77,7 @@ import fr.remotecontrol.ui.preplay.toRoute
 import fr.remotecontrol.ui.remote.NowPlayingViewModel
 import fr.remotecontrol.ui.remote.RemoteScreen
 import fr.remotecontrol.ui.remote.RemoteViewModel
-import fr.remotecontrol.ui.remote.VolumeKeysWhileResumed
+import fr.remotecontrol.ui.remote.registerVolumeKeysWhileResumed
 import fr.remotecontrol.ui.scan.ScanScreen
 import fr.remotecontrol.ui.scan.ScanViewModel
 import fr.remotecontrol.ui.search.SearchScreen
@@ -103,14 +108,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Touches de volume vers la télé sur tout écran, tant que l'activité est au premier plan et qu'une lecture
+        // est en cours. L'abonnement garde l'état du lecteur vivant pendant ce temps (voulu).
+        lifecycleScope.launch {
+            registerVolumeKeysWhileResumed(lifecycle, container.volumeKeysActive, container.volumeKeys, container.volumeStepper::step)
+        }
     }
 
-    // Touches de volume : d'abord la télécommande (si affichée en lecture), sinon le système.
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
-        (application as RcApp).container.volumeKeys.onKeyDown(keyCode) || super.onKeyDown(keyCode, event)
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-        (application as RcApp).container.volumeKeys.onKeyUp(keyCode) || super.onKeyUp(keyCode, event)
+    // Touches de volume interceptées au plus tôt, avant les vues : la télé si un gestionnaire est inscrit, sinon le système.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        (application as RcApp).container.volumeKeys.dispatch(event.keyCode, event.action) || super.dispatchKeyEvent(event)
 }
 
 /** Destinations de premier niveau : celles qui affichent la barre de navigation. */
@@ -156,6 +163,7 @@ private fun RcScaffold(c: AppContainer) {
             Modifier.safeDrawingPadding()
         }
         Box(Modifier.weight(1f).then(insets)) { RcNavHost(c, nav) }
+        VolumeKeysFailure(c, onRemote = entry?.destination?.hasRoute<RemoteRoute>() == true)
         if (miniPlayer) NowPlaying(c) { nav.navigate(RemoteRoute) { launchSingleTop = true } }
         if (top != null) {
             RcBottomBar(selected = shown, onSelect = {
@@ -167,6 +175,18 @@ private fun RcScaffold(c: AppContainer) {
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
         }
     }
+}
+
+/**
+ * Échec d'envoi des touches de volume hors de la télécommande (qui l'affiche elle-même) : un message en bas
+ * d'écran, comme celui du bandeau « Sur la télé », jusqu'à « OK ».
+ */
+@Composable
+private fun VolumeKeysFailure(c: AppContainer, onRemote: Boolean) {
+    var message by remember { mutableStateOf<String?>(null) }
+    val skip by rememberUpdatedState(onRemote)
+    LaunchedEffect(c) { c.volumeStepper.failures.collect { if (!skip) message = it.messageFr() } }
+    message?.let { RcSnackbar(it, { message = null }, Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
 }
 
 @Composable
@@ -324,10 +344,17 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             )
         }
         composable<RemoteRoute> {
-            val vm = viewModel { RemoteViewModel(c.api, c.remote, playingInfo = c.catalogDao::playingInfo) }
+            val vm = viewModel {
+                RemoteViewModel(
+                    c.api,
+                    c.remote,
+                    pendingVolume = c.volumeStepper.pending,
+                    volumeFailures = c.volumeStepper.failures,
+                    playingInfo = c.catalogDao::playingInfo,
+                )
+            }
             val state by vm.state.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
-            VolumeKeysWhileResumed(c.volumeKeys, state.running && server is ServerState.Connected, vm::volumeStep)
             RemoteScreen(
                 state = state,
                 server = server,

@@ -32,7 +32,7 @@ L'itération 2 est fusionnée et a été essayée par l'utilisateur. Cette étap
 
 **Anti-objectifs (échec même si « ça marche »)**
 - **La télé clignote** ou montre un écran intermédiaire à la reprise. C'est corrigé à l'itération 2 et doit le rester.
-- **Les touches de volume agissent sur la télé hors de l'écran télécommande**, ou le téléphone perd le réglage de son propre volume.
+- **Les touches de volume agissent sur la télé sans lecture en cours**, ou le téléphone perd le réglage de son propre volume hors lecture.
 - **Le découpage de la page télé change son rendu ou son comportement.**
 
 ## 3. Contraintes
@@ -95,7 +95,7 @@ Chacun n'a qu'une manière raisonnable de se faire ; ce sont les choix du concep
 
 ### 5.2 Touches de volume
 
-- **Où :** uniquement quand l'écran Télécommande est l'écran actif (`RESUMED`) et qu'une lecture est en cours. Partout ailleurs, les touches gardent leur effet normal sur le volume du téléphone.
+- **Où (révisé le 2026-11-26 après essai) :** sur **n'importe quel écran** de l'appli, dès qu'une lecture est en cours (pause comprise) et que le serveur est connecté, tant que l'appli est au premier plan. Sans lecture, ou serveur déconnecté, les touches gardent leur effet normal sur le volume du téléphone. *(Première version : écran Télécommande seulement ; l'utilisateur veut le réglage partout pendant une lecture.)*
 - **Effet :** volume de la télé ± 5, borné entre 0 et 100, à partir du dernier volume connu par les événements `player` (`state.volume`, entier de 0 à 100).
   - Le gestionnaire n'est inscrit que si une lecture est connue. Sans état connu, l'appui garde son effet normal sur le téléphone. Envoi par `POST /api/player/volume`.
   - Un appui maintenu répète les pas.
@@ -103,7 +103,7 @@ Chacun n'a qu'une manière raisonnable de se faire ; ce sont les choix du concep
   - Le curseur de volume de l'écran suit tout de suite.
 - **Réalisation :**
   - l'activité intercepte `KEYCODE_VOLUME_UP` et `KEYCODE_VOLUME_DOWN` quand un gestionnaire est inscrit ;
-  - l'écran Télécommande inscrit son gestionnaire tant qu'il est `RESUMED` ;
+  - l'activité inscrit le gestionnaire tant qu'elle est `RESUMED` et qu'une lecture est en cours ; elle intercepte les touches dans `dispatchKeyEvent`, avant les vues ;
   - l'appui est consommé, donc le téléphone n'affiche pas son propre curseur de volume.
 - **Échec d'envoi :** même message d'erreur que le curseur de volume actuel.
 

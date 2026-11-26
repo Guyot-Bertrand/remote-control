@@ -3,6 +3,7 @@ package fr.remotecontrol.ui.remote
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.remotecontrol.data.db.PlayingInfo
+import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.MediaTracksDto
@@ -27,9 +28,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -81,24 +83,23 @@ data class RemoteUi(
 /** Saisie en cours : position ou volume tenus par le doigt (ou envoyés et pas encore confirmés). */
 private data class Local(val seek: Double? = null, val volume: Int? = null, val message: String? = null)
 
-/** Un appui sur une touche de volume ; [seq] le distingue d'un appui précédent de même niveau. */
-private data class VolumeShot(val level: Int, val seq: Long)
-
 private const val TICK_MS = 1_000L
 
 /** Délai maximal pendant lequel une position ou un volume envoyés restent affichés en attendant le serveur. */
 private const val HOLD_MS = 2_000L
 private const val SEEK_TOLERANCE = 2.0
 private const val VOLUME_TOLERANCE = 2
-private const val VOLUME_STEP = 5
 
 /**
  * [playingInfo] : affiche, année et qualité d'une lecture (œuvre, fichier), lues dans le catalogue local.
+ * [pendingVolume] et [volumeFailures] : ceux des touches de volume du téléphone ([fr.remotecontrol.player.VolumeStepper]) ;
+ * le curseur suit le volume visé, le doigt gardant la priorité, et un échec affiche le même message que le curseur.
  */
 class RemoteViewModel(
     private val api: RcApi,
     private val controller: RemoteController,
-    private val volumeSendIntervalMs: Long = 250L,
+    private val pendingVolume: StateFlow<Int?> = MutableStateFlow(null),
+    private val volumeFailures: Flow<ApiError> = emptyFlow(),
     private val playingInfo: (workId: Long, mediaFileId: Long) -> Flow<PlayingInfo?> = { _, _ -> flowOf(null) },
 ) : ViewModel() {
     private val local = MutableStateFlow(Local())
@@ -134,7 +135,17 @@ class RemoteViewModel(
         .distinctUntilChanged()
         .flatMapLatest { ids -> ids?.let { (w, m) -> playingInfo(w, m) } ?: flowOf(null) }
 
-    val state: StateFlow<RemoteUi> = combine(live, local, tracks, lastCurrent, info) { s, l, t, last, i ->
+    /**
+     * Saisie affichée : celle du doigt, sinon le volume visé par les touches. Les échecs des touches ne sont
+     * écoutés que tant que l'écran l'est (abonnement à [state]).
+     */
+    private val shownLocal: Flow<Local> = channelFlow {
+        launch { volumeFailures.collect { e -> local.update { it.copy(message = e.messageFr()) } } }
+        combine(local, pendingVolume) { l, p -> if (l.volume == null && p != null) l.copy(volume = p) else l }
+            .collect { send(it) }
+    }
+
+    val state: StateFlow<RemoteUi> = combine(live, shownLocal, tracks, lastCurrent, info) { s, l, t, last, i ->
         toUi(s, l, t, last, i)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RemoteUi())
 
@@ -196,36 +207,6 @@ class RemoteViewModel(
         )
     }
 
-    /** Cible de volume des touches du téléphone, pas encore envoyée : la dernière valeur gagne. */
-    private val volumeTarget = MutableStateFlow<VolumeShot?>(null)
-    private var volumeSeq = 0L
-
-    init {
-        viewModelScope.launch {
-            volumeTarget.filterNotNull().collect { shot ->
-                val v = shot.level
-                // Envois sérialisés : le suivant attend la réponse du précédent (l'attente du serveur, non).
-                sendHeld(
-                    send = { api.volume(v) },
-                    reached = { abs(it.volume - v) <= VOLUME_TOLERANCE },
-                    stillHeld = { it.volume == v },
-                    release = { it.copy(volume = null) },
-                )
-                delay(volumeSendIntervalMs)
-                volumeTarget.compareAndSet(shot, null)
-            }
-        }
-    }
-
-    /** Touche de volume : le curseur bouge tout de suite de 5, l'envoi est au plus un par intervalle. */
-    fun volumeStep(up: Boolean) {
-        val base = local.value.volume ?: state.value.volume
-        val target = (base + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0, 100)
-        local.update { it.copy(volume = target) }
-        // Numéro d'appui : une même valeur redemandée est quand même envoyée (et tenue).
-        volumeTarget.value = VolumeShot(target, ++volumeSeq)
-    }
-
     fun selectAudio(index: Int?) = command { api.audio(index) }
 
     fun selectSubtitle(sel: SubSel) = command { api.subtitle(sel) }
@@ -254,24 +235,15 @@ class RemoteViewModel(
         stillHeld: (Local) -> Boolean,
         release: (Local) -> Local,
     ) {
-        viewModelScope.launch { sendHeld(send, reached, stillHeld, release) }
-    }
-
-    /** Comme [holdUntilServer], mais rend la main dès la réponse à [send] ; l'attente du serveur se poursuit à part. */
-    private suspend fun sendHeld(
-        send: suspend () -> ApiResult<Unit>,
-        reached: (PlayerStateDto) -> Boolean,
-        stillHeld: (Local) -> Boolean,
-        release: (Local) -> Local,
-    ) {
-        val failed = fail(send())
         viewModelScope.launch {
+            val failed = fail(send())
             if (!failed) {
                 withTimeoutOrNull(HOLD_MS) { controller.snapshot.first { it != null && reached(it.state) } }
             }
             local.update { if (stillHeld(it)) release(it) else it }
         }
     }
+
 }
 
 private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, last: CurrentDto?, info: PlayingInfo?): RemoteUi {
