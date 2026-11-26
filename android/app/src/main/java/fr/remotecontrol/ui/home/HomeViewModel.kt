@@ -102,7 +102,7 @@ private fun HomeUi.withProgress(p: SyncProgress): HomeUi = when (p) {
     is SyncProgress.Writing -> copy(
         syncLabel = Texts.firstSyncSaving,
         syncCount = Texts.firstSyncWriting(p.done, p.total),
-        syncFraction = if (p.total > 0) (p.done.toFloat() / p.total).coerceIn(0f, 1f) else null,
+        syncFraction = p.fraction.coerceIn(0f, 1f),
     )
 }
 

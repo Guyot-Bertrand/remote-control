@@ -115,9 +115,40 @@ class SyncRepositoryTest {
         repo.sync()
         job.cancel()
         assertEquals(
-            listOf(SyncProgress.Idle, SyncProgress.Downloading, SyncProgress.Writing(500, 1200), SyncProgress.Writing(1000, 1200), SyncProgress.Writing(1200, 1200), SyncProgress.Idle),
-            seen,
+            listOf(Pair(500, 1200), Pair(1000, 1200), Pair(1200, 1200)),
+            seen.filterIsInstance<SyncProgress.Writing>().map { it.done to it.total },
         )
+        assertEquals(listOf(SyncProgress.Idle, SyncProgress.Downloading), seen.take(2))
+        assertEquals(SyncProgress.Idle, seen.last())
+        assertEquals(1f, seen.filterIsInstance<SyncProgress.Writing>().last().fraction, 0f)
+    }
+
+    @Test fun fraction_covers_all_rows_and_ends_at_one() = runTest {
+        val w = full.works[0]
+        val dto = SyncDto(
+            revision = 1, full = true,
+            works = (1L..1200).map { w.copy(id = it) },
+            seasons = (1L..1200).map { full.seasons[0].copy(id = it, workId = it) },
+            episodes = (1L..3000).map { full.episodes[0].copy(id = it, seasonId = (it - 1) % 1200 + 1) },
+            mediaFiles = (1L..3500).map { full.mediaFiles[0].copy(id = it, workId = null, episodeId = (it - 1) % 3000 + 1) },
+            collections = (1L..20).map { full.collections[0].copy(id = it) },
+            workCollections = (1L..100).map { full.workCollections[0].copy(workId = it, collectionId = (it - 1) % 20 + 1) },
+            progress = (1L..50).map { full.progress[0].copy(targetKind = "episode", targetId = it) },
+        )
+        val calls = mutableListOf<Triple<Int, Int, Float>>()
+        SyncWriter(db).apply(dto) { done, total, fraction -> calls += Triple(done, total, fraction) }
+        assertEquals(calls.map { it.third }.sorted(), calls.map { it.third })
+        assertTrue(calls.first { it.first == 1200 }.third < 0.5f)
+        assertEquals(1f, calls.last().third, 0f)
+        assertEquals(1200, calls.last().first)
+        assertEquals(1200, calls.last().second)
+    }
+
+    @Test fun fraction_with_no_rows_is_one() = runTest {
+        val calls = mutableListOf<Float>()
+        SyncWriter(db).apply(SyncDto(revision = 1, full = true)) { _, _, fraction -> calls += fraction }
+        assertTrue(calls.isNotEmpty())
+        assertTrue(calls.all { it == 1f })
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
