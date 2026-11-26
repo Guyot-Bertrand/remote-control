@@ -240,6 +240,40 @@ class RemoteViewModelTest {
         val vm = viewModel()
         vm.volumeStep(true)
         assertEquals("Serveur injoignable", withTimeout(5_000) { vm.state.first { it.message != null } }.message)
+        assertEquals(50, withTimeout(5_000) { vm.state.first { it.volume == 50 } }.volume)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun volume_same_level_retargeted_is_still_sent() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 250L).also { vms += it }
+        observe(vm, vt)
+        vm.volumeStep(true)
+        advanceTimeBy(10)
+        push(withVolume(55))
+        advanceTimeBy(300) // envoi de 55 fini, tenue relâchée, cible effacée
+        // Le serveur redescend à 50 ; + puis − puis + dans l'intervalle : 55, 50, 55.
+        push(withVolume(50))
+        vm.volumeStep(true)
+        vm.volumeStep(false)
+        vm.volumeStep(true)
+        advanceTimeBy(10)
+        assertEquals(listOf("volume(55)", "volume(55)"), commands("volume"))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun volume_same_level_after_failure_returns_slider() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        api.volumeResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 250L).also { vms += it }
+        observe(vm, vt)
+        vm.volumeStep(true)
+        advanceTimeBy(300)
+        assertEquals(50, vm.state.value.volume)
+        vm.volumeStep(true) // même cible 55 que l'envoi échoué
+        advanceTimeBy(300)
+        assertEquals(listOf("volume(55)", "volume(55)"), commands("volume"))
+        assertEquals(50, vm.state.value.volume)
     }
 
     @Test fun idle_error_message() = runBlocking {

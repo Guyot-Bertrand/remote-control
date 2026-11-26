@@ -327,7 +327,7 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             val vm = viewModel { RemoteViewModel(c.api, c.remote, playingInfo = c.catalogDao::playingInfo) }
             val state by vm.state.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
-            VolumeKeysWhileResumed(c.volumeKeys, state.running, vm::volumeStep)
+            VolumeKeysWhileResumed(c.volumeKeys, state.running && server is ServerState.Connected, vm::volumeStep)
             RemoteScreen(
                 state = state,
                 server = server,

@@ -81,6 +81,9 @@ data class RemoteUi(
 /** Saisie en cours : position ou volume tenus par le doigt (ou envoyés et pas encore confirmés). */
 private data class Local(val seek: Double? = null, val volume: Int? = null, val message: String? = null)
 
+/** Un appui sur une touche de volume ; [seq] le distingue d'un appui précédent de même niveau. */
+private data class VolumeShot(val level: Int, val seq: Long)
+
 private const val TICK_MS = 1_000L
 
 /** Délai maximal pendant lequel une position ou un volume envoyés restent affichés en attendant le serveur. */
@@ -194,11 +197,13 @@ class RemoteViewModel(
     }
 
     /** Cible de volume des touches du téléphone, pas encore envoyée : la dernière valeur gagne. */
-    private val volumeTarget = MutableStateFlow<Int?>(null)
+    private val volumeTarget = MutableStateFlow<VolumeShot?>(null)
+    private var volumeSeq = 0L
 
     init {
         viewModelScope.launch {
-            volumeTarget.filterNotNull().collect { v ->
+            volumeTarget.filterNotNull().collect { shot ->
+                val v = shot.level
                 // Envois sérialisés : le suivant attend la réponse du précédent (l'attente du serveur, non).
                 sendHeld(
                     send = { api.volume(v) },
@@ -207,7 +212,7 @@ class RemoteViewModel(
                     release = { it.copy(volume = null) },
                 )
                 delay(volumeSendIntervalMs)
-                volumeTarget.compareAndSet(v, null)
+                volumeTarget.compareAndSet(shot, null)
             }
         }
     }
@@ -217,7 +222,8 @@ class RemoteViewModel(
         val base = local.value.volume ?: state.value.volume
         val target = (base + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0, 100)
         local.update { it.copy(volume = target) }
-        volumeTarget.value = target
+        // Numéro d'appui : une même valeur redemandée est quand même envoyée (et tenue).
+        volumeTarget.value = VolumeShot(target, ++volumeSeq)
     }
 
     fun selectAudio(index: Int?) = command { api.audio(index) }
