@@ -307,10 +307,13 @@ class PlaybackService:
             return
         if self._is_current(req):
             try:
-                if self._session.parked in ("hide", "minimize"):
-                    self._check_tracks(self._session, req.audio, req.subtitle)
+                s = self._session
+                unparked = s.parked in ("hide", "minimize")
+                image = s.image  # effacée par la reprise, montrée jusqu'au retour
+                if unparked:
+                    self._check_tracks(s, req.audio, req.subtitle)
                     await self._restore_video()
-                if await self._rejoin(req):
+                if await self._rejoin(req, unparked, image):
                     return
             except PlayError:
                 raise
@@ -349,13 +352,15 @@ class PlaybackService:
                 and s.current["target_id"] == req.target_id
                 and req.media_file_id in (None, s.current["media_file_id"]))
 
-    async def _rejoin(self, req: PlayRequest) -> bool:
+    async def _rejoin(self, req: PlayRequest, unparked: bool = False,
+                      image: str | None = None) -> bool:
         """Lecture demandée du média déjà en cours : pas de relance du lecteur (la télé
         ne clignote pas). « start » revient au début, « resume » garde la position ;
         pistes demandées appliquées (refusées si inconnues), pause levée.
 
         Faux si la lecture s'est terminée entre-temps (fin de fichier pendant une
-        commande) : l'appelant relance alors normalement."""
+        commande) : l'appelant relance alors normalement. Après une mise de côté
+        (`unparked`), la télé garde la capture `image` jusqu'au retour de la vidéo."""
         s = self._session
         assert s is not None
         self._check_tracks(s, req.audio, req.subtitle)
@@ -371,7 +376,10 @@ class PlaybackService:
             await self.player.set_pause(False)
         if self._session is not s:
             return False
-        if self.tv.state.screen != "playing":
+        if unparked:
+            self._await_video(s, image)
+            self._publish()
+        elif self.tv.state.screen != "playing":
             self.tv.set_playing(s.current["work_id"])
         return True
 

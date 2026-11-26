@@ -397,3 +397,38 @@ def test_nan_or_infinite_duration_is_ignored(conn, monkeypatch, tmp_path):
         assert r["duration_s"] is None and r["width"] == 624
         assert conn.execute("SELECT duration_min FROM episode").fetchone()[0] is None
         json.dumps(row(r), allow_nan=False)
+
+
+async def test_loop_rechecks_playback_after_stale_files(state, monkeypatch):
+    """Une lecture lancée pendant la vérification des fichiers suspend l'analyse : la
+    file est gardée et reprise après la lecture."""
+    files = [(i, Path(f"/x/f{i}.mp4")) for i in (1, 2)]
+    monkeypatch.setattr(analysis, "recheck_candidates",
+                        lambda conn, ix: [(i, p, 1.0, 1) for i, p in files])
+
+    def fake_stale(c):
+        state.playback.current = {"id": 1}  # lecture lancée pendant le thread
+        return list(files)
+
+    monkeypatch.setattr(analysis, "stale_files", fake_stale)
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    analyzed = []
+    monkeypatch.setattr(analysis, "_analyze_in_thread",
+                        lambda db, mf_id, path: analyzed.append(mf_id) or False)
+    state.last_full_index = 100.0
+    sleeps = []
+    seen = []  # fichiers analysés à chaque attente
+
+    async def sleep(s):
+        sleeps.append(s)
+        seen.append(list(analyzed))
+        if len(sleeps) == 2:
+            state.playback.current = None  # fin de la lecture
+        if len(sleeps) == 3:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert sleeps[:2] == [7.0, 7.0]
+    assert seen[:2] == [[], []]  # rien d'analysé pendant la lecture
+    assert analyzed == [1, 2]

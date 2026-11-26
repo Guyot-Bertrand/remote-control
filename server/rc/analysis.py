@@ -187,6 +187,9 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
                     last_announce = state.clock()
                     await sleep(poll)
                     continue
+            if state.playback is not None and state.playback.current is not None:
+                await sleep(poll)  # lecture lancée pendant la vérification : file gardée
+                continue
             media_file_id, path = queue.pop(0)
             try:
                 await asyncio.to_thread(_analyze_in_thread, db_file, media_file_id, path)

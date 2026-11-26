@@ -273,6 +273,10 @@ async def test_play_same_media_while_minimized_unparks(env):
     assert env.player.calls[0] == ("set_minimized", False)
     assert ("set_pause", False) in env.player.calls
     assert env.player.starts() == [] and not env.svc.parked
+    # pas d'écran « lecture » intermédiaire pendant que mpv revient
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert env.tv.state.screen == "playing"
 
 
 async def test_minimize_failure_falls_back_to_restart(env):
@@ -430,6 +434,10 @@ async def test_play_same_media_while_hidden_unparks(env):
     assert env.player.calls[0] == ("set_video", True)
     assert ("set_pause", False) in env.player.calls
     assert env.player.starts() == [] and not env.svc.parked
+    # pas d'écran « lecture » intermédiaire pendant que mpv rouvre sa fenêtre
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert env.tv.state.screen == "playing"
 
 
 async def test_hide_failure_falls_back_to_restart(env):
