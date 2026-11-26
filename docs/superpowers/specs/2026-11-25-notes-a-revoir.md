@@ -2,7 +2,11 @@
 
 *Points relevés pendant les essais du 2026-11-25. Rien d'urgent : jugés acceptables pour l'instant par l'utilisateur.*
 
-## Latence à la reprise d'une vidéo mise de côté
+## Latence à la reprise d'une vidéo mise de côté — résolue (étape 3)
+
+**Résolu le 2026-11-26.** Le mode `hide`, défaut depuis l'étape 3, ferme la fenêtre de mpv sans l'arrêter (`vid=no`) et la rend à la reprise : reprise quasi immédiate. `restart` reste disponible.
+
+*Constat d'origine :*
 
 **Constat.** En mode `pause_background = "restart"`, la reprise relance mpv. Il y a une petite latence avant que la vidéo reparte : le temps que mpv démarre, ouvre le fichier et se place à la position. Le clignotement est corrigé : la télé garde l'image de la pause en plein écran pendant ce temps.
 

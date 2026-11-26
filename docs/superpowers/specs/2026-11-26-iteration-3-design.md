@@ -1,6 +1,6 @@
 # Remote-Control — Étape 3 — Document de conception
 
-*Date : 2026-11-26. Statut : en attente de validation.*
+*Date : 2026-11-26. Statut : validé, réalisé et fusionné le 2026-11-26.*
 *S'appuie sur l'itération 2 (`2026-11-24-iteration-2-design.md`) et sur le contrat d'API (`docs/superpowers/plans/2026-11-22-api-contract-rulings.md`, arbitrages 1 à 19).*
 
 ## 1. Intention
