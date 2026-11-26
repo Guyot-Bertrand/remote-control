@@ -24,6 +24,7 @@ import fr.remotecontrol.player.RemoteController
 import fr.remotecontrol.player.TvStatus
 import fr.remotecontrol.player.liveWhileConnected
 import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.ui.remote.VolumeKeys
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +62,8 @@ class AppContainer(context: Context) {
     val tvMirror: TvMirror by lazy {
         TvMirror(api, store, connected = locator.state.map { it is ServerState.Connected })
     }
+    /** Touches de volume du téléphone, détournées vers la télé quand la télécommande est affichée en lecture. */
+    val volumeKeys: VolumeKeys = VolumeKeys()
     val filter: CatalogFilter = CatalogFilter()
     val playLauncher: PlayLauncher by lazy { PlayLauncher(api, locator::reportPlayerMissing) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }

@@ -181,6 +181,49 @@ class RemoteViewModelTest {
         assertEquals(listOf("volume(55)"), commands("volume"))
     }
 
+    private fun withVolume(level: Int) = playing.copy(state = playing.state.copy(volume = level))
+
+    @Test fun volume_step_moves_slider_immediately() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val vm = viewModel()
+        vm.volumeStep(true)
+        assertEquals(55, vm.state.value.volume)
+    }
+
+    @Test fun volume_step_clamps() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(98))
+        val vm = viewModel()
+        vm.volumeStep(true)
+        // 98 est à la tolérance de 100 : le curseur est déjà relâché, la cible envoyée le prouve.
+        assertEquals(listOf("volume(100)"), commands("volume"))
+    }
+
+    @Test fun volume_step_clamps_at_zero() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(3))
+        val vm = viewModel()
+        vm.volumeStep(false)
+        assertEquals(listOf("volume(0)"), commands("volume"))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun volume_keys_coalesced_last_value_wins() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 200L).also { vms += it }
+        observe(vm, vt)
+        repeat(6) { vm.volumeStep(true) }
+        advanceTimeBy(50)
+        advanceTimeBy(300)
+        assertEquals(listOf("volume(55)", "volume(80)"), commands("volume"))
+    }
+
+    @Test fun volume_key_failure_shows_message() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        api.volumeResult = ApiResult.Err(ApiError.Unreachable)
+        val vm = viewModel()
+        vm.volumeStep(true)
+        assertEquals("Serveur injoignable", withTimeout(5_000) { vm.state.first { it.message != null } }.message)
+    }
+
     @Test fun idle_error_message() = runBlocking {
         api.stopResult = ApiResult.Err(ApiError.Server("idle", null))
         val vm = viewModel()

@@ -1,6 +1,7 @@
 package fr.remotecontrol
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -71,6 +72,7 @@ import fr.remotecontrol.ui.preplay.toRoute
 import fr.remotecontrol.ui.remote.NowPlayingViewModel
 import fr.remotecontrol.ui.remote.RemoteScreen
 import fr.remotecontrol.ui.remote.RemoteViewModel
+import fr.remotecontrol.ui.remote.VolumeKeysWhileResumed
 import fr.remotecontrol.ui.scan.ScanScreen
 import fr.remotecontrol.ui.scan.ScanViewModel
 import fr.remotecontrol.ui.search.SearchScreen
@@ -102,6 +104,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // Touches de volume : d'abord la télécommande (si affichée en lecture), sinon le système.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        (application as RcApp).container.volumeKeys.onKeyDown(keyCode) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        (application as RcApp).container.volumeKeys.onKeyUp(keyCode) || super.onKeyUp(keyCode, event)
 }
 
 /** Destinations de premier niveau : celles qui affichent la barre de navigation. */
@@ -315,9 +324,10 @@ private fun RcNavHost(c: AppContainer, nav: NavHostController) {
             )
         }
         composable<RemoteRoute> {
-            val vm = viewModel { RemoteViewModel(c.api, c.remote, c.catalogDao::playingInfo) }
+            val vm = viewModel { RemoteViewModel(c.api, c.remote, playingInfo = c.catalogDao::playingInfo) }
             val state by vm.state.collectAsStateWithLifecycle()
             val server by c.locator.state.collectAsStateWithLifecycle()
+            VolumeKeysWhileResumed(c.volumeKeys, state.running, vm::volumeStep)
             RemoteScreen(
                 state = state,
                 server = server,

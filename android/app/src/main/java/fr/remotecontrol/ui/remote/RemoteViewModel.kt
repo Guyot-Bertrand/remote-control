@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -86,6 +87,7 @@ private const val TICK_MS = 1_000L
 private const val HOLD_MS = 2_000L
 private const val SEEK_TOLERANCE = 2.0
 private const val VOLUME_TOLERANCE = 2
+private const val VOLUME_STEP = 5
 
 /**
  * [playingInfo] : affiche, année et qualité d'une lecture (œuvre, fichier), lues dans le catalogue local.
@@ -93,6 +95,7 @@ private const val VOLUME_TOLERANCE = 2
 class RemoteViewModel(
     private val api: RcApi,
     private val controller: RemoteController,
+    private val volumeSendIntervalMs: Long = 250L,
     private val playingInfo: (workId: Long, mediaFileId: Long) -> Flow<PlayingInfo?> = { _, _ -> flowOf(null) },
 ) : ViewModel() {
     private val local = MutableStateFlow(Local())
@@ -188,6 +191,32 @@ class RemoteViewModel(
             stillHeld = { it.volume == target },
             release = { it.copy(volume = null) },
         )
+    }
+
+    /** Cible de volume des touches du téléphone, pas encore envoyée : la dernière valeur gagne. */
+    private val volumeTarget = MutableStateFlow<Int?>(null)
+
+    init {
+        viewModelScope.launch {
+            volumeTarget.filterNotNull().collect { v ->
+                holdUntilServer(
+                    send = { api.volume(v) },
+                    reached = { abs(it.volume - v) <= VOLUME_TOLERANCE },
+                    stillHeld = { it.volume == v },
+                    release = { it.copy(volume = null) },
+                )
+                delay(volumeSendIntervalMs)
+                volumeTarget.compareAndSet(v, null)
+            }
+        }
+    }
+
+    /** Touche de volume : le curseur bouge tout de suite de 5, l'envoi est au plus un par intervalle. */
+    fun volumeStep(up: Boolean) {
+        val base = local.value.volume ?: state.value.volume
+        val target = (base + if (up) VOLUME_STEP else -VOLUME_STEP).coerceIn(0, 100)
+        local.update { it.copy(volume = target) }
+        volumeTarget.value = target
     }
 
     fun selectAudio(index: Int?) = command { api.audio(index) }
