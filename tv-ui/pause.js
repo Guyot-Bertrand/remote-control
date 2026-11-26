@@ -2,8 +2,8 @@
    - renderStateCorner(pause) : coin d'état en haut à droite (448×252) ; l'horloge
      sans pause, la vignette de la vidéo en pause sinon.
    - renderPausedFull(pause) : image en pause en plein écran (télécommande ouverte).
-   Chargé avant views.js et app.js ; utilise esc, fmtClock, clockText et dateText d'app.js
-   au moment du rendu. */
+   Chargé après common.js, avant sheets.js, views.js et app.js ; utilise esc, fmtClock,
+   clockText et dateText de common.js au moment du rendu. */
 'use strict';
 
 function pauseIcon(size) {

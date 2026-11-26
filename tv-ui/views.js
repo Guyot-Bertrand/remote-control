@@ -3,10 +3,10 @@
    - renderView(view, pause) aiguille sur view.screen : accueil, parcourir, collection,
      recherche ; un écran inconnu se replie sur l'accueil miroir.
    - Les fiches (œuvre, saison, version et pistes) chargent leurs données (sheetJson
-     d'app.js, gardées d'une vue à l'autre) : renderView renvoie alors une promesse.
+     de sheets.js, gardées d'une vue à l'autre) : renderView renvoie alors une promesse.
    - Chaque vue porte le coin d'état (renderStateCorner) : horloge, ou vidéo en pause.
-   Chargé après pause.js et avant app.js ; utilise esc, poster, ICON, KIND, NBSP, joinDot,
-   fmtMinutes et differs d'app.js au moment du rendu. Les affiches gardent le même `src`
+   Chargé après sheets.js et avant app.js ; utilise esc, poster, ICON, KIND, NBSP, joinDot,
+   fmtMinutes et differs de common.js au moment du rendu. Les affiches gardent le même `src`
    d'une vue à l'autre : le fondu de app.js les reprend sans les recharger. */
 'use strict';
 
