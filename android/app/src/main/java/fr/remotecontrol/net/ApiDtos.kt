@@ -256,6 +256,7 @@ data class SectionDto(
     val label: String,
     val people: List<PersonDto> = emptyList(),
     val items: List<ItemRefDto> = emptyList(),
+    val kind: String? = null,
 )
 
 @Serializable

@@ -226,7 +226,7 @@ class OkHttpRcApiTest {
         assertEquals("""[{"kind":"work","id":101}]""", body["items"].toString())
         assertEquals("""{"letter":"M","index":1240,"total":2552}""", body["position"].toString())
         assertEquals(
-            """[{"label":"Personnes","people":[{"name":"P","role":"Réalisation","count":1}],"items":[]}]""",
+            """[{"label":"Personnes","people":[{"name":"P","role":"Réalisation","count":1}],"items":[],"kind":null}]""",
             body["sections"].toString(),
         )
         assertEquals(ApiResult.Ok(false), r)

@@ -71,6 +71,29 @@ class TvViewsTest {
         assertEquals(1, homeView(HomeUi(recent = listOf(work(1)))).sections.size)
     }
 
+    @Test fun home_sections_carry_kind() {
+        val ui = HomeUi(
+            resume = listOf(ResumeItem("work", 7, 7, null, "Film", null, 0.5f, "")),
+            recent = listOf(work(1)),
+            collections = listOf(CollectionSummary(4, "C", 3, 3)),
+        )
+        assertEquals(listOf("resume", "recent", "collections"), homeView(ui).sections.map { it.kind })
+    }
+
+    @Test fun search_sections_carry_kind() {
+        val sections = SearchSections(
+            people = listOf(PersonHit("Léa", false, 2)),
+            works = listOf(SearchHit(work(1), null, null, emptyList())),
+            aka = listOf(AkaHit(work(2), AltKind.Original, "VO")),
+        )
+        assertEquals(listOf("people", "works", "aka"), searchView("x", sections).sections.map { it.kind })
+    }
+
+    @Test fun empty_sections_dropped_with_their_kind() {
+        val ui = HomeUi(recent = listOf(work(1)), collections = listOf(CollectionSummary(4, "C", 3, 3)))
+        assertEquals(listOf("recent", "collections"), homeView(ui).sections.map { it.kind })
+    }
+
     @Test fun search_view_sections_and_people() {
         val hit = SearchHit(work(1), null, null, emptyList())
         val sections = SearchSections(
