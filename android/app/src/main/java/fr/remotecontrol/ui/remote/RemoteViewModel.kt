@@ -199,7 +199,8 @@ class RemoteViewModel(
     init {
         viewModelScope.launch {
             volumeTarget.filterNotNull().collect { v ->
-                holdUntilServer(
+                // Envois sérialisés : le suivant attend la réponse du précédent (l'attente du serveur, non).
+                sendHeld(
                     send = { api.volume(v) },
                     reached = { abs(it.volume - v) <= VOLUME_TOLERANCE },
                     stillHeld = { it.volume == v },
@@ -247,8 +248,19 @@ class RemoteViewModel(
         stillHeld: (Local) -> Boolean,
         release: (Local) -> Local,
     ) {
+        viewModelScope.launch { sendHeld(send, reached, stillHeld, release) }
+    }
+
+    /** Comme [holdUntilServer], mais rend la main dès la réponse à [send] ; l'attente du serveur se poursuit à part. */
+    private suspend fun sendHeld(
+        send: suspend () -> ApiResult<Unit>,
+        reached: (PlayerStateDto) -> Boolean,
+        stillHeld: (Local) -> Boolean,
+        release: (Local) -> Local,
+    ) {
+        val failed = fail(send())
         viewModelScope.launch {
-            if (!fail(send())) {
+            if (!failed) {
                 withTimeoutOrNull(HOLD_MS) { controller.snapshot.first { it != null && reached(it.state) } }
             }
             local.update { if (stillHeld(it)) release(it) else it }

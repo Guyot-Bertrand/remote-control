@@ -56,6 +56,21 @@ class VolumeKeysTest {
         assertNotNull(keys.handler)
         running.value = false
         assertNull(keys.handler)
+        running.value = true
+        assertNotNull(keys.handler)
         job.cancel()
+        assertNull(keys.handler)
+    }
+
+    @Test fun cancel_keeps_a_handler_registered_by_someone_else() = runTest {
+        val keys = VolumeKeys()
+        val job = launch(Dispatchers.Main) {
+            registerVolumeKeysWhileResumed(owner.lifecycle, MutableStateFlow(true), keys) {}
+        }
+        owner.registry.currentState = Lifecycle.State.RESUMED
+        val other: (Boolean) -> Unit = {}
+        keys.handler = other
+        job.cancel()
+        assertTrue(keys.handler === other)
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 
@@ -47,7 +48,7 @@ suspend fun registerVolumeKeysWhileResumed(
                 if (!on) return@collectLatest
                 keys.handler = mine
                 try {
-                    kotlinx.coroutines.awaitCancellation()
+                    awaitCancellation()
                 } finally {
                     if (keys.handler === mine) keys.handler = null
                 }

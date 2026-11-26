@@ -14,6 +14,7 @@ import fr.remotecontrol.testing.Fixtures
 import fr.remotecontrol.testing.MainDispatcherRule
 import fr.remotecontrol.testing.clearAndJoin
 import fr.remotecontrol.ui.common.FilePills
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -214,6 +215,23 @@ class RemoteViewModelTest {
         advanceTimeBy(50)
         advanceTimeBy(300)
         assertEquals(listOf("volume(55)", "volume(80)"), commands("volume"))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun volume_sends_are_serialised_on_slow_network() = virtualTest { vt ->
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val gate = CompletableDeferred<Unit>()
+        api.volumeGate = gate
+        val vm = RemoteViewModel(api, RemoteController(api, events, vt), volumeSendIntervalMs = 200L).also { vms += it }
+        observe(vm, vt)
+        vm.volumeStep(true)
+        advanceTimeBy(50)
+        repeat(3) { vm.volumeStep(true) }
+        advanceTimeBy(1_000)
+        assertEquals(listOf("volume(55)"), commands("volume")) // la réponse n'est pas venue : pas de second envoi
+        gate.complete(Unit)
+        advanceTimeBy(300)
+        assertEquals(listOf("volume(55)", "volume(70)"), commands("volume"))
     }
 
     @Test fun volume_key_failure_shows_message() = runBlocking {
