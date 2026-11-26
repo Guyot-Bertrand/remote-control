@@ -21,10 +21,12 @@ class SyncWriter(
     private val afterUpserts: suspend () -> Unit = {},
 ) {
     /**
-     * Les œuvres sont écrites par paquets de [WORK_BATCH], dans la même transaction ; [onProgress] reçoit le
-     * nombre d'œuvres écrites et le total (`total_works`, sinon le nombre d'œuvres de la réponse).
+     * Chaque liste est écrite par paquets de [ROW_BATCH], dans la même transaction. [onProgress] reçoit le nombre
+     * d'œuvres écrites, leur total (`total_works`, sinon le nombre d'œuvres de la réponse) et la fraction de toutes
+     * les lignes écrites (œuvres, saisons, épisodes, fichiers, collections, liens, progressions) ; le dernier appel
+     * vaut `1f`.
      */
-    suspend fun apply(dto: SyncDto, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }) {
+    suspend fun apply(dto: SyncDto, onProgress: (done: Int, total: Int, fraction: Float) -> Unit = { _, _, _ -> }) {
         val dao = db.syncDao()
         db.withTransaction {
             if (dto.full) dao.clearCatalog()
@@ -37,40 +39,67 @@ class SyncWriter(
             dao.deleteCollections(d.collection)
 
             val total = dto.totalWorks ?: dto.works.size
-            dto.works.chunked(WORK_BATCH).forEachIndexed { i, batch ->
+            val totalRows = dto.works.size + dto.seasons.size + dto.episodes.size + dto.mediaFiles.size +
+                dto.collections.size + dto.workCollections.size + dto.progress.size
+            var written = 0
+            var worksDone = 0
+            fun report(count: Int) {
+                written += count
+                onProgress(worksDone, total, if (totalRows == 0) 1f else written.toFloat() / totalRows)
+            }
+
+            dto.works.chunked(ROW_BATCH).forEach { batch ->
                 dao.upsertWorks(batch.map { it.toEntity() })
                 dao.upsertFts(batch.map { WorkFtsEntity(it.id, ftsText(it)) })
-                onProgress(minOf((i + 1) * WORK_BATCH, dto.works.size), total)
+                worksDone += batch.size
+                report(batch.size)
             }
-            dao.upsertSeasons(dto.seasons.map { SeasonEntity(it.id, it.workId, it.number, it.label) })
-            dao.upsertEpisodes(dto.episodes.map { EpisodeEntity(it.id, it.seasonId, it.number, it.title, it.durationMin) })
-            dao.upsertMediaFiles(
-                dto.mediaFiles.map {
-                    MediaFileEntity(it.id, it.workId, it.episodeId, it.quality, it.size, it.relpath, it.volumeUuid, it.present, it.audioLangs, it.subtitleLangs, it.width, it.height, it.durationS)
-                },
-            )
+            dto.seasons.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertSeasons(batch.map { SeasonEntity(it.id, it.workId, it.number, it.label) })
+                report(batch.size)
+            }
+            dto.episodes.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertEpisodes(batch.map { EpisodeEntity(it.id, it.seasonId, it.number, it.title, it.durationMin) })
+                report(batch.size)
+            }
+            dto.mediaFiles.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertMediaFiles(
+                    batch.map {
+                        MediaFileEntity(it.id, it.workId, it.episodeId, it.quality, it.size, it.relpath, it.volumeUuid, it.present, it.audioLangs, it.subtitleLangs, it.width, it.height, it.durationS)
+                    },
+                )
+                report(batch.size)
+            }
             dao.upsertVolumes(dto.volumes.map { VolumeEntity(it.uuid, it.label, it.present) })
-            dao.upsertCollections(dto.collections.map { CollectionEntity(it.id, it.name, it.description, it.link) })
-            dao.upsertProgress(
-                dto.progress.map {
-                    ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt, it.audio, it.subtitle)
-                },
-            )
+            dto.collections.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertCollections(batch.map { CollectionEntity(it.id, it.name, it.description, it.link) })
+                report(batch.size)
+            }
+            dto.progress.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertProgress(
+                    batch.map {
+                        ProgressEntity(it.targetKind, it.targetId, it.mediaFileId, it.position, it.duration, it.watched, it.updatedAt, it.audio, it.subtitle)
+                    },
+                )
+                report(batch.size)
+            }
             afterUpserts()
 
             // Contract: each returned work carries its full membership list; replace that work's links.
             val workIds = dto.works.map { it.id }
             dao.deleteWorkCollectionsOf(workIds)
             val returned = workIds.toSet()
-            dao.upsertWorkCollections(
-                dto.workCollections.filter { it.workId in returned }
-                    .map { WorkCollectionEntity(it.workId, it.collectionId, it.rank) },
-            )
+            val links = dto.workCollections.filter { it.workId in returned }
+            links.chunked(ROW_BATCH).forEach { batch ->
+                dao.upsertWorkCollections(batch.map { WorkCollectionEntity(it.workId, it.collectionId, it.rank) })
+                report(batch.size)
+            }
 
             dao.recomputePlayable()
             db.metaDao().put(MetaEntity(META_REVISION, dto.revision.toString()))
+            onProgress(worksDone, total, 1f)
         }
     }
 }
 
-private const val WORK_BATCH = 500
+private const val ROW_BATCH = 500

@@ -84,10 +84,10 @@ class HomeViewModelTest {
     }
 
     @Test fun home_first_sync_shows_writing_progress() = runBlocking {
-        val ui = viewModel(progress = MutableStateFlow(SyncProgress.Writing(1250, 3992))).await { it.syncCount != null }
+        val ui = viewModel(progress = MutableStateFlow(SyncProgress.Writing(1250, 3992, 0.2f))).await { it.syncCount != null }
         assertEquals("1\u202F250 / 3\u202F992 œuvres", ui.syncCount)
         assertEquals("Enregistrement des œuvres…", ui.syncLabel)
-        assertEquals(1250f / 3992f, ui.syncFraction!!, 1e-6f)
+        assertEquals(0.2f, ui.syncFraction!!, 1e-6f)
     }
 
     @Test fun home_first_sync_download_is_indeterminate() = runBlocking {

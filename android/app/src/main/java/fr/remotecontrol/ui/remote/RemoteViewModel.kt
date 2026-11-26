@@ -3,6 +3,7 @@ package fr.remotecontrol.ui.remote
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.remotecontrol.data.db.PlayingInfo
+import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.CurrentDto
 import fr.remotecontrol.net.MediaTracksDto
@@ -27,8 +28,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -89,10 +92,14 @@ private const val VOLUME_TOLERANCE = 2
 
 /**
  * [playingInfo] : affiche, année et qualité d'une lecture (œuvre, fichier), lues dans le catalogue local.
+ * [pendingVolume] et [volumeFailures] : ceux des touches de volume du téléphone ([fr.remotecontrol.player.VolumeStepper]) ;
+ * le curseur suit le volume visé, le doigt gardant la priorité, et un échec affiche le même message que le curseur.
  */
 class RemoteViewModel(
     private val api: RcApi,
     private val controller: RemoteController,
+    private val pendingVolume: StateFlow<Int?> = MutableStateFlow(null),
+    private val volumeFailures: Flow<ApiError> = emptyFlow(),
     private val playingInfo: (workId: Long, mediaFileId: Long) -> Flow<PlayingInfo?> = { _, _ -> flowOf(null) },
 ) : ViewModel() {
     private val local = MutableStateFlow(Local())
@@ -128,7 +135,17 @@ class RemoteViewModel(
         .distinctUntilChanged()
         .flatMapLatest { ids -> ids?.let { (w, m) -> playingInfo(w, m) } ?: flowOf(null) }
 
-    val state: StateFlow<RemoteUi> = combine(live, local, tracks, lastCurrent, info) { s, l, t, last, i ->
+    /**
+     * Saisie affichée : celle du doigt, sinon le volume visé par les touches. Les échecs des touches ne sont
+     * écoutés que tant que l'écran l'est (abonnement à [state]).
+     */
+    private val shownLocal: Flow<Local> = channelFlow {
+        launch { volumeFailures.collect { e -> local.update { it.copy(message = e.messageFr()) } } }
+        combine(local, pendingVolume) { l, p -> if (l.volume == null && p != null) l.copy(volume = p) else l }
+            .collect { send(it) }
+    }
+
+    val state: StateFlow<RemoteUi> = combine(live, shownLocal, tracks, lastCurrent, info) { s, l, t, last, i ->
         toUi(s, l, t, last, i)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RemoteUi())
 
@@ -219,12 +236,14 @@ class RemoteViewModel(
         release: (Local) -> Local,
     ) {
         viewModelScope.launch {
-            if (!fail(send())) {
+            val failed = fail(send())
+            if (!failed) {
                 withTimeoutOrNull(HOLD_MS) { controller.snapshot.first { it != null && reached(it.state) } }
             }
             local.update { if (stillHeld(it)) release(it) else it }
         }
     }
+
 }
 
 private fun toUi(s: PlayerSnapshotDto?, l: Local, t: Map<Long, MediaTracksDto>, last: CurrentDto?, info: PlayingInfo?): RemoteUi {

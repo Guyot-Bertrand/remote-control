@@ -20,6 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -179,6 +180,41 @@ class RemoteViewModelTest {
         assertTrue(commands("volume").isEmpty())
         vm.onVolumeRelease()
         assertEquals(listOf("volume(55)"), commands("volume"))
+    }
+
+    private fun withVolume(level: Int) = playing.copy(state = playing.state.copy(volume = level))
+
+    @Test fun slider_follows_volume_keys_pending_value() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val pending = MutableStateFlow<Int?>(null)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), pendingVolume = pending).also { vms += it }
+        observe(vm, scope)
+        assertEquals(50, vm.state.value.volume)
+        pending.value = 65
+        assertEquals(65, vm.state.value.volume)
+        pending.value = null
+        assertEquals(50, vm.state.value.volume)
+    }
+
+    @Test fun finger_keeps_priority_over_volume_keys() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val pending = MutableStateFlow<Int?>(65)
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), pendingVolume = pending).also { vms += it }
+        observe(vm, scope)
+        vm.onVolumeDrag(30)
+        assertEquals(30, vm.state.value.volume)
+        pending.value = 70
+        assertEquals(30, vm.state.value.volume)
+    }
+
+    @Test fun volume_keys_failure_shows_message() = runBlocking {
+        api.playerStateResult = ApiResult.Ok(withVolume(50))
+        val failures = MutableSharedFlow<ApiError>()
+        val vm = RemoteViewModel(api, RemoteController(api, events, scope), volumeFailures = failures).also { vms += it }
+        observe(vm, scope)
+        failures.subscriptionCount.first { it > 0 }
+        failures.emit(ApiError.Unreachable)
+        assertEquals("Serveur injoignable", vm.state.value.message)
     }
 
     @Test fun idle_error_message() = runBlocking {

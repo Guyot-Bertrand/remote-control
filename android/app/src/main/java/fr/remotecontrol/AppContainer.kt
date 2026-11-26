@@ -22,8 +22,11 @@ import fr.remotecontrol.net.rcOkHttpClient
 import fr.remotecontrol.player.PlayLauncher
 import fr.remotecontrol.player.RemoteController
 import fr.remotecontrol.player.TvStatus
+import fr.remotecontrol.player.VolumeStepper
 import fr.remotecontrol.player.liveWhileConnected
 import fr.remotecontrol.net.PlayerSnapshotDto
+import fr.remotecontrol.ui.remote.VolumeKeys
+import fr.remotecontrol.ui.remote.volumeKeysActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -61,9 +64,17 @@ class AppContainer(context: Context) {
     val tvMirror: TvMirror by lazy {
         TvMirror(api, store, connected = locator.state.map { it is ServerState.Connected })
     }
+    /** Touches de volume du téléphone, détournées vers la télé (sur tout écran) quand une lecture est en cours. */
+    val volumeKeys: VolumeKeys = VolumeKeys(log = VolumeKeys.logcat)
     val filter: CatalogFilter = CatalogFilter()
     val playLauncher: PlayLauncher by lazy { PlayLauncher(api, locator::reportPlayerMissing) }
     val remote: RemoteController by lazy { RemoteController(api, events, appScope) }
+
+    /** Pas de volume des touches du téléphone et leur envoi, communs à tous les écrans. */
+    val volumeStepper: VolumeStepper by lazy { VolumeStepper(api, remote.snapshot, appScope) }
+
+    /** Les touches de volume vont à la télé : lecture en cours (pause comprise) et serveur connecté. */
+    val volumeKeysActive: Flow<Boolean> by lazy { volumeKeysActive(remote.snapshot, locator.state, volumeKeys.log) }
 
     /** Lecture en cours pour les fiches : inconnue tant que le serveur n'est pas connecté. */
     val liveForSheets: Flow<PlayerSnapshotDto?> by lazy { liveWhileConnected(remote.snapshot, locator.state) }

@@ -131,6 +131,10 @@ class ApiDtosTest {
         val snap = RcJson.decodeFromString<PlayerSnapshotDto>(Fixtures.text("player_state.json"))
         assertEquals(612.5, snap.state.position, 0.0)
     }
+
+    @Test fun section_kind_serialized() {
+        assertTrue(RcJson.encodeToString(SectionDto("Reprendre", kind = "resume")).contains("\"kind\":\"resume\""))
+    }
 }
 
 private const val NEW_FIELDS_JSON = """

@@ -18,6 +18,13 @@ import fr.remotecontrol.ui.search.SearchSections
 /** Limite d'éléments par liste, imposée par le serveur (arbitrage 14) ; au-delà, la vue est refusée (422). */
 private const val MAX_ITEMS = 40
 
+const val KIND_RESUME = "resume"
+const val KIND_RECENT = "recent"
+const val KIND_COLLECTIONS = "collections"
+const val KIND_PEOPLE = "people"
+const val KIND_WORKS = "works"
+const val KIND_AKA = "aka"
+
 /** Fenêtre de [max] éléments au plus autour de l'index visible [first] : [before] avant lui, bornée aux extrémités. */
 fun windowAround(ids: List<Long>, first: Int, before: Int = 10, max: Int = MAX_ITEMS): List<Long> {
     if (ids.isEmpty()) return emptyList()
@@ -75,9 +82,10 @@ fun homeView(ui: HomeUi): TvViewDto {
             items = ui.resume.take(MAX_ITEMS).map {
                 if (it.targetKind == EPISODE) ItemRefDto("episode", it.targetId) else ItemRefDto("work", it.targetId)
             },
+            kind = KIND_RESUME,
         ),
-        SectionDto(Texts.sectionRecent, items = workRefs(ui.recent.map { it.id })),
-        SectionDto(Texts.sectionCollections, items = ui.collections.take(MAX_ITEMS).map { ItemRefDto("collection", it.id) }),
+        SectionDto(Texts.sectionRecent, items = workRefs(ui.recent.map { it.id }), kind = KIND_RECENT),
+        SectionDto(Texts.sectionCollections, items = ui.collections.take(MAX_ITEMS).map { ItemRefDto("collection", it.id) }, kind = KIND_COLLECTIONS),
     ).filter { it.items.isNotEmpty() }
     return TvViewDto(screen = "home", title = Texts.appName, sections = sections)
 }
@@ -89,9 +97,10 @@ fun searchView(query: String, sections: SearchSections): TvViewDto {
             people = sections.people.take(MAX_ITEMS).map {
                 PersonDto(it.name, if (it.directing) Texts.directors else Texts.acting, it.workCount)
             },
+            kind = KIND_PEOPLE,
         ),
-        SectionDto(Texts.sectionWorks, items = workRefs(sections.works.map { it.work.id })),
-        SectionDto(Texts.sectionAka, items = workRefs(sections.aka.map { it.work.id })),
+        SectionDto(Texts.sectionWorks, items = workRefs(sections.works.map { it.work.id }), kind = KIND_WORKS),
+        SectionDto(Texts.sectionAka, items = workRefs(sections.aka.map { it.work.id }), kind = KIND_AKA),
     ).filter { it.people.isNotEmpty() || it.items.isNotEmpty() }
     return TvViewDto(screen = "search", title = Texts.navSearch, query = query, sections = out)
 }

@@ -25,7 +25,7 @@ sealed interface SyncOutcome {
 sealed interface SyncProgress {
     data object Idle : SyncProgress
     data object Downloading : SyncProgress
-    data class Writing(val done: Int, val total: Int) : SyncProgress
+    data class Writing(val done: Int, val total: Int, val fraction: Float) : SyncProgress
 }
 
 class SyncRepository(
@@ -63,8 +63,8 @@ class SyncRepository(
                 is ApiResult.Err -> SyncOutcome.Failed(r.error)
                 is ApiResult.Ok -> {
                     try {
-                        writer.apply(r.value) { done, total ->
-                            if (r.value.full) _progress.value = SyncProgress.Writing(done, total)
+                        writer.apply(r.value) { done, total, fraction ->
+                            if (r.value.full) _progress.value = SyncProgress.Writing(done, total, fraction)
                         }
                         db.metaDao().put(MetaEntity(META_SYNCED_AT, clock().toString()))
                         SyncOutcome.Done(r.value.revision, r.value.full)

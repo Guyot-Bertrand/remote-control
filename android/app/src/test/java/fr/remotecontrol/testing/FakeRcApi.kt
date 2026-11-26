@@ -23,6 +23,8 @@ class FakeRcApi : RcApi {
     var pauseResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var seekResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var volumeResult: ApiResult<Unit> = ApiResult.Ok(Unit)
+    /** Si non nul, [volume] attend sa complétion avant de répondre (réseau lent). */
+    var volumeGate: CompletableDeferred<Unit>? = null
     var audioResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var subtitleResult: ApiResult<Unit> = ApiResult.Ok(Unit)
     var stopResult: ApiResult<Unit> = ApiResult.Ok(Unit)
@@ -68,7 +70,11 @@ class FakeRcApi : RcApi {
     override suspend fun pause(paused: Boolean) = pauseResult.also { calls += "pause($paused)" }
     override suspend fun seek(seconds: Double, relative: Boolean) =
         seekResult.also { calls += "seek($seconds,$relative)" }
-    override suspend fun volume(level: Int) = volumeResult.also { calls += "volume($level)" }
+    override suspend fun volume(level: Int): ApiResult<Unit> {
+        calls += "volume($level)"
+        volumeGate?.await()
+        return volumeResult
+    }
     override suspend fun audio(index: Int?) = audioResult.also { calls += "audio($index)" }
     override suspend fun subtitle(sel: SubSel) = subtitleResult.also { calls += "subtitle($sel)" }
     override suspend fun stop() = stopResult.also { calls += "stop()" }
