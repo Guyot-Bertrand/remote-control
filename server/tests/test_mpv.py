@@ -278,3 +278,15 @@ async def test_unminimize_restores_fullscreen(make_player, tmp_path):
     assert ["set_property", "window-minimized", False] in cmds
     assert ["set_property", "fullscreen", True] in cmds
     await p.stop()
+
+
+async def test_set_volume_shows_mpv_volume_bar(make_player, tmp_path):
+    # Retour visuel sur la vidéo : barre de volume de mpv (sans texte), pleine à 100.
+    p, states, log = make_player([])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_volume(70)
+    cmds = logged(log)
+    assert cmds[-1] == ["osd-bar", "set", "volume", "70"]
+    argv = next(c for c in cmds if c[0] == "argv")
+    assert "--osd-duration=5000" in argv and "--volume-max=100" in argv
+    await p.stop()

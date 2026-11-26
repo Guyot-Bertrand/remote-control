@@ -167,6 +167,8 @@ class MpvPlayer:
             self.mpv_path, "--fs", "--no-terminal", "--idle=no",
             f"--input-ipc-server={self._sock}", "--hwdec=auto-safe",
             "--alang=fr,fre,fra", "--slang=fr,fre,fra", f"--start={start_at}",
+            # Barre de volume affichée 5 s sur la vidéo, pleine à 100 (bornes de l'API).
+            "--osd-duration=5000", "--volume-max=100",
             *("--sub-file=" + str(p) for p in self._external),
             *self.extra_args, str(path),
         ]
@@ -284,7 +286,8 @@ class MpvPlayer:
         await self._c().command("seek", seconds, "relative" if relative else "absolute")
 
     async def set_volume(self, level: int) -> None:
-        await self._c().set_property("volume", level)
+        # Préfixe osd-bar : mpv montre sa barre de volume (sans texte) en changeant la valeur.
+        await self._c().command("osd-bar", "set", "volume", str(level))
 
     async def set_audio(self, index: int | None) -> None:
         await self._c().set_property("aid", "auto" if index is None else index)
