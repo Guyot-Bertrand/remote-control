@@ -22,3 +22,13 @@ def test_rc_config_env(tmp_path, monkeypatch):
     f.write_text("port = 9111\n")
     monkeypatch.setenv("RC_CONFIG", str(f))
     assert load_config(None).port == 9111
+
+
+def test_pause_background_default_hide(tmp_path):
+    assert load_config(tmp_path / "absent.toml").pause_background == "hide"
+
+
+def test_pause_background_explicit_restart(tmp_path):
+    f = tmp_path / "c.toml"
+    f.write_text('pause_background = "restart"\n')
+    assert load_config(f).pause_background == "restart"

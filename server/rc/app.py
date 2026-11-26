@@ -47,7 +47,7 @@ DEFAULT_TV_UI = Path(rc.__file__).resolve().parents[2] / "tv-ui"
 
 Stat = tuple[int, int]  # (taille, mtime en ns)
 LOGGED_DETAILS = 20  # avertissements et orphelins détaillés dans le journal
-PAUSE_MODES = ("minimize", "restart")
+PAUSE_MODES = ("hide", "minimize", "restart")
 SKIPPED_INTERFACES = ("lo", "docker", "br-", "veth", "virbr")
 
 
@@ -379,7 +379,7 @@ def create_app(config: Config, player: Player | None = None,
     (config.data_dir / "catalog").mkdir(exist_ok=True)
     (config.data_dir / "pause").mkdir(exist_ok=True)
     if config.pause_background not in PAUSE_MODES:
-        log.warning("pause_background inconnu (%r) : « restart » utilisé", config.pause_background)
+        log.warning("pause_background inconnu (%r) : « hide » utilisé", config.pause_background)
     # check_same_thread=False : l'appli est créée dans un thread et servie dans celui de la
     # boucle d'événements (uvicorn, TestClient). La connexion n'est utilisée que dans ce
     # dernier ; les threads auxiliaires ouvrent leur propre connexion.
@@ -401,8 +401,9 @@ def create_app(config: Config, player: Player | None = None,
                                on_catalog=lambda rev: publish_catalog(state, rev),
                                player_available=player_available,
                                pause_image=config.data_dir / "pause" / "pause.jpg",
-                               pause_mode=lambda: ("minimize" if config.pause_background
-                                                   == "minimize" else "restart"))
+                               pause_mode=lambda: (config.pause_background
+                                                   if config.pause_background in PAUSE_MODES
+                                                   else "hide"))
     state.playback = playback
     mirror = MirrorService(conn, tv, playback)
     playback.on_pause_change = mirror.on_pause_change

@@ -246,6 +246,30 @@ async def test_minimize_sets_window_minimized_only(make_player, tmp_path):
     await p.stop()
 
 
+async def test_set_video_keeps_and_restores_track(make_player, tmp_path):
+    p, states, log = make_player([], props={"vid": 2})
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_video(False)
+    cmds = logged(log)
+    assert ["get_property", "vid"] in cmds
+    assert cmds[-1] == ["set_property", "vid", "no"]
+    await p.set_video(True)
+    cmds = logged(log)
+    assert cmds[-2:] == [["set_property", "vid", 2], ["set_property", "fullscreen", True]]
+    await p.stop()
+
+
+async def test_set_video_restores_auto_when_unreadable(make_player, tmp_path):
+    p, states, log = make_player([], fail=["get_property"])
+    await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])
+    await p.set_video(False)
+    assert logged(log)[-1] == ["set_property", "vid", "no"]
+    await p.set_video(True)
+    cmds = logged(log)
+    assert cmds[-2:] == [["set_property", "vid", "auto"], ["set_property", "fullscreen", True]]
+    await p.stop()
+
+
 async def test_unminimize_restores_fullscreen(make_player, tmp_path):
     p, states, log = make_player([])
     await p.start(tmp_path / "f.mkv", 0, None, {"kind": "none"}, [])

@@ -149,6 +149,7 @@ class MpvPlayer:
         self._audio: int | None = None
         self._subtitle: SubSel = {"kind": "none"}
         self._stopping = False
+        self._vid_kept: Any = None  # piste vidéo retirée par set_video(False)
 
     # -- cycle de vie ---------------------------------------------------
 
@@ -160,6 +161,7 @@ class MpvPlayer:
         self._embedded = 0
         self._audio, self._subtitle = audio, subtitle
         self._stopping = False
+        self._vid_kept = None
         self.state = PlayerState(running=True)
         args = [
             self.mpv_path, "--fs", "--no-terminal", "--idle=no",
@@ -298,6 +300,20 @@ class MpvPlayer:
         await self._c().set_property("window-minimized", minimized)
         if not minimized:
             await self._c().set_property("fullscreen", True)
+
+    async def set_video(self, enabled: bool) -> None:
+        """Retire la piste vidéo (mpv ferme sa fenêtre) ou la rend, en plein écran."""
+        client = self._c()
+        if not enabled:
+            try:
+                vid = await client.command("get_property", "vid")
+            except MpvError:
+                vid = None
+            self._vid_kept = None if vid is False or vid == "no" else vid
+            await client.set_property("vid", "no")
+            return
+        await client.set_property("vid", self._vid_kept or "auto")
+        await client.set_property("fullscreen", True)
 
     async def stop(self) -> None:
         self._stopping = True

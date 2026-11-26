@@ -19,6 +19,7 @@ class FakePlayer:
         self.screenshot_gate: asyncio.Event | None = None  # capture lente
         self.pause_gate: asyncio.Event | None = None  # commande de pause lente (IPC)
         self.minimize_error: Exception | None = None  # levée par set_minimized
+        self.video_error: Exception | None = None  # levée par set_video
 
     def _command(self, *call):
         self.calls.append(call)
@@ -64,6 +65,11 @@ class FakePlayer:
         self.calls.append(("set_minimized", minimized))
         if self.minimize_error is not None:
             raise self.minimize_error
+
+    async def set_video(self, enabled):
+        self.calls.append(("set_video", enabled))
+        if self.video_error is not None:
+            raise self.video_error
 
     async def stop(self):
         self.calls.append(("stop",))

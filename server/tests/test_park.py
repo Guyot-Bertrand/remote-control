@@ -401,3 +401,84 @@ async def test_resume_falls_back_to_playing_without_player_event(env, monkeypatc
     await env.svc.pause(False)
     await asyncio.sleep(0.01)
     assert env.tv.state.screen == "playing"
+
+
+async def test_park_hide_keeps_player_running(env):
+    env.mode = "hide"
+    info = await parked(env)
+    assert ("set_video", False) in env.player.calls
+    assert ("stop",) not in env.player.calls
+    assert info["image"] == "/api/player/pause.jpg?v=1"
+    assert env.svc.parked
+    st = env.svc.state
+    assert st.running and st.paused and st.position == 1394
+    env.player.calls.clear()
+    await env.svc.pause(False)
+    assert env.player.calls == [("set_video", True), ("set_pause", False)]
+    assert env.tv.state.screen == "paused" and env.tv.state.pause["image"] is not None
+    await video_back(env)
+    assert not env.svc.parked and env.tv.state.screen == "playing"
+
+
+async def test_play_same_media_while_hidden_unparks(env):
+    env.mode = "hide"
+    await parked(env)
+    env.player.calls.clear()
+    await env.svc.play(PlayRequest("work", 1, "resume"))
+    assert env.player.calls[0] == ("set_video", True)
+    assert ("set_pause", False) in env.player.calls
+    assert env.player.starts() == [] and not env.svc.parked
+
+
+async def test_hide_failure_falls_back_to_restart(env):
+    env.mode = "hide"
+    env.player.video_error = RuntimeError("pas de vidéo")
+    await parked(env)
+    assert ("stop",) in env.player.calls
+    assert env.svc._session.parked == "restart" and env.svc.current is not None
+    env.player.calls.clear()
+    await env.svc.pause(False)
+    assert env.player.starts()[-1]["start_at"] == 1394
+    assert ("set_video", True) not in env.player.calls
+
+
+async def test_seek_while_hidden_updates_pause_tile(env):
+    env.mode = "hide"
+    await parked(env)
+    env.tv.show_view({"screen": "browse"}, env.svc.pause_info())
+    await env.svc.seek(1500, False)
+    assert ("seek", 1500, False) in env.player.calls
+    emit(env, position=1500.0, duration=6000.0, paused=True, audio=1)  # mpv suit le saut
+    assert env.tv.state.screen == "view"
+    assert env.tv.state.pause["position"] == 1500
+
+
+async def test_volume_and_tracks_while_hidden_go_to_player(env):
+    env.mode = "hide"
+    await parked(env)
+    await env.svc.set_volume(40)
+    await env.svc.set_audio(2)
+    assert ("set_volume", 40) in env.player.calls
+    assert ("set_audio", 2) in env.player.calls
+    assert env.svc.parked
+
+
+async def test_stop_while_hidden_stops_player(env):
+    env.mode = "hide"
+    await parked(env)
+    await env.svc.stop()
+    assert env.player.calls.count(("stop",)) == 1
+    assert env.svc.current is None and not env.svc.parked
+    assert env.tv.state.screen != "paused"
+
+
+async def test_restore_video_failure_still_resumes(env, caplog):
+    env.mode = "hide"
+    await parked(env)
+    env.player.video_error = RuntimeError("piste vidéo introuvable")
+    env.player.calls.clear()
+    with caplog.at_level("WARNING"):
+        await env.svc.pause(False)
+    assert ("set_pause", False) in env.player.calls
+    assert env.svc.current is not None and not env.svc.parked
+    assert any(r.levelname == "WARNING" for r in caplog.records)
