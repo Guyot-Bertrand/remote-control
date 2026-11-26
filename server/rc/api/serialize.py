@@ -231,18 +231,28 @@ def _marks(n: int) -> str:
     return ",".join("?" * n)
 
 
+# Deux requêtes indexées (media_file.work_id ; season.work_id puis episode puis
+# media_file.episode_id), à la place d'un COALESCE(...) IN (...) qui parcourt media_file.
+_AVAILABILITY_QUERIES = (
+    "SELECT mf.work_id AS wid, mf.id, mf.present, v.label, v.present AS vp"
+    " FROM media_file mf LEFT JOIN volume v ON v.uuid = mf.volume_uuid"
+    " WHERE mf.work_id IN ({marks})",
+    "SELECT s.work_id AS wid, mf.id, mf.present, v.label, v.present AS vp"
+    " FROM season s JOIN episode e ON e.season_id = s.id"
+    " JOIN media_file mf ON mf.episode_id = e.id"
+    " LEFT JOIN volume v ON v.uuid = mf.volume_uuid"
+    " WHERE s.work_id IN ({marks})",
+)
+
+
 def _availability(conn: sqlite3.Connection, work_ids: list[int]) -> dict[int, tuple[bool, str | None]]:
     """Par œuvre : (jouable, libellé du premier disque absent qui porte ses fichiers)."""
     out: dict[int, tuple[bool, str | None]] = {w: (False, None) for w in work_ids}
     if not work_ids:
         return out
-    rows = conn.execute(
-        "SELECT COALESCE(mf.work_id, s.work_id) AS wid, mf.present, v.label, v.present AS vp"
-        " FROM media_file mf LEFT JOIN episode e ON e.id = mf.episode_id"
-        " LEFT JOIN season s ON s.id = e.season_id"
-        " LEFT JOIN volume v ON v.uuid = mf.volume_uuid"
-        f" WHERE COALESCE(mf.work_id, s.work_id) IN ({_marks(len(work_ids))})"
-        " ORDER BY mf.id", work_ids).fetchall()
+    rows = [r for q in _AVAILABILITY_QUERIES
+            for r in conn.execute(q.format(marks=_marks(len(work_ids))), work_ids)]
+    rows.sort(key=lambda r: r["id"])
     playable = {r["wid"] for r in rows if r["present"]}
     absent: dict[int, str | None] = {}
     for r in rows:

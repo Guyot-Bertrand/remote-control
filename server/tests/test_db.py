@@ -18,10 +18,10 @@ def user_version(path) -> int:
 
 def test_fresh_db_gets_schema_version(tmp_path):
     open_db(tmp_path / "rc.db").close()
-    assert SCHEMA_VERSION == 2
-    assert user_version(tmp_path / "rc.db") == 2
+    assert SCHEMA_VERSION == 3
+    assert user_version(tmp_path / "rc.db") == 3
     open_db(tmp_path / "rc.db").close()  # réouverture sans changement
-    assert user_version(tmp_path / "rc.db") == 2
+    assert user_version(tmp_path / "rc.db") == 3
 
 
 def make_too_new(path):
@@ -72,9 +72,9 @@ def make_v1(path) -> None:
     c.close()
 
 
-def test_fresh_database_is_v2(tmp_path):
+def test_fresh_database_is_v3(tmp_path):
     conn = open_db(tmp_path / "rc.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
     cols = {r[1] for r in conn.execute("PRAGMA table_info(media_file)")}
     assert {"audio_langs_json", "subtitle_langs_json", "width", "height", "duration_s"} <= cols
     assert "medium" in {r[1] for r in conn.execute("PRAGMA table_info(work)")}
@@ -86,12 +86,12 @@ def test_fresh_database_is_v2(tmp_path):
 def test_v1_database_migrates(tmp_path):
     make_v1(tmp_path / "rc.db")
     conn = open_db(tmp_path / "rc.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
     assert conn.execute("SELECT medium FROM work").fetchone()[0] is None
     assert conn.execute("SELECT value FROM meta WHERE key='needs_reimport'").fetchone()[0] == "1"
     conn.close()
     conn = open_db(tmp_path / "rc.db")  # réouverture : pas de nouvelle migration
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
     conn.close()
 
 
@@ -104,4 +104,16 @@ def test_row_keeps_null_json_columns_null(tmp_path):
     assert d["audio_langs"] is None
     assert d["subtitle_langs"] is None
     assert d["subtitles"] == []
+    conn.close()
+
+
+def test_schema_v3_and_indexes_on_existing_db(tmp_path):
+    open_db(tmp_path / "rc.db").close()
+    c = sqlite3.connect(tmp_path / "rc.db")
+    c.execute("DROP INDEX media_file_work")
+    c.execute("PRAGMA user_version = 2")  # base v2 sans l'index de la v3
+    c.close()
+    conn = open_db(tmp_path / "rc.db")
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert "media_file_work" in {r[1] for r in conn.execute("PRAGMA index_list(media_file)")}
     conn.close()

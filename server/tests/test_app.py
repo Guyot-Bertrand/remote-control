@@ -529,7 +529,7 @@ def test_v1_database_migrates_and_reimports(setup):
         assert restored.conn.execute(
             "SELECT value FROM meta WHERE key='needs_reimport'").fetchone() is None
         expected = len(parse_catalog(FIXTURE.read_text(encoding="utf-8")).works)
-        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 3
         assert restored.conn.execute(
             "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
         assert works(restored) == expected

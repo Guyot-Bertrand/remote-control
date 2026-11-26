@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 2  # PRAGMA user_version de la base créée par schema.sql
+SCHEMA_VERSION = 3  # PRAGMA user_version de la base créée par schema.sql
 
 
 # Colonnes ajoutées par la version 2 (table, colonne, type).

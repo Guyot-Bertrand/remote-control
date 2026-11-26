@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS media_file (
     UNIQUE (work_id, episode_id, relpath)
 );
 CREATE INDEX IF NOT EXISTS media_file_episode ON media_file (episode_id);
+CREATE INDEX IF NOT EXISTS media_file_work ON media_file (work_id);
 
 CREATE TABLE IF NOT EXISTS collection (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
