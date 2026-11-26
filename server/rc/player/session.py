@@ -202,6 +202,24 @@ def _quality_rank(quality: str) -> int:
     return QUALITY_ORDER.index(quality) if quality in QUALITY_ORDER else len(QUALITY_ORDER)
 
 
+def pause_detail(conn: sqlite3.Connection, current: dict) -> str | None:
+    """Ligne de détail de la pause : « titre d'épisode · qualité résolution », parties
+    inconnues omises ; None si tout l'est (arbitrage 20)."""
+    row = conn.execute("SELECT quality, width, height FROM media_file WHERE id = ?",
+                       (current["media_file_id"],)).fetchone()
+    title = None
+    if current["target_kind"] == "episode":
+        ep = conn.execute("SELECT title FROM episode WHERE id = ?",
+                          (current["target_id"],)).fetchone()
+        title = (ep[0] or "").strip() if ep else None
+    quality, width, height = (row[0], row[1], row[2]) if row else ("", None, None)
+    parts = [quality or ""]
+    if width and height and width > 0 and height > 0:
+        parts.append(f"{width}\u202f×\u202f{height}")
+    group = " ".join(p for p in parts if p)
+    return " · ".join(p for p in (title, group) if p) or None
+
+
 @dataclass
 class _Session:
     current: dict
@@ -266,9 +284,15 @@ class PlaybackService:
         s = self._session
         if s is None or not self._state.paused:
             return None
-        return {"image": s.image, "title": s.current["title"],
+        return self._pause_dict(s, s.image)
+
+    def _pause_dict(self, s: _Session, image: str | None) -> dict:
+        """Objet `pause` de l'état télé, calculé à chaque appel (la résolution d'une
+        analyse arrivée pendant la pause apparaît)."""
+        return {"image": image, "title": s.current["title"],
                 "position": float(self._state.position),
-                "duration": self._state.duration, "work_id": s.current["work_id"]}
+                "duration": self._state.duration, "work_id": s.current["work_id"],
+                "detail": pause_detail(self.conn, s.current)}
 
     # -- lancement ------------------------------------------------------
 
@@ -597,9 +621,7 @@ class PlaybackService:
         celle que mpv va afficher) et ne passe en « lecture » qu'une fois mpv reparti,
         sous sa fenêtre plein écran : pas d'écran intermédiaire visible."""
         self._cancel_resuming()
-        info = {"image": image, "title": s.current["title"],
-                "position": self._state.position, "duration": self._state.duration,
-                "work_id": s.current["work_id"]}
+        info = self._pause_dict(s, image)
         if self.tv.state.screen != "paused" or self.tv.state.pause != info:
             self.tv.show_paused(info)
         timer = asyncio.get_running_loop().call_later(

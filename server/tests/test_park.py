@@ -12,7 +12,8 @@ from rc.events import EventBus
 from rc.fake_tree import make_fake_tree
 from rc.player import session as session_mod
 from rc.player.base import PlayerState
-from rc.player.session import PlaybackService, PlayError, PlayRequest, TvController
+from rc.player.session import (PlaybackService, PlayError, PlayRequest, TvController,
+                               pause_detail)
 from rc.probe import MediaTracks, Track
 from rc.volumes import Volume, build_index, locate_files
 
@@ -99,7 +100,8 @@ async def test_park_restart_captures_saves_and_stops(env):
     assert ("stop",) in env.player.calls
     assert info["position"] == 1394 and info["image"].endswith("v=1")
     assert info == {"image": "/api/player/pause.jpg?v=1", "title": "Ava",
-                    "position": 1394.0, "duration": 6000.0, "work_id": 1}
+                    "position": 1394.0, "duration": 6000.0, "work_id": 1,
+                    "detail": pause_detail(env.conn, env.svc.current)}
     assert env.svc.parked
     assert env.svc.state.running and env.svc.state.paused
     assert env.svc.state.position == 1394
@@ -486,3 +488,56 @@ async def test_restore_video_failure_still_resumes(env, caplog):
     assert any(r.levelname == "WARNING"
                and "restauration de la vidéo impossible" in r.getMessage()
                for r in caplog.records)
+
+
+# -- ligne de détail de la pause (arbitrage 20) ---------------------------------
+
+def _episode_current(conn, title, quality, width, height):
+    row = conn.execute("SELECT id FROM episode LIMIT 1").fetchone()
+    conn.execute("UPDATE episode SET title = ? WHERE id = ?", (title, row[0]))
+    mf = conn.execute("SELECT id FROM media_file WHERE episode_id = ? LIMIT 1",
+                      (row[0],)).fetchone()
+    if mf is None:
+        conn.execute("INSERT INTO media_file (episode_id, quality, relpath, subtitles_json)"
+                     " VALUES (?, ?, 'x', '[]')", (row[0], quality))
+        mf = conn.execute("SELECT last_insert_rowid()").fetchone()
+    conn.execute("UPDATE media_file SET quality = ?, width = ?, height = ? WHERE id = ?",
+                 (quality, width, height, mf[0]))
+    return {"target_kind": "episode", "target_id": row[0], "media_file_id": mf[0]}
+
+
+def _film_current(conn, quality, width, height):
+    mf = conn.execute("SELECT id FROM media_file WHERE work_id = 1 LIMIT 1").fetchone()
+    conn.execute("UPDATE media_file SET quality = ?, width = ?, height = ? WHERE id = ?",
+                 (quality, width, height, mf[0]))
+    return {"target_kind": "work", "target_id": 1, "media_file_id": mf[0]}
+
+
+def test_pause_detail_episode(env):
+    cur = _episode_current(env.conn, "Hiros", "SD", 624, 352)
+    assert pause_detail(env.conn, cur) == "Hiros · SD 624\u202f×\u202f352"
+
+
+def test_pause_detail_film_without_analysis(env):
+    assert pause_detail(env.conn, _film_current(env.conn, "FHD", None, None)) == "FHD"
+
+
+def test_pause_detail_omits_empty_episode_title_and_zero_width(env):
+    cur = _episode_current(env.conn, "", "SD", 0, 0)
+    assert pause_detail(env.conn, cur) == "SD"
+
+
+def test_pause_detail_none_when_nothing_known(env):
+    assert pause_detail(env.conn, _film_current(env.conn, "", None, None)) is None
+
+
+async def test_pause_info_carries_detail(env):
+    await paused_at_1394(env)
+    cur = env.svc.current
+    env.conn.execute("UPDATE media_file SET quality = 'HD', width = 1280, height = 720"
+                     " WHERE id = ?", (cur["media_file_id"],))
+    info = await env.svc.park()
+    assert info["detail"] == pause_detail(env.conn, cur)
+    assert info["detail"] is not None and "HD" in info["detail"]
+    await env.svc.pause(False)  # reprise : l'objet de _await_video le porte aussi
+    assert env.tv.state.pause["detail"] == info["detail"]

@@ -10,7 +10,8 @@
    "title": "Heroes — S01E05",
    "position": 1394.0,
    "duration": 2490.0,
-   "work_id": 12
+   "work_id": 12,
+   "detail": "Hiros · SD 624 × 352"
   }
  },
  "paused-full-sd": {
@@ -24,7 +25,23 @@
    "title": "Bonjour l'angoisse",
    "position": 2472.0,
    "duration": 5404.0,
-   "work_id": 101
+   "work_id": 101,
+   "detail": "SD 704 × 576"
+  }
+ },
+ "paused-full-nodetail": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "paused",
+  "view": null,
+  "pause": {
+   "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 624 352'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c2639'/%3E%3Cstop offset='1' stop-color='%2305070b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='624' height='352' fill='url(%23g)'/%3E%3Ccircle cx='334' cy='95' r='60' fill='%236e665a'/%3E%3Cg fill='%230b0f17'%3E%3Crect x='12' y='141' width='56' height='211'/%3E%3Crect x='75' y='92' width='37' height='260'/%3E%3Crect x='118' y='169' width='62' height='183'/%3E%3Crect x='262' y='169' width='28' height='183' rx='14'/%3E%3Crect x='387' y='113' width='50' height='239'/%3E%3Crect x='443' y='155' width='75' height='197'/%3E%3Crect x='530' y='71' width='44' height='281'/%3E%3C/g%3E%3C/svg%3E",
+   "title": "Heroes — S01E05",
+   "position": 1394.0,
+   "duration": 2490.0,
+   "work_id": 12,
+   "detail": null
   }
  },
  "home": {
