@@ -201,14 +201,24 @@ function collectionCard(c) {
 </div>`;
 }
 
-/** Sorte de rangée : collections (cartes), « Reprendre » (grandes vignettes avec ce
-    qui reste), ou autres (petites vignettes). */
-function homeSectionKind(s) {
+/** Code de la section : le `kind` du téléphone, sinon déduit de l'étiquette et du contenu
+    (règle d'avant les codes). */
+function sectionKind(s) {
+  if (s.kind) return s.kind;
   const items = s.items || [];
-  if (items.every((it) => it.kind === 'collection')) return 'coll';
+  if ((s.people || []).length) return 'people';
+  if (items.length && items.every((it) => it.kind === 'collection')) return 'collections';
+  if (/^aussi connu/i.test(s.label || '')) return 'aka';
   const resume = /^reprendre/i.test(s.label || '')
-    || items.every((it) => it.progress_ratio != null || it.remaining_min != null);
-  return resume ? 'l' : 's';
+    || (items.length && items.every((it) => it.progress_ratio != null || it.remaining_min != null));
+  return resume ? 'resume' : 'recent';
+}
+
+/** Sorte de rangée d'accueil : collections (cartes), « Reprendre » (grandes vignettes
+    avec ce qui reste), ou autres (petites vignettes). */
+function homeRowKind(s) {
+  const k = sectionKind(s);
+  return k === 'collections' ? 'coll' : k === 'resume' ? 'l' : 's';
 }
 
 /** Hauteur d'une rangée (étiquette comprise), pour ne montrer que les rangées entières. */
@@ -237,7 +247,7 @@ function renderHomeView(view, pause) {
   let room = HOME_ROOM;
   const shown = [];
   for (const s of (view.sections || []).filter((x) => (x.items || []).length)) {
-    const kind = homeSectionKind(s);
+    const kind = homeRowKind(s);
     const h = homeSectionHeight(s, kind) + (shown.length ? HOME_GAP : 0);
     if (h > room && shown.length) break;
     room -= h;
@@ -394,9 +404,10 @@ function searchSection(s, query) {
   const people = s.people || [];
   const items = s.items || [];
   const many = people.length + items.length > 2;
+  const kind = sectionKind(s);
   let rows;
-  if (people.length) rows = people.map((p) => personRow(p, query)).join('');
-  else if (/^aussi connu/i.test(s.label || '')) rows = items.map((it) => akaCard(it, query)).join('');
+  if (kind === 'people') rows = people.map((p) => personRow(p, query)).join('');
+  else if (kind === 'aka') rows = items.map((it) => akaCard(it, query)).join('');
   else rows = items.map((it) => foundRow(it, query)).join('');
   return `<div class="mv-search-col${many ? ' compact' : ''}">
 <span class="mv-section-label">${esc(String(s.label || '').toUpperCase())}</span>
@@ -431,7 +442,7 @@ function renderSearchView(view, pause) {
   } else {
     const cols = sections.slice(0, SEARCH_COLUMNS);
     // Les colonnes d'affiches sont un peu plus larges que celles de texte.
-    const widths = cols.map((s) => ((s.people || []).length || /^aussi connu/i.test(s.label || '')
+    const widths = cols.map((s) => (['people', 'aka'].includes(sectionKind(s))
       ? 'minmax(0,1fr)' : 'minmax(0,1.2fr)')).join(' ');
     body = `<div class="mv-search" style="grid-template-columns:${widths}">`
       + `${cols.map((s) => searchSection(s, query)).join('')}</div>`;
