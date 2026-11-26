@@ -312,9 +312,9 @@ async def test_new_volume_restarts_bar_delay(make_player, tmp_path, monkeypatch)
 
 
 def test_volume_bar_geometry():
-    # Barre verticale à 12 % du bord droit (repère 1920 × 1080), remplie depuis le bas.
+    # Barre verticale à 6 % du bord droit (repère 1920 × 1080), remplie depuis le bas.
     full, half, empty = volume_bar_ass(100), volume_bar_ass(50), volume_bar_ass(0)
     assert full.count("\\p1") == 2 and half.count("\\p1") == 2
     assert empty.count("\\p1") == 1  # piste seule, pas de remplissage
-    assert " 1690 " in full  # bord droit de la barre : 1920 × 0,88
+    assert " 1805 " in full  # bord droit de la barre : 1920 × 0,94
     assert half != full

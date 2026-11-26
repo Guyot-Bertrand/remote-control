@@ -29,9 +29,9 @@ def _rect(x0: int, y0: int, x1: int, y1: int) -> str:
 
 
 def volume_bar_ass(level: int) -> str:
-    """Barre verticale à 12 % du bord droit, 40 % de la hauteur, remplie depuis le bas."""
+    """Barre verticale à 6 % du bord droit, 40 % de la hauteur, remplie depuis le bas."""
     w, h = 24, round(_OSD_H * 0.40)
-    x1 = round(_OSD_W * 0.88)
+    x1 = round(_OSD_W * 0.94)
     x0, y0 = x1 - w, (_OSD_H - h) // 2
     y1 = y0 + h
     head = "{\\an7\\pos(0,0)\\shad0"
