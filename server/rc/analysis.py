@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sqlite3
 import subprocess
 from collections.abc import Callable
@@ -26,15 +27,47 @@ _PROBE_ERRORS = (subprocess.CalledProcessError, FileNotFoundError,
                  json.JSONDecodeError, OSError)
 
 
-def pending_files(conn: sqlite3.Connection, indexes, recheck: bool) -> list[tuple[int, Path]]:
-    """Fichiers présents résolus sur un disque monté ; seuls les non analysés sauf `recheck`
-    (le cache d'analyse décide alors s'il faut relancer ffprobe)."""
-    where = "" if recheck else " AND width IS NULL AND duration_s IS NULL"
+def pending_files(conn: sqlite3.Connection, indexes) -> list[tuple[int, Path]]:
+    """Fichiers présents résolus sur un disque monté et pas encore analysés."""
     out: list[tuple[int, Path]] = []
-    for r in conn.execute(f"SELECT id FROM media_file WHERE present = 1{where} ORDER BY id"):
+    for r in conn.execute("SELECT id FROM media_file WHERE present = 1"
+                          " AND width IS NULL AND duration_s IS NULL ORDER BY id"):
         path = resolve_media_path(conn, r["id"], indexes)
         if path is not None:
             out.append((r["id"], path))
+    return out
+
+
+def recheck_candidates(conn: sqlite3.Connection, indexes
+                       ) -> list[tuple[int, Path, float | None, int | None]]:
+    """Fichiers présents résolus, avec mtime et taille du cache d'analyse (`None` sans cache).
+    Aucun `stat` : la liste se lit dans le fil principal, le `stat` se fait ailleurs."""
+    cache = {r["media_file_id"]: (r["mtime"], r["size"])
+             for r in conn.execute("SELECT media_file_id, mtime, size FROM probe_cache")}
+    out = []
+    for r in conn.execute("SELECT id FROM media_file WHERE present = 1 ORDER BY id"):
+        path = resolve_media_path(conn, r["id"], indexes)
+        if path is not None:
+            mtime, size = cache.get(r["id"], (None, None))
+            out.append((r["id"], path, mtime, size))
+    return out
+
+
+def stale_files(candidates) -> list[tuple[int, Path]]:
+    """Garde les fichiers à ré-analyser : sans cache, modifiés (comparaison exacte, comme
+    `cached_tracks`) ou dont le `stat` échoue. Bloquant : à lancer dans un fil."""
+    out: list[tuple[int, Path]] = []
+    for media_file_id, path, mtime, size in candidates:
+        if mtime is None or size is None:
+            out.append((media_file_id, path))
+            continue
+        try:
+            st = os.stat(path)
+        except OSError:
+            out.append((media_file_id, path))
+            continue
+        if st.st_mtime != mtime or st.st_size != size:
+            out.append((media_file_id, path))
     return out
 
 
@@ -140,7 +173,11 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
             if not queue:
                 full = state.last_full_index
                 recheck = full is not None and full != handled_index
-                queue = pending_files(state.conn, state.indexes, recheck)
+                if recheck:
+                    queue = await asyncio.to_thread(
+                        stale_files, recheck_candidates(state.conn, state.indexes))
+                else:
+                    queue = pending_files(state.conn, state.indexes)
                 if recheck:
                     handled_index = full  # seulement une fois la liste obtenue
                     failed.clear()
