@@ -201,17 +201,26 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
                 queue = [f for f in queue if f[0] not in failed]
                 if not queue:
                     idle = state.playback is None or state.playback.current is None
-                    wrote = False
+                    wrote = failed_now = False
                     if idle and not frames_off:
+                        # TMDB inutilisable (clé refusée, réseau absent) : les œuvres
+                        # avec IMDb n'attendent pas un essai qui n'aboutira pas.
+                        tmdb_enabled = (bool(state.config.tmdb_api_key)
+                                        and not state.tmdb_unusable)
+                        before = len(frame_failed)
                         try:
                             wrote = await asyncio.to_thread(
                                 _extract_in_thread, db_file, state.config.data_dir / "assets",
-                                state.indexes, frame_failed, bool(state.config.tmdb_api_key))
+                                state.indexes, frame_failed, tmdb_enabled)
                         except FfmpegMissing as exc:
                             frames_off = True
                             log.warning("ffmpeg introuvable, images extraites suspendues"
                                         " jusqu'au prochain index complet (%s)", exc)
-                        if wrote:  # une œuvre par tour, sans attendre la suivante
+                        failed_now = len(frame_failed) > before
+                        # Une œuvre par tour, sans attendre la suivante : après une image
+                        # écrite comme après un échec (l'œuvre reste écartée jusqu'au
+                        # prochain index complet), sinon les échecs affameraient la suite.
+                        if wrote or failed_now:
                             if state.clock() - last_announce >= ANNOUNCE_EVERY:
                                 publish_catalog(state, current_revision(state.conn))
                                 last_announce = state.clock()

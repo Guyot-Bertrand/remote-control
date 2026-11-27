@@ -103,14 +103,18 @@ def frame_source(conn: sqlite3.Connection, work_id: int,
 
 def extract_frame(path: Path, at: float, dest: Path, runner=subprocess.run) -> None:
     """Une image à `at` secondes dans `dest` (JPEG), en basse priorité. Lève en cas
-    d'échec de ffmpeg ; `FfmpegMissing` s'il est introuvable."""
+    d'échec de ffmpeg ; `FfmpegMissing` s'il est introuvable. L'absence est vérifiée
+    avant le lancement : derrière `nice`, un ffmpeg absent ne donnerait qu'un code 127."""
+    ff = shutil.which("ffmpeg")
+    if ff is None:
+        raise FfmpegMissing("ffmpeg introuvable dans le PATH")
     nice = ["nice", "-n", "10"] if shutil.which("nice") else []
-    cmd = [*nice, "ffmpeg", "-v", "error", "-y", "-threads", "1",
+    cmd = [*nice, ff, "-v", "error", "-y", "-threads", "1",
            "-protocol_whitelist", "file", "-format_whitelist", FORMAT_WHITELIST,
            "-ss", str(at), "-i", f"file:{path.resolve()}", "-frames:v", "1", str(dest)]
     try:
         runner(cmd, check=True, capture_output=True, timeout=FFMPEG_TIMEOUT)
-    except FileNotFoundError as exc:
+    except FileNotFoundError as exc:  # ffmpeg retiré entre-temps, lancé sans nice
         raise FfmpegMissing(str(exc)) from exc
 
 

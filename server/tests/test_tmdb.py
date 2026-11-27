@@ -367,6 +367,25 @@ async def test_abort_is_signalled(conn, tmp_path, status):
     assert outcome["aborted"] is True
 
 
+@pytest.mark.parametrize("status,unusable", [(401, True), (403, True), (429, False),
+                                             (404, False), (200, False)])
+async def test_unusable_signalled_for_refused_key_only(conn, tmp_path, status, unusable):
+    outcome = {}
+    async with client_for(Recorder(status=status)) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome.get("unusable", False) is unusable
+
+
+async def test_unusable_signalled_without_network(conn, tmp_path):
+    def handler(request):
+        raise httpx.ConnectError("pas de réseau", request=request)
+
+    outcome = {}
+    async with client_for(handler) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome["unusable"] is True and outcome["aborted"] is True
+
+
 async def test_unchanged_url_takes_no_revision(conn, tmp_path):
     conn.execute("UPDATE work SET tmdb_url = 'https://www.themoviedb.org/movie/5' "
                  "WHERE imdb_id = 'tt0000001'")

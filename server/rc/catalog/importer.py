@@ -188,8 +188,21 @@ def _sync_files(conn, work_id: int, wanted: dict[tuple, dict], rev: int) -> None
     conn.executemany("DELETE FROM media_file WHERE id = ?", [(i,) for i in gone])
 
 
+def _forget_tmdb(conn, work_id: int) -> None:
+    """IMDb changé : ce que TMDB avait trouvé ne vaut plus, la recherche est refaite.
+    Une affiche locale ou extraite reste (l'extraite sera remplacée par TMDB)."""
+    conn.execute("DELETE FROM meta WHERE key IN (?, ?)",
+                 (f"tmdb_tried:{work_id}", f"tmdb_link_tried:{work_id}"))
+    conn.execute("UPDATE work SET tmdb_url = NULL, "
+                 "poster_asset = CASE WHEN poster_source = 'tmdb' THEN NULL "
+                 "ELSE poster_asset END, "
+                 "poster_source = CASE WHEN poster_source = 'tmdb' THEN NULL "
+                 "ELSE poster_source END WHERE id = ?", (work_id,))
+
+
 def _write_work(conn, work_id: int, p: dict, content_hash: str,
                 collection_ids: dict[str, int], rev: int) -> None:
+    old = conn.execute("SELECT imdb_id FROM work WHERE id = ?", (work_id,)).fetchone()
     conn.execute(
         "INSERT INTO work (id, type, key, title_fr, title_vo, title_alt, year, "
         "duration_min, episode_count, directors_json, genres_json, cast_json, synopsis, "
@@ -216,6 +229,8 @@ def _write_work(conn, work_id: int, p: dict, content_hash: str,
          json.dumps(p["ratings"], ensure_ascii=False), content_hash, rev),
     )
     _unbury(conn, "work", work_id)
+    if old is not None and old["imdb_id"] != p["imdb_id"]:
+        _forget_tmdb(conn, work_id)
 
     season_ids = _sync_rows(
         conn, "season", "work_id", work_id, "label",

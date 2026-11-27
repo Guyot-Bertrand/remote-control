@@ -66,6 +66,9 @@ class AppState:
     refused: Stat | None = None  # dernière version refusée (avertie une seule fois)
     published_revision: int | None = None  # dernière révision annoncée aux clients
     poster_failures: set = field(default_factory=set)  # affiches illisibles (inchangées)
+    # Clé TMDB refusée ou réseau indisponible au dernier tour TMDB ; faux dès qu'un tour
+    # aboutit. Les images extraites n'attendent alors plus TMDB (remplacées plus tard).
+    tmdb_unusable: bool = False
     playback: PlaybackService | None = None
 
 
@@ -261,6 +264,10 @@ async def _tmdb_step(state: AppState) -> None:
             await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
                                         state.config.tmdb_api_key, client,
                                         indexes=state.indexes, outcome=outcome)
+            if outcome.get("unusable"):
+                state.tmdb_unusable = True
+            elif not outcome.get("aborted"):
+                state.tmdb_unusable = False  # tour abouti ; une limite (429) n'y change rien
             if not outcome.get("aborted"):
                 await fetch_missing_tmdb_links(state.conn, state.config.tmdb_api_key, client)
     except Exception:

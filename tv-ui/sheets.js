@@ -41,8 +41,6 @@ function versionPills(w, readable) {
     .map((r) => `<div class="pills">${r}</div>`).join('');
 }
 
-/** Fiche d'une œuvre ; `pause` : vidéo en pause dans le coin d'état ; `enter` : entrée
-    animée (pas lors d'une mise à jour de la même fiche). */
 // Pastilles de notes (arbitrage 24) : IM, SC et SC@xx ayant une valeur, jamais NP, NT ni WK.
 function fmtRating(code, value) {
   const n = Number(value);
@@ -59,6 +57,8 @@ function ratingPills(ratings) {
     .join('');
 }
 
+/** Fiche d'une œuvre ; `pause` : vidéo en pause dans le coin d'état ; `enter` : entrée
+    animée (pas lors d'une mise à jour de la même fiche). */
 function renderWork(w, { pause = null, enter = true } = {}) {
   const readable = readableVersions(w.media_files);
   const title = w.title_fr;
@@ -114,6 +114,27 @@ ${cast.length ? `<div class="cast"><span class="muted">Avec </span>${esc(cast.jo
 ${colls ? `<div class="colls">${colls}</div>` : ''}
 ${pills ? `<div class="versions">${pills}</div>` : ''}
 </div></div></div>`;
+}
+
+/** Résumé de la fiche : la colonne le rétrécit quand la place manque (pastilles de
+    notes, reprise…). Il garde alors autant de lignes entières qu'il en tient, jamais une
+    demi-ligne ; s'il n'en tient aucune, il disparaît. À rappeler une fois l'écran dans la
+    page (mesure) et après le chargement des polices. */
+function fitSynopsis(root) {
+  root.querySelectorAll('.synopsis').forEach((el) => {
+    el.style.removeProperty('-webkit-line-clamp');
+    el.style.removeProperty('max-height');
+    el.style.removeProperty('display');
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    if (!lh) return;
+    const lines = Math.floor((el.clientHeight + 0.5) / lh);
+    if (lines < 1) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.webkitLineClamp = String(lines);
+    el.style.maxHeight = `${lines * lh}px`;
+  });
 }
 
 // Saison (maquette 4b) : trois colonnes de huit lignes sous l'en-tête et le coin d'état.

@@ -122,8 +122,19 @@ def test_malformed_note_is_none():
         text = f"MN ; film ; A [2000] ; A ; *\nMQ ; IM ; {bad} ; https://x.org/a\n"
         assert _ratings(text) == [("IM", "IMDb", None, "https://x.org/a")]
     assert _ratings("MN ; film ; A [2000] ; A ; *\nMQ ; IM ;\n") == [("IM", "IMDb", None, None)]
-    text = "MN ; film ; A [2000] ; A ; *\nMQ ; WK ; 5.0 ; ftp://x.org\n"
-    assert _ratings(text) == [("WK", "Wikipédia", 5.0, None)]
+    text = "MN ; film ; A [2000] ; A ; *\nMQ ; WK ; ? ; ftp://x.org\n"
+    assert _ratings(text) == [("WK", "Wikipédia", None, None)]
+
+
+def test_wikipedia_rating_never_has_value():
+    text = "MN ; film ; A [2000] ; A ; *\nMQ ; WK ; 5.0 ; https://fr.wikipedia.org/wiki/A\n"
+    assert _ratings(text) == [("WK", "Wikipédia", None, "https://fr.wikipedia.org/wiki/A")]
+
+
+def test_rating_url_with_semicolon_kept_whole():
+    url = "https://fr.wikipedia.org/wiki/A?x=1;y=2"
+    text = f"MN ; film ; A [2000] ; A ; *\nMQ ; IM ; 7.0 ; {url}\nMQ ; NP;6.0;{url}\n"
+    assert _ratings(text) == [("IM", "IMDb", 7.0, url), ("NP", "Note personnelle", 6.0, url)]
 
 
 def test_mq_before_any_work_is_silently_ignored():

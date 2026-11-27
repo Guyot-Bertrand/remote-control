@@ -407,6 +407,30 @@ async def test_tmdb_step_skips_link_pass_when_aborted(setup, monkeypatch):
     assert calls == []
 
 
+async def test_tmdb_step_records_unusable_tmdb(setup, monkeypatch):
+    state, _ = setup
+    outcomes = iter([{"aborted": True, "unusable": True}, {"aborted": True},
+                     {}, {"aborted": True, "unusable": True}])
+
+    async def posters(*a, outcome=None, **k):
+        outcome.update(next(outcomes))
+        return 0
+
+    async def links(*a, **k):
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = "k"
+    assert state.tmdb_unusable is False
+    seen = []
+    for _ in range(4):
+        await app_mod._tmdb_step(state)
+        seen.append(state.tmdb_unusable)
+    # clé refusée ou réseau absent → vrai ; limite (429) → inchangé ; tour abouti → faux
+    assert seen == [True, True, False, True]
+
+
 BAD_LINES = "".join(f"ZZ ; bizarre {i}\n" for i in range(25))
 
 

@@ -21,6 +21,12 @@ def jpeg_bytes(color=(200, 30, 30)):
     return buf.getvalue()
 
 
+@pytest.fixture(autouse=True)
+def ffmpeg_found(monkeypatch):
+    """ffmpeg et nice « installés » : les tests ne dépendent pas de la machine."""
+    monkeypatch.setattr(frames.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+
 @pytest.fixture
 def conn(tmp_path):
     c = open_db(tmp_path / "rc.db")
@@ -148,19 +154,36 @@ def test_extract_frame_command(tmp_path, monkeypatch):
         calls.append((cmd, kw))
         return subprocess.CompletedProcess(cmd, 0)
 
-    monkeypatch.setattr(frames.shutil, "which", lambda name: "/usr/bin/nice")
+    monkeypatch.setattr(frames.shutil, "which", lambda name: f"/usr/bin/{name}")
     extract_frame(Path("/v/film.mkv"), 540.0, tmp_path / "frame.jpg", runner=runner)
     cmd, kw = calls[0]
-    assert cmd == ["nice", "-n", "10", "ffmpeg", "-v", "error", "-y", "-threads", "1",
+    assert cmd == ["nice", "-n", "10", "/usr/bin/ffmpeg", "-v", "error", "-y", "-threads", "1",
                    "-protocol_whitelist", "file",
                    "-format_whitelist", "matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,avi,mpegts,"
                    "mpeg,flv,asf,ogg,rm,dv,nut",
                    "-ss", "540.0", "-i", "file:/v/film.mkv",
                    "-frames:v", "1", str(tmp_path / "frame.jpg")]
     assert kw["timeout"] == 60 and kw["check"] is True
-    monkeypatch.setattr(frames.shutil, "which", lambda name: None)  # sans nice
+    monkeypatch.setattr(frames.shutil, "which",  # sans nice
+                        lambda name: "/opt/ffmpeg" if name == "ffmpeg" else None)
     extract_frame(Path("/v/film.mkv"), 1.0, tmp_path / "frame.jpg", runner=runner)
-    assert calls[1][0][0] == "ffmpeg"
+    assert calls[1][0][0] == "/opt/ffmpeg"
+
+
+def test_extract_frame_ffmpeg_missing_while_nice_present(tmp_path, monkeypatch):
+    # Avec nice, ffmpeg absent fait sortir nice en 127 (CalledProcessError) : jamais
+    # FileNotFoundError. L'absence se voit donc avant de lancer quoi que ce soit.
+    calls = []
+
+    def runner(cmd, **kw):
+        calls.append(cmd)
+        raise subprocess.CalledProcessError(127, cmd)
+
+    monkeypatch.setattr(frames.shutil, "which",
+                        lambda name: "/usr/bin/nice" if name == "nice" else None)
+    with pytest.raises(frames.FfmpegMissing):
+        extract_frame(Path("/v/film.mkv"), 1.0, tmp_path / "frame.jpg", runner=runner)
+    assert calls == []
 
 
 def test_extract_frame_relative_input_made_absolute(tmp_path, monkeypatch):
@@ -405,7 +428,8 @@ async def test_loop_passes_tmdb_enabled_and_clears_failures(state, monkeypatch):
 
     def fake_extract(db_file, assets_dir, indexes, failed, tmdb_enabled):
         seen.append((tmdb_enabled, set(failed)))
-        failed.add(len(seen))
+        if not failed:
+            failed.add(1)  # un échec : l'œuvre suivante est essayée sans attendre
         return False
 
     monkeypatch.setattr(analysis, "_extract_in_thread", fake_extract)
@@ -420,7 +444,58 @@ async def test_loop_passes_tmdb_enabled_and_clears_failures(state, monkeypatch):
 
     with pytest.raises(Stop):
         await analysis_loop(state, sleep=sleep)
-    assert seen == [(True, set()), (True, {1}), (True, set())]
+    assert seen == [(True, set()), (True, {1}), (True, {1}), (True, set()), (True, {1})]
+    assert sleeps == [7.0, 7.0, 7.0]
+
+
+async def test_loop_many_failures_do_not_starve_later_work(state, monkeypatch, tmp_path):
+    """Plus de 20 œuvres en échec permanent : la suivante est atteinte dans le même cycle,
+    sans attendre une période après chaque échec."""
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    for wid in range(1, 27):
+        add_work(state.conn, wid)
+        add_file(state.conn, wid, work_id=wid, duration=100.0)
+    state.indexes = indexes_for(tmp_path, *range(1, 27))
+    calls = []
+
+    def runner(cmd, **kw):
+        src = cmd[cmd.index("-i") + 1]
+        calls.append(src)
+        if not src.endswith("/f26.mkv"):
+            raise subprocess.CalledProcessError(1, cmd)
+        Path(cmd[-1]).write_bytes(jpeg_bytes())
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(frames, "_runner", runner)
+    sleeps = []
+
+    async def sleep(s):
+        sleeps.append(s)
+        raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert len(calls) == 26 and sleeps == [7.0]
+    rows = state.conn.execute("SELECT id FROM work WHERE poster_source = 'frame'").fetchall()
+    assert [r[0] for r in rows] == [26]
+
+
+async def test_loop_disables_tmdb_wait_when_tmdb_unusable(state, monkeypatch):
+    state.config.tmdb_api_key = "k"
+    state.tmdb_unusable = True  # clé refusée ou réseau absent au dernier tour TMDB
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    seen = []
+    monkeypatch.setattr(analysis, "_extract_in_thread",
+                        lambda db, a, ix, failed, tmdb: seen.append(tmdb) or False)
+
+    async def sleep(s):
+        state.tmdb_unusable = False
+        if len(seen) == 2:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert seen == [False, True]
 
 
 async def test_loop_no_extraction_if_playback_starts_during_listing(state, monkeypatch):

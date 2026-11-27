@@ -113,7 +113,8 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
                                 limit: int = 20,
                                 indexes: dict[str, dict[str, Path]] | None = None,
                                 outcome: dict | None = None) -> int:
-    """`outcome["aborted"]` devient vrai si le passage est interrompu (429, clé, réseau)."""
+    """`outcome["aborted"]` devient vrai si le passage est interrompu (429, clé, réseau) ;
+    `outcome["unusable"]` aussi pour une clé refusée ou un réseau indisponible."""
     if not api_key:
         return 0
     rows = conn.execute(
@@ -152,14 +153,14 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
                 log.warning("TMDB : réseau indisponible (%s), passage interrompu",
                             type(exc).__name__)
                 if outcome is not None:
-                    outcome["aborted"] = True
+                    outcome["aborted"] = outcome["unusable"] = True
                 break
             except httpx.HTTPStatusError as exc:
                 status = exc.response.status_code
                 if status in (401, 403):
                     log.warning("TMDB : clé refusée (HTTP %d), passage interrompu", status)
                     if outcome is not None:
-                        outcome["aborted"] = True
+                        outcome["aborted"] = outcome["unusable"] = True
                     break
                 log.warning("TMDB : affiche indisponible pour %s (HTTP %d)", imdb_id, status)
                 if status != 404:

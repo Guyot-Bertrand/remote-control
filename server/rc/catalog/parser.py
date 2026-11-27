@@ -176,8 +176,9 @@ def _on_mq(st: _State, f: list[str]) -> None:
     m = _IMDB.search(" ; ".join(f))
     if m and w.imdb_id is None:
         w.imdb_id = m.group(1)
-    # découpe tolérante (« ;7.0 », champ vide) : locale aux lignes MQ
-    g = [x.strip() for x in re.split(r"\s*;\s*", ";".join(f[1:]))]
+    # découpe tolérante (« ;7.0 », champ vide) : locale aux lignes MQ. Limitée à trois
+    # champs (code ; note ; reste) : un « ; » dans l'URL ne la coupe pas.
+    g = [x.strip() for x in re.split(r"\s*;\s*", ";".join(f[1:]), maxsplit=2)]
     code = _field(g, 0)
     if _rating_rank(code) is None or any(r.code == code for r in w.ratings):
         return
@@ -187,7 +188,8 @@ def _on_mq(st: _State, f: list[str]) -> None:
         ParsedRating(
             code=code,
             name=_FIXED_NAMES.get(code) or st.sources.get(code, code),
-            value=float(raw) if _NOTE.match(raw) else None,
+            # Wikipédia : un lien, jamais une note
+            value=float(raw) if code != "WK" and _NOTE.match(raw) else None,
             url=url if url.startswith("http") else None,
         )
     )

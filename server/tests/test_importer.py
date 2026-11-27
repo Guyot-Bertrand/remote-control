@@ -294,3 +294,40 @@ def test_rating_change_bumps_work_revision(conn):
     assert after["rev"] > before["rev"]
     assert after["content_hash"] != before["content_hash"]
     assert '"value": 6.5' in after["ratings_json"]
+
+
+def test_imdb_change_resets_tmdb_state(conn):
+    text = ("MN ; film ; A [2000] ; A ; *\n"
+            "MQ ; IM ; 7.0 ; https://www.imdb.com/title/tt0000001/\n"
+            "MN ; film ; B [2001] ; B ; *\n"
+            "MQ ; IM ; 7.0 ; https://www.imdb.com/title/tt0000002/\n")
+    import_catalog(conn, parse(text), {})
+    ids = {r["key"]: r["id"] for r in conn.execute("SELECT id, key FROM work")}
+    a, b = ids["A [2000]"], ids["B [2001]"]
+    assert conn.execute("SELECT imdb_id FROM work WHERE id = ?", (a,)).fetchone()[0] \
+        == "tt0000001"
+    conn.execute("INSERT INTO asset (hash, source) VALUES ('t', 'tmdb')")
+    for wid in (a, b):
+        conn.execute("UPDATE work SET poster_asset = 't', poster_source = 'tmdb', "
+                     "tmdb_url = 'https://www.themoviedb.org/movie/1' WHERE id = ?", (wid,))
+        for m in ("tmdb_tried", "tmdb_link_tried"):
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, '1')", (f"{m}:{wid}",))
+    import_catalog(conn, parse(text.replace("tt0000001", "tt0000009")), {})
+    ra = conn.execute("SELECT * FROM work WHERE id = ?", (a,)).fetchone()
+    assert ra["imdb_id"] == "tt0000009"
+    assert (ra["poster_asset"], ra["poster_source"], ra["tmdb_url"]) == (None, None, None)
+    keys = {r[0] for r in conn.execute("SELECT key FROM meta WHERE key LIKE 'tmdb%'")}
+    assert keys == {f"tmdb_tried:{b}", f"tmdb_link_tried:{b}"}  # B inchangée
+    rb = conn.execute("SELECT * FROM work WHERE id = ?", (b,)).fetchone()
+    assert (rb["poster_asset"], rb["poster_source"]) == ("t", "tmdb")
+
+
+def test_imdb_change_keeps_local_and_frame_posters(conn):
+    text = ("MN ; film ; A [2000] ; A ; *\n"
+            "MQ ; IM ; 7.0 ; https://www.imdb.com/title/tt0000001/\n")
+    import_catalog(conn, parse(text), {})
+    conn.execute("INSERT INTO asset (hash, source) VALUES ('f', 'frame')")
+    conn.execute("UPDATE work SET poster_asset = 'f', poster_source = 'frame'")
+    import_catalog(conn, parse(text.replace("tt0000001", "tt0000009")), {})
+    r = conn.execute("SELECT poster_asset, poster_source FROM work").fetchone()
+    assert tuple(r) == ("f", "frame")
