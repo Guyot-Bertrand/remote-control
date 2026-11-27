@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rc.catalog.model import CollectionRef, ParsedGroup
+from rc.catalog.model import CollectionRef, ParsedGroup, ParsedRating
 from rc.catalog.parser import parse_catalog
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
@@ -95,7 +95,6 @@ def _ratings(text):
 
 
 def test_ratings_order_names_values_urls():
-    w = parse_catalog(RATINGS_SAMPLE).works[0]
     assert _ratings(RATINGS_SAMPLE) == [
         ("IM", "IMDb", 7.0, "https://www.imdb.com/title/tt5974624/"),
         ("SC", "Sens Critique", 6.2, "https://www.senscritique.com/film/ava/123"),
@@ -104,7 +103,7 @@ def test_ratings_order_names_values_urls():
         ("WK", "Wikipédia", None, "https://fr.wikipedia.org/wiki/Ava"),
         ("NP", "Note personnelle", 7.0, None),
     ]
-    assert w.imdb_id == "tt5974624"
+    assert parse_catalog(RATINGS_SAMPLE).works[0].imdb_id == "tt5974624"
 
 
 def test_rating_code_without_qs_line_shows_code():
@@ -127,6 +126,18 @@ def test_malformed_note_is_none():
     assert _ratings(text) == [("WK", "Wikipédia", 5.0, None)]
 
 
-def test_mq_before_any_work_is_ignored_with_warning():
+def test_mq_before_any_work_is_silently_ignored():
     res = parse_catalog("MQ ; IM ; 7.0 ; https://www.imdb.com/title/tt1/\n")
     assert res.works == []  # comportement actuel : ignorée, sans avertissement
+
+
+def test_mq_without_space_after_separator():
+    text = "MN ; film ; A [2000] ; A ; *\nMQ ; SC@ES ;7.0\nMQ ; SC@ES ; 3.0\n"
+    w = parse_catalog(text).works[0]
+    assert w.ratings == [ParsedRating("SC@ES", "SC@ES", 7.0, None)]
+
+
+def test_mq_empty_middle_field():
+    text = "MN ; film ; A [2000] ; A ; *\nMQ ; SC ; ; http://x\n"
+    w = parse_catalog(text).works[0]
+    assert w.ratings == [ParsedRating("SC", "Sens Critique", None, "http://x")]

@@ -176,11 +176,13 @@ def _on_mq(st: _State, f: list[str]) -> None:
     m = _IMDB.search(" ; ".join(f))
     if m and w.imdb_id is None:
         w.imdb_id = m.group(1)
-    code = _field(f, 1)
+    # découpe tolérante (« ;7.0 », champ vide) : locale aux lignes MQ
+    g = [x.strip() for x in re.split(r"\s*;\s*", ";".join(f[1:]))]
+    code = _field(g, 0)
     if _rating_rank(code) is None or any(r.code == code for r in w.ratings):
         return
-    raw = _field(f, 2)
-    url = _field(f, 3)
+    raw = _field(g, 1)
+    url = _field(g, 2)
     w.ratings.append(
         ParsedRating(
             code=code,
