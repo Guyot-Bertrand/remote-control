@@ -59,7 +59,13 @@ data class WorkDto(
     val poster: String? = null,
     /** Support d'origine quand l'œuvre n'a pas de fichier lisible (arbitrage 13) ; nul sinon. */
     val medium: String? = null,
+    /** Notes ordonnées (arbitrage 24) ; vide avec un serveur plus ancien. */
+    val ratings: List<RatingDto> = emptyList(),
+    @SerialName("tmdb_url") val tmdbUrl: String? = null,
 )
+
+@Serializable
+data class RatingDto(val code: String, val name: String, val value: Double? = null, val url: String? = null)
 
 @Serializable
 data class SeasonDto(

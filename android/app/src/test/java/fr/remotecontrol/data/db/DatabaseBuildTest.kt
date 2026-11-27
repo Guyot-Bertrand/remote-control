@@ -24,17 +24,17 @@ class DatabaseBuildTest {
         context.deleteDatabase(name)
     }
 
-    /** Cache d'une version de développement plus récente (schéma 3) : effacé, jamais de plantage. */
+    /** Cache d'une version de développement plus récente (schéma 4) : effacé, jamais de plantage. */
     @Test fun newer_cache_is_wiped_on_downgrade() = runBlocking {
         SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use {
             it.execSQL("CREATE TABLE meta (`key` TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)")
             it.execSQL("INSERT INTO meta VALUES ('sync.revision', '9')")
-            it.version = 3
+            it.version = 4
         }
         val opened = buildDatabase(context, name).also { db = it }
         assertNull(opened.metaDao().get("sync.revision"))
         assertEquals(0, opened.catalogDao().workCount())
-        assertEquals(2, opened.openHelper.readableDatabase.version)
+        assertEquals(3, opened.openHelper.readableDatabase.version)
     }
 
     /** Cache d'une version précédente de l'appli (schéma 1) : effacé à la mise à jour, jamais de plantage. */
@@ -47,6 +47,18 @@ class DatabaseBuildTest {
         val opened = buildDatabase(context, name).also { db = it }
         assertNull(opened.metaDao().get("sync.revision"))
         assertEquals(0, opened.catalogDao().workCount())
-        assertEquals(2, opened.openHelper.readableDatabase.version)
+        assertEquals(3, opened.openHelper.readableDatabase.version)
+    }
+
+    /** Cache de l'étape 3 (schéma 2) : effacé à la mise à jour vers la version 3. */
+    @Test fun v2_cache_is_wiped_on_upgrade() = runBlocking {
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use {
+            it.execSQL("CREATE TABLE meta (`key` TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)")
+            it.execSQL("INSERT INTO meta VALUES ('sync.revision', '9')")
+            it.version = 2
+        }
+        val opened = buildDatabase(context, name).also { db = it }
+        assertNull(opened.metaDao().get("sync.revision"))
+        assertEquals(3, opened.openHelper.readableDatabase.version)
     }
 }

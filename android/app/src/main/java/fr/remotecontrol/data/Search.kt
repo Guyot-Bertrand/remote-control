@@ -31,4 +31,5 @@ fun WorkDto.toEntity(): WorkEntity = WorkEntity(
     durationMin = durationMin, episodeCount = episodeCount, directors = directors, genres = genres,
     cast = cast, synopsis = synopsis, tags = tags, episodic = episodic, poster = poster,
     sortKey = fold(titleFr), playable = false, medium = medium,
+    ratings = ratings, tmdbUrl = tmdbUrl,
 )
