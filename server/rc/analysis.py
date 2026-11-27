@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from rc.catalog.paths import QUALITY_ORDER
 from rc.db import next_revision
+from rc.frames import extract_one
 from rc.probe import cached_tracks, find_external_subs, media_summary
 from rc.volumes import resolve_media_path
 
@@ -154,8 +155,20 @@ def _analyze_in_thread(db_file: str, media_file_id: int, path: Path) -> bool:
         conn.close()
 
 
+def _extract_in_thread(db_file: str, assets_dir: Path, indexes: dict[str, dict[str, Path]],
+                       failed: set[int], tmdb_enabled: bool) -> bool:
+    conn = sqlite3.connect(db_file, isolation_level=None, timeout=5)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        return extract_one(conn, assets_dir, indexes, failed, tmdb_enabled)
+    finally:
+        conn.close()
+
+
 async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> None:
-    """Un fichier à la fois, suspendue pendant une lecture ; annonce au plus toutes les 30 s."""
+    """Un fichier à la fois, suspendue pendant une lecture ; annonce au plus toutes les 30 s.
+    File vide : une image extraite par tour pour une œuvre sans affiche."""
     from rc.app import _db_file, publish_catalog
     from rc.db import current_revision
 
@@ -163,6 +176,7 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
     poll = state.config.poll_interval
     queue: list[tuple[int, Path]] = []
     failed: set[int] = set()  # analyses en erreur : écartées jusqu'au prochain index complet
+    frame_failed: set[int] = set()  # œuvres dont l'extraction a échoué, idem
     handled_index: float | None = None
     last_announce = state.clock()
     while True:
@@ -181,8 +195,18 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
                 if recheck:
                     handled_index = full  # seulement une fois la liste obtenue
                     failed.clear()
+                    frame_failed.clear()
                 queue = [f for f in queue if f[0] not in failed]
                 if not queue:
+                    if state.playback is None or state.playback.current is None:
+                        wrote = await asyncio.to_thread(
+                            _extract_in_thread, db_file, state.config.data_dir / "assets",
+                            state.indexes, frame_failed, bool(state.config.tmdb_api_key))
+                        if wrote:  # une œuvre par tour, sans attendre la suivante
+                            if state.clock() - last_announce >= ANNOUNCE_EVERY:
+                                publish_catalog(state, current_revision(state.conn))
+                                last_announce = state.clock()
+                            continue  # le tour sans image annonce de toute façon
                     publish_catalog(state, current_revision(state.conn))
                     last_announce = state.clock()
                     await sleep(poll)
