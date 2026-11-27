@@ -32,6 +32,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -121,6 +122,10 @@ fun WorkScreen(
             }
             state.message?.let { MessageBanner(it, onDismissMessage) }
             state.work.synopsis?.let { Synopsis(it) }
+            notesUi(state.work.ratings, state.work.tmdbUrl)?.let { ui ->
+                val uriHandler = LocalUriHandler.current
+                WorkNotes(ui) { url -> runCatching { uriHandler.openUri(url) } }
+            }
             if (state.work.episodic && state.seasons.isNotEmpty()) Seasons(state.seasons, onOpenSeason)
             if (state.work.cast.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
