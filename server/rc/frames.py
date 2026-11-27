@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import sqlite3
 import subprocess
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from rc.assets import process_image
@@ -18,6 +20,15 @@ log = logging.getLogger("rc.frames")
 DEFAULT_AT = 300.0  # secondes, quand la durée est inconnue
 FFMPEG_TIMEOUT = 60
 _runner = subprocess.run  # remplacé dans les tests
+# Fichiers venus des disques, donc non sûrs : ffmpeg ne lit que des fichiers locaux
+# (`file:` seulement, pas de réseau) et seulement des conteneurs vidéo. Les formats
+# « liste de lecture » (hls, concat…), qui iraient chercher d'autres fichiers, sont refusés.
+FORMAT_WHITELIST = ("matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,avi,mpegts,mpeg,flv,asf,ogg,"
+                    "rm,dv,nut")
+
+
+class FfmpegMissing(Exception):
+    """ffmpeg introuvable : inutile d'essayer les autres œuvres."""
 
 
 def frame_time(duration_s: float | None) -> float:
@@ -55,21 +66,24 @@ def _chosen_file(conn: sqlite3.Connection, work_id: int, episodic: bool
     return _best([r for r in rows if r["episode_id"] == first])
 
 
-def frame_candidates(conn: sqlite3.Connection, tmdb_enabled: bool) -> list[int]:
+def iter_candidates(conn: sqlite3.Connection, tmdb_enabled: bool) -> Iterator[int]:
     """Œuvres jouables sans affiche ni affiche locale déclarée (même sur un disque
-    débranché), dont TMDB ne peut plus rien donner, et dont le fichier choisi est analysé."""
+    débranché), dont TMDB ne peut plus rien donner, et dont le fichier choisi est analysé.
+    Paresseux : le fichier choisi n'est cherché qu'au fur et à mesure."""
     rows = conn.execute(
         "SELECT id, episodic FROM work WHERE poster_asset IS NULL "
         "AND poster_relpath IS NULL "
         "AND (? = 0 OR imdb_id IS NULL "
         "OR EXISTS (SELECT 1 FROM meta WHERE key = 'tmdb_tried:' || work.id)) "
         "ORDER BY id", (int(tmdb_enabled),)).fetchall()
-    out = []
     for r in rows:
         f = _chosen_file(conn, r["id"], bool(r["episodic"]))
         if f is not None and (f["width"] is not None or f["duration_s"] is not None):
-            out.append(r["id"])
-    return out
+            yield r["id"]
+
+
+def frame_candidates(conn: sqlite3.Connection, tmdb_enabled: bool) -> list[int]:
+    return list(iter_candidates(conn, tmdb_enabled))
 
 
 def frame_source(conn: sqlite3.Connection, work_id: int,
@@ -88,10 +102,25 @@ def frame_source(conn: sqlite3.Connection, work_id: int,
 
 
 def extract_frame(path: Path, at: float, dest: Path, runner=subprocess.run) -> None:
-    """Une image à `at` secondes dans `dest` (JPEG). Lève en cas d'échec de ffmpeg."""
-    runner(["ffmpeg", "-v", "error", "-y", "-ss", str(at), "-i", str(path),
-            "-frames:v", "1", str(dest)],
-           check=True, capture_output=True, timeout=FFMPEG_TIMEOUT)
+    """Une image à `at` secondes dans `dest` (JPEG), en basse priorité. Lève en cas
+    d'échec de ffmpeg ; `FfmpegMissing` s'il est introuvable."""
+    nice = ["nice", "-n", "10"] if shutil.which("nice") else []
+    cmd = [*nice, "ffmpeg", "-v", "error", "-y", "-threads", "1",
+           "-protocol_whitelist", "file", "-format_whitelist", FORMAT_WHITELIST,
+           "-ss", str(at), "-i", f"file:{path.resolve()}", "-frames:v", "1", str(dest)]
+    try:
+        runner(cmd, check=True, capture_output=True, timeout=FFMPEG_TIMEOUT)
+    except FileNotFoundError as exc:
+        raise FfmpegMissing(str(exc)) from exc
+
+
+def _detail(exc: Exception) -> str:
+    """Message d'erreur, avec la fin de la sortie d'erreur de ffmpeg (200 caractères)."""
+    err = getattr(exc, "stderr", None)
+    if isinstance(err, bytes):
+        err = err.decode("utf-8", "replace")
+    err = (err or "").strip()
+    return f"{exc} — {err[-200:]}" if err else str(exc)
 
 
 def _has_image(p: Path) -> bool:
@@ -118,8 +147,9 @@ def extract_one(conn: sqlite3.Connection, assets_dir: Path,
                 indexes: dict[str, dict[str, Path]], failed: set[int],
                 tmdb_enabled: bool) -> bool:
     """Extrait l'image de la première œuvre candidate non écartée (bloquant). Vrai si une
-    affiche a été écrite ; un échec écarte l'œuvre (`failed`) et rend faux."""
-    for work_id in frame_candidates(conn, tmdb_enabled):
+    affiche a été écrite ; un échec écarte l'œuvre (`failed`) et rend faux. ffmpeg
+    introuvable : `FfmpegMissing` est propagée, aucune œuvre n'est écartée."""
+    for work_id in iter_candidates(conn, tmdb_enabled):
         if work_id in failed:
             continue
         src = frame_source(conn, work_id, indexes)
@@ -128,8 +158,10 @@ def extract_one(conn: sqlite3.Connection, assets_dir: Path,
         path, duration = src
         try:
             h = _grab(path, duration, assets_dir)
-        except Exception as exc:  # ffmpeg absent, code d'erreur, délai, image illisible
-            log.warning("image extraite impossible pour %s : %s", path, exc)
+        except FfmpegMissing:
+            raise
+        except Exception as exc:  # code d'erreur, délai, aucune image, image illisible
+            log.warning("image extraite impossible pour %s : %s", path, _detail(exc))
             failed.add(work_id)
             return False
         conn.execute("BEGIN IMMEDIATE")
@@ -143,6 +175,12 @@ def extract_one(conn: sqlite3.Connection, assets_dir: Path,
                              (h,))
                 conn.execute("UPDATE work SET poster_asset = ?, poster_source = 'frame', "
                              "rev = ? WHERE id = ?", (h, rev, work_id))
+            elif conn.execute("SELECT 1 FROM asset WHERE hash = ?", (h,)).fetchone() is None:
+                # Image devenue inutile : ses fichiers ne restent pas orphelins. Fait sous
+                # le verrou d'écriture, aucune ligne `asset` ne peut arriver entre-temps.
+                # Reste un cas théorique : une affiche locale aux octets identiques, traitée
+                # au même instant, trouverait ses fichiers puis les perdrait ici.
+                shutil.rmtree(assets_dir / h, ignore_errors=True)
             conn.execute("COMMIT")
         except BaseException:
             conn.execute("ROLLBACK")

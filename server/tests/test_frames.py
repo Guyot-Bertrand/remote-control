@@ -141,18 +141,34 @@ def test_frame_source_unresolved_file(conn, tmp_path):
     assert frame_source(conn, 1, {"u": {}}) is None
 
 
-def test_extract_frame_command(tmp_path):
+def test_extract_frame_command(tmp_path, monkeypatch):
     calls = []
 
     def runner(cmd, **kw):
         calls.append((cmd, kw))
         return subprocess.CompletedProcess(cmd, 0)
 
+    monkeypatch.setattr(frames.shutil, "which", lambda name: "/usr/bin/nice")
     extract_frame(Path("/v/film.mkv"), 540.0, tmp_path / "frame.jpg", runner=runner)
     cmd, kw = calls[0]
-    assert cmd == ["ffmpeg", "-v", "error", "-y", "-ss", "540.0", "-i", "/v/film.mkv",
+    assert cmd == ["nice", "-n", "10", "ffmpeg", "-v", "error", "-y", "-threads", "1",
+                   "-protocol_whitelist", "file",
+                   "-format_whitelist", "matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,avi,mpegts,"
+                   "mpeg,flv,asf,ogg,rm,dv,nut",
+                   "-ss", "540.0", "-i", "file:/v/film.mkv",
                    "-frames:v", "1", str(tmp_path / "frame.jpg")]
     assert kw["timeout"] == 60 and kw["check"] is True
+    monkeypatch.setattr(frames.shutil, "which", lambda name: None)  # sans nice
+    extract_frame(Path("/v/film.mkv"), 1.0, tmp_path / "frame.jpg", runner=runner)
+    assert calls[1][0][0] == "ffmpeg"
+
+
+def test_extract_frame_relative_input_made_absolute(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.chdir(tmp_path)
+    extract_frame(Path("-x.mkv"), 1.0, tmp_path / "f.jpg",
+                  runner=lambda cmd, **kw: calls.append(cmd))
+    assert calls[0][calls[0].index("-i") + 1] == f"file:{tmp_path}/-x.mkv"
 
 
 def writing_runner(calls, write_when=lambda at: True):
@@ -201,20 +217,91 @@ def test_extraction_failure_is_skipped_until_full_index(conn, tmp_path, monkeypa
     add_file(conn, 2, work_id=2, duration=100.0)
     idx = indexes_for(tmp_path, 1, 2)
 
-    def missing(cmd, **kw):
-        raise FileNotFoundError("ffmpeg")
+    def broken(cmd, **kw):
+        raise subprocess.CalledProcessError(1, cmd, stderr=b"x" * 300 + b" moov atom not found")
 
-    monkeypatch.setattr(frames, "_runner", missing)
+    monkeypatch.setattr(frames, "_runner", broken)
     failed: set[int] = set()
     rev0 = current_revision(conn)
     assert extract_one(conn, tmp_path / "assets", idx, failed, False) is False
-    assert failed == {1} and "ffmpeg" in caplog.text
+    assert failed == {1} and "moov atom not found" in caplog.text
+    assert "x" * 201 not in caplog.text  # fin de stderr seulement (200 caractères)
     assert current_revision(conn) == rev0
     calls = []
     monkeypatch.setattr(frames, "_runner", writing_runner(calls))
     assert extract_one(conn, tmp_path / "assets", idx, failed, False) is True
     rows = conn.execute("SELECT id, poster_source FROM work ORDER BY id").fetchall()
     assert [tuple(r) for r in rows] == [(1, None), (2, "frame")]
+
+
+def test_missing_ffmpeg_raises_without_marking_works(conn, tmp_path, monkeypatch):
+    for wid in (1, 2):
+        add_work(conn, wid)
+        add_file(conn, wid, work_id=wid, duration=100.0)
+    calls = []
+
+    def missing(cmd, **kw):
+        calls.append(cmd)
+        raise FileNotFoundError("ffmpeg")
+
+    monkeypatch.setattr(frames, "_runner", missing)
+    failed: set[int] = set()
+    with pytest.raises(frames.FfmpegMissing):
+        extract_one(conn, tmp_path / "assets", indexes_for(tmp_path, 1, 2), failed, False)
+    assert failed == set() and len(calls) == 1
+
+
+def test_extract_one_stops_at_first_usable_candidate(conn, tmp_path, monkeypatch):
+    for wid in (1, 2, 3):
+        add_work(conn, wid)
+        add_file(conn, wid, work_id=wid, duration=100.0)
+    looked = []
+    real = frames._chosen_file
+    monkeypatch.setattr(frames, "_chosen_file",
+                        lambda c, w, e: looked.append(w) or real(c, w, e))
+    monkeypatch.setattr(frames, "_runner", writing_runner([]))
+    assert extract_one(conn, tmp_path / "assets", indexes_for(tmp_path, 1, 2, 3), set(),
+                       False)
+    assert 3 not in looked  # la liste entière n'est pas construite
+
+
+def test_orphan_frame_removed_when_poster_arrived_meanwhile(conn, tmp_path, monkeypatch):
+    add_work(conn, 1)
+    add_file(conn, 1, work_id=1, duration=100.0)
+    assets = tmp_path / "assets"
+    real_grab = frames._grab
+
+    def grab_then_tmdb(path, duration, assets_dir):
+        h = real_grab(path, duration, assets_dir)
+        conn.execute("UPDATE work SET poster_asset = 'f' || 'ffffffffffffff',"
+                     " poster_source = 'tmdb'")  # TMDB est passé pendant l'extraction
+        return h
+
+    monkeypatch.setattr(frames, "_grab", grab_then_tmdb)
+    monkeypatch.setattr(frames, "_runner", writing_runner([]))
+    rev0 = current_revision(conn)
+    assert extract_one(conn, assets, indexes_for(tmp_path, 1), set(), False) is False
+    assert current_revision(conn) == rev0
+    assert conn.execute("SELECT poster_source FROM work").fetchone()[0] == "tmdb"
+    assert list(assets.iterdir()) == []  # fichiers de l'image retirés
+
+
+def test_frame_kept_when_hash_referenced(conn, tmp_path, monkeypatch):
+    add_work(conn, 1)
+    add_file(conn, 1, work_id=1, duration=100.0)
+    assets = tmp_path / "assets"
+    real_grab = frames._grab
+
+    def grab_then_local(path, duration, assets_dir):
+        h = real_grab(path, duration, assets_dir)
+        conn.execute("INSERT INTO asset (hash, source) VALUES (?, 'AF/x.jpg')", (h,))
+        conn.execute("UPDATE work SET poster_asset = ?, poster_source = 'local'", (h,))
+        return h
+
+    monkeypatch.setattr(frames, "_grab", grab_then_local)
+    monkeypatch.setattr(frames, "_runner", writing_runner([]))
+    assert extract_one(conn, assets, indexes_for(tmp_path, 1), set(), False) is False
+    assert len(list(assets.iterdir())) == 1  # partagée : gardée
 
 
 def test_unreadable_image_marks_failed(conn, tmp_path, monkeypatch):
@@ -351,3 +438,29 @@ async def test_loop_no_extraction_if_playback_starts_during_listing(state, monke
     with pytest.raises(Stop):
         await analysis_loop(state, sleep=sleep)
     assert calls == []
+
+
+async def test_loop_missing_ffmpeg_logged_once_until_full_index(state, monkeypatch, caplog):
+    monkeypatch.setattr(analysis, "pending_files", lambda conn, ix: [])
+    monkeypatch.setattr(analysis, "recheck_candidates", lambda conn, ix: [])
+    monkeypatch.setattr(analysis, "stale_files", lambda c: [])
+    calls = []
+
+    def missing(*a):
+        calls.append(1)
+        raise frames.FfmpegMissing("ffmpeg")
+
+    monkeypatch.setattr(analysis, "_extract_in_thread", missing)
+    sleeps = []
+
+    async def sleep(s):
+        sleeps.append(s)
+        if len(sleeps) == 3:
+            state.last_full_index = 100.0
+        if len(sleeps) == 4:
+            raise Stop
+
+    with pytest.raises(Stop):
+        await analysis_loop(state, sleep=sleep)
+    assert len(calls) == 2 and sleeps == [7.0] * 4  # 1er tour, puis après l'index complet
+    assert caplog.text.count("ffmpeg introuvable") == 2

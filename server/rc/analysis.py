@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from rc.catalog.paths import QUALITY_ORDER
 from rc.db import next_revision
-from rc.frames import extract_one
+from rc.frames import FfmpegMissing, extract_one
 from rc.probe import cached_tracks, find_external_subs, media_summary
 from rc.volumes import resolve_media_path
 
@@ -177,6 +177,7 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
     queue: list[tuple[int, Path]] = []
     failed: set[int] = set()  # analyses en erreur : écartées jusqu'au prochain index complet
     frame_failed: set[int] = set()  # œuvres dont l'extraction a échoué, idem
+    frames_off = False  # ffmpeg introuvable : plus d'extraction jusqu'au prochain index complet
     handled_index: float | None = None
     last_announce = state.clock()
     while True:
@@ -196,12 +197,20 @@ async def analysis_loop(state: AppState, sleep: Callable = asyncio.sleep) -> Non
                     handled_index = full  # seulement une fois la liste obtenue
                     failed.clear()
                     frame_failed.clear()
+                    frames_off = False
                 queue = [f for f in queue if f[0] not in failed]
                 if not queue:
-                    if state.playback is None or state.playback.current is None:
-                        wrote = await asyncio.to_thread(
-                            _extract_in_thread, db_file, state.config.data_dir / "assets",
-                            state.indexes, frame_failed, bool(state.config.tmdb_api_key))
+                    idle = state.playback is None or state.playback.current is None
+                    wrote = False
+                    if idle and not frames_off:
+                        try:
+                            wrote = await asyncio.to_thread(
+                                _extract_in_thread, db_file, state.config.data_dir / "assets",
+                                state.indexes, frame_failed, bool(state.config.tmdb_api_key))
+                        except FfmpegMissing as exc:
+                            frames_off = True
+                            log.warning("ffmpeg introuvable, images extraites suspendues"
+                                        " jusqu'au prochain index complet (%s)", exc)
                         if wrote:  # une œuvre par tour, sans attendre la suivante
                             if state.clock() - last_announce >= ANNOUNCE_EVERY:
                                 publish_catalog(state, current_revision(state.conn))
