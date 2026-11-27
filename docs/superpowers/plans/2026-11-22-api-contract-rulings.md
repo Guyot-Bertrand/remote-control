@@ -87,3 +87,14 @@ Complète la Task 10 du plan serveur ; fait foi pour le serveur et l'appli Andro
     - recherche : « Personnes » → `people`, « Œuvres » → `works`, « Aussi connu sous » → `aka`.
 22. **`POST /api/tv/show` est retirée** (404). Les écrans `home`, `work` et `season` de l'état télé restent : la veille utilise `home`.
 23. **`pause_background`** (config serveur) vaut `hide` par défaut : la piste vidéo de mpv est retirée pendant la pause (fenêtre fermée, mpv lancé et en pause), puis rendue à la reprise. Les commandes `seek`, `volume`, `audio`, `subtitle` et `pause` vont directement à mpv, comme en `minimize`. Valeurs : `hide`, `restart`, `minimize` ; une valeur inconnue donne `hide`.
+
+## Ajouts (2026-11-27, étape 4)
+
+24. **`ratings`** (œuvre, dans `/api/sync` `works[]` et `/api/works/{id}`) : liste ordonnée de `{"code", "name", "value", "url"}`, vide si rien.
+    - `code` : `IM`, `SC`, `SC@xx` (un par critique), `WK`, `NP`, `NT`, dans cet ordre (les `SC@xx` dans l'ordre du fichier) ;
+    - `name` : nom affiché — `IMDb`, `Sens Critique`, `Wikipédia`, `Note personnelle`, `Note technique`, et pour `SC@xx` le nom du critique tiré de la ligne `QS` (`Sens Critique / Prénom Nom (pseudo)` → `Prénom Nom`) ; à défaut le code ;
+    - `value` : nombre (`7.0`) ou `null` (`?`, vide, illisible) ; `url` : texte commençant par `http` ou `null`.
+    - Un même code deux fois : la première ligne gagne. Les autres codes sont ignorés.
+    - La télé n'affiche jamais `NP` ni `NT` ; elle n'affiche que `IM`, `SC`, `SC@xx` ayant une valeur.
+25. **`tmdb_url`** (œuvre) : `https://www.themoviedb.org/movie/<id>` ou `…/tv/<id>`, ou `null`.
+26. **Affiches extraites** : `poster` peut désigner une image extraite de la vidéo ; aucun changement de forme. Priorité : affiche locale > TMDB > image extraite.
