@@ -366,6 +366,47 @@ async def test_tmdb_failure_does_not_block_publish(setup, monkeypatch):
     assert any(e["type"] == "catalog" for e in events)
 
 
+async def test_tmdb_step_runs_link_pass_after_posters(setup, monkeypatch):
+    state, _ = setup
+    calls = []
+
+    async def posters(*a, **k):
+        calls.append("posters")
+        return 0
+
+    async def links(*a, **k):
+        calls.append("links")
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = ""
+    await app_mod._tmdb_step(state)
+    assert calls == []
+    state.config.tmdb_api_key = "k"
+    await app_mod._tmdb_step(state)
+    assert calls == ["posters", "links"]
+
+
+async def test_tmdb_step_skips_link_pass_when_aborted(setup, monkeypatch):
+    state, _ = setup
+    calls = []
+
+    async def posters(*a, outcome=None, **k):
+        outcome["aborted"] = True
+        return 0
+
+    async def links(*a, **k):
+        calls.append("links")
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = "k"
+    await app_mod._tmdb_step(state)
+    assert calls == []
+
+
 BAD_LINES = "".join(f"ZZ ; bizarre {i}\n" for i in range(25))
 
 

@@ -334,6 +334,7 @@ async def test_link_lookup_for_work_with_local_poster(conn, tmp_path):
 
 
 async def test_link_lookup_tried_once(conn, tmp_path):
+    conn.execute("UPDATE work SET poster_source = 'local' WHERE imdb_id = 'tt0000001'")
     rec = Recorder(status=404)
     async with client_for(rec) as c:
         await fetch_missing_tmdb_links(conn, KEY, c)
@@ -341,3 +342,39 @@ async def test_link_lookup_tried_once(conn, tmp_path):
     assert len(rec.requests) == 1
     assert conn.execute("SELECT COUNT(*) FROM meta WHERE key LIKE 'tmdb_link_tried:%'"
                         ).fetchone()[0] == 1
+
+
+async def test_poster_pass_404_means_no_second_find_in_link_pass(conn, tmp_path):
+    rec = Recorder(status=404)
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+        assert await fetch_missing_tmdb_links(conn, KEY, c) == 0
+    assert len(rec.requests) == 1
+
+
+async def test_link_pass_ignores_works_without_poster_history(conn, tmp_path):
+    rec = Recorder()
+    async with client_for(rec) as c:  # ni locale ni tentée par la passe des affiches
+        assert await fetch_missing_tmdb_links(conn, KEY, c) == 0
+    assert rec.requests == []
+
+
+@pytest.mark.parametrize("status", [429, 401])
+async def test_abort_is_signalled(conn, tmp_path, status):
+    outcome = {}
+    async with client_for(Recorder(status=status)) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome["aborted"] is True
+
+
+async def test_unchanged_url_takes_no_revision(conn, tmp_path):
+    conn.execute("UPDATE work SET tmdb_url = 'https://www.themoviedb.org/movie/5' "
+                 "WHERE imdb_id = 'tt0000001'")
+    before = work(conn)["rev"]
+    rev0 = conn.execute("SELECT value FROM meta WHERE key='revision'").fetchone()[0]
+    rec = Recorder(find={"movie_results": [{"id": 5, "poster_path": None}]})
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert work(conn)["rev"] == before
+    assert conn.execute("SELECT value FROM meta WHERE key='revision'"
+                        ).fetchone()[0] == rev0

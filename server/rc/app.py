@@ -257,10 +257,12 @@ async def _tmdb_step(state: AppState) -> None:
         return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
+            outcome: dict = {}
             await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
                                         state.config.tmdb_api_key, client,
-                                        indexes=state.indexes)
-            await fetch_missing_tmdb_links(state.conn, state.config.tmdb_api_key, client)
+                                        indexes=state.indexes, outcome=outcome)
+            if not outcome.get("aborted"):
+                await fetch_missing_tmdb_links(state.conn, state.config.tmdb_api_key, client)
     except Exception:
         log.exception("secours TMDB en échec, tour poursuivi")
 
