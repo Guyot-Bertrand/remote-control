@@ -12,7 +12,7 @@ import androidx.room.TypeConverters
         VolumeEntity::class, CollectionEntity::class, WorkCollectionEntity::class,
         ProgressEntity::class, MetaEntity::class, WorkFtsEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

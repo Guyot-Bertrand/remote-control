@@ -55,6 +55,14 @@ object Texts {
     const val stop = "Arrêter"
     const val directors = "Réalisation"
     const val cast = "Avec"
+    const val myRating = "Ma note"
+    const val technicalRating = "Technique"
+    const val scaleImdb = "IMDb"
+    const val scaleSensCritique = "Sens Critique"
+    const val scaleWikipedia = "Wikipédia"
+    const val scaleTmdb = "TMDB"
+    /** Échelle des notes personnelles : seules les valeurs impaires ont un mot. */
+    val personalScale = mapOf(1 to "bof", 3 to "pas terrible", 5 to "bien", 7 to "très bien", 9 to "excellent")
     const val work = "Fiche de l'œuvre"
     const val season = "Saison"
 

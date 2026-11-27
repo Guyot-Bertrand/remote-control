@@ -135,6 +135,31 @@ class ApiDtosTest {
     @Test fun section_kind_serialized() {
         assertTrue(RcJson.encodeToString(SectionDto("Reprendre", kind = "resume")).contains("\"kind\":\"resume\""))
     }
+
+    private val ratingsJson = """{"id": 1, "type": "film", "key": "k", "title_fr": "A",
+        "ratings": [{"code": "IM", "name": "IMDb", "value": 7.0, "url": "https://www.imdb.com/title/tt1/"},
+                    {"code": "SC@ES", "name": "Élodie S.", "value": 8.0},
+                    {"code": "WK", "name": "Wikipédia", "value": null}],
+        "tmdb_url": "https://www.themoviedb.org/movie/603"}"""
+
+    @Test fun work_ratings_and_tmdb_url_decode() {
+        val w = RcJson.decodeFromString<WorkDto>(ratingsJson)
+        assertEquals(
+            listOf(
+                RatingDto("IM", "IMDb", 7.0, "https://www.imdb.com/title/tt1/"),
+                RatingDto("SC@ES", "Élodie S.", 8.0, null),
+                RatingDto("WK", "Wikipédia", null, null),
+            ),
+            w.ratings,
+        )
+        assertEquals("https://www.themoviedb.org/movie/603", w.tmdbUrl)
+    }
+
+    @Test fun old_server_work_without_ratings_decodes() {
+        val w = RcJson.decodeFromString<WorkDto>("""{"id": 1, "type": "film", "key": "k", "title_fr": "A"}""")
+        assertTrue(w.ratings.isEmpty())
+        assertNull(w.tmdbUrl)
+    }
 }
 
 private const val NEW_FIELDS_JSON = """

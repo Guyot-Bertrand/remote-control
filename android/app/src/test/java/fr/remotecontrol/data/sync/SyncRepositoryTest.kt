@@ -6,6 +6,7 @@ import fr.remotecontrol.data.db.WorkEntity
 import fr.remotecontrol.net.ApiError
 import fr.remotecontrol.net.ApiResult
 import fr.remotecontrol.net.DeletedDto
+import fr.remotecontrol.net.RatingDto
 import fr.remotecontrol.net.RcJson
 import fr.remotecontrol.net.SyncDto
 import fr.remotecontrol.testing.FakeRcApi
@@ -80,6 +81,25 @@ class SyncRepositoryTest {
 
     private fun rows(sql: String) = db.query(sql, null).use { c ->
         buildList { while (c.moveToNext()) add((0 until c.columnCount).map { if (c.isNull(it)) null else c.getString(it) }) }
+    }
+
+    @Test fun sync_writes_ratings_to_entity() = runTest {
+        val dto = SyncDto(
+            revision = 9, full = true, totalWorks = 1,
+            works = listOf(
+                RcJson.decodeFromString(
+                    """{"id": 1, "type": "film", "key": "k", "title_fr": "A",
+                    "ratings": [{"code": "IM", "name": "IMDb", "value": 7.0, "url": "https://x.test/"},
+                                {"code": "WK", "name": "Wikipédia", "value": null}],
+                    "tmdb_url": "https://www.themoviedb.org/tv/1"}""",
+                ),
+            ),
+        )
+        api.syncResponses.addLast(ApiResult.Ok(dto))
+        repo.sync()
+        val w = dao.work(1).first()!!
+        assertEquals(listOf(RatingDto("IM", "IMDb", 7.0, "https://x.test/"), RatingDto("WK", "Wikipédia", null, null)), w.ratings)
+        assertEquals("https://www.themoviedb.org/tv/1", w.tmdbUrl)
     }
 
     @Test fun new_fields_decode_and_are_stored() = runTest {

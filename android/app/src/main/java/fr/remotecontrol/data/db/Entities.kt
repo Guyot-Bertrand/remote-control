@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import fr.remotecontrol.net.RatingDto
 import fr.remotecontrol.net.SubSel
 
 @Entity(
@@ -30,6 +31,8 @@ data class WorkEntity(
     val sortKey: String,
     val playable: Boolean = false,
     val medium: String? = null,
+    val ratings: List<RatingDto> = emptyList(),
+    val tmdbUrl: String? = null,
 )
 
 @Entity(tableName = "season", indices = [Index("workId")])
