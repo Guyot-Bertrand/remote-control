@@ -722,3 +722,17 @@ def test_tv_view_unknown_section_kind_is_422(env):
 def test_tv_show_route_removed(env):
     r = env.client.post("/api/tv/show", json={"screen": "home"})
     assert r.status_code == 404
+
+
+def test_api_exposes_ratings_and_tmdb_url(env):
+    w = env.client.get("/api/works/1").json()
+    assert w["ratings"] == [{"code": "IM", "name": "IMDb", "value": 6.7,
+                             "url": "https://www.imdb.com/title/tt6194530/"}]
+    assert w["tmdb_url"] is None
+    assert "poster_source" not in w and "ratings_json" not in w
+    works = env.client.get("/api/sync").json()["works"]
+    assert works and all(isinstance(x["ratings"], list) and "tmdb_url" in x
+                         and "poster_source" not in x for x in works)
+    ava = next(x for x in works if x["id"] == 1)
+    assert ava["ratings"] == w["ratings"]
+    assert env.client.get("/api/works/5").json()["ratings"] == []

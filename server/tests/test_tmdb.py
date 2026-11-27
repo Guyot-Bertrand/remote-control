@@ -10,7 +10,7 @@ from rc.assets import asset_path
 from rc.catalog.importer import import_catalog
 from rc.catalog.parser import parse_catalog
 from rc.db import open_db
-from rc.tmdb import fetch_missing_posters
+from rc.tmdb import fetch_missing_posters, fetch_missing_tmdb_links
 
 FIXTURE = Path(__file__).parent / "fixtures" / "medias_sample.txt"
 KEY = "secretkey123"
@@ -205,7 +205,7 @@ async def test_oversized_download_aborted(conn, tmp_path, monkeypatch):
 
 async def test_does_not_touch_text_fields(conn, tmp_path):
     cols = [r[1] for r in conn.execute("PRAGMA table_info(work)")
-            if r[1] not in ("poster_asset", "rev")]
+            if r[1] not in ("poster_asset", "rev", "poster_source", "tmdb_url")]
     sql = f"SELECT {', '.join(cols)} FROM work ORDER BY id"
     before = [tuple(r) for r in conn.execute(sql)]
     async with client_for(Recorder()) as c:
@@ -262,3 +262,138 @@ def test_redact_filter_masks_secrets():
                             "GET https://x/?api_key=%s&a=1 Bearer eyJabc.d", (KEY,), None)
     RedactFilter().filter(rec)
     assert KEY not in rec.msg and "eyJabc" not in rec.msg and "a=1" in rec.msg
+
+
+async def test_poster_found_stores_tmdb_url_and_source(conn, tmp_path):
+    rec = Recorder(find={"movie_results": [{"id": 4242, "poster_path": "/abc.jpg"}]})
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    w = work(conn)
+    assert w["tmdb_url"] == "https://www.themoviedb.org/movie/4242"
+    assert w["poster_source"] == "tmdb"
+
+
+async def test_tv_result_gives_tv_url(conn, tmp_path):
+    rec = Recorder(find={"movie_results": [],
+                         "tv_results": [{"id": 77, "poster_path": "/abc.jpg"}]})
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert work(conn)["tmdb_url"] == "https://www.themoviedb.org/tv/77"
+
+
+async def test_match_without_poster_still_stores_url(conn, tmp_path):
+    rec = Recorder(find={"movie_results": [{"id": 5, "poster_path": None}]})
+    rev0 = work(conn)["rev"]
+    async with client_for(rec) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+    w = work(conn)
+    assert w["tmdb_url"] == "https://www.themoviedb.org/movie/5"
+    assert w["poster_asset"] is None and w["rev"] > rev0
+
+
+async def test_tmdb_replaces_frame_only_for_untried_works(conn, tmp_path):
+    second_work(conn)
+    conn.execute("UPDATE work SET poster_source = 'frame', poster_asset = 'f' "
+                 "WHERE imdb_id IS NOT NULL")
+    conn.execute("INSERT INTO asset (hash, source) VALUES ('f', 'frame')")
+    conn.execute("INSERT INTO meta (key, value) SELECT 'tmdb_tried:' || id, '1' "
+                 "FROM work WHERE imdb_id = 'tt0000002'")
+    rec = Recorder()
+    async with client_for(rec) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 1
+    a = work(conn)
+    b = conn.execute("SELECT * FROM work WHERE imdb_id = 'tt0000002'").fetchone()
+    assert a["poster_source"] == "tmdb" and a["poster_asset"] != "f"
+    assert b["poster_source"] == "frame" and b["poster_asset"] == "f"
+    assert all("tt0000002" not in str(r.url) for r in rec.requests)
+
+
+async def test_local_poster_never_replaced_by_tmdb(conn, tmp_path):
+    conn.execute("INSERT INTO asset (hash, source) VALUES ('l', 'local')")
+    conn.execute("UPDATE work SET poster_source = 'local', poster_asset = 'l' "
+                 "WHERE imdb_id = 'tt0000001'")
+    rec = Recorder()
+    async with client_for(rec) as c:
+        assert await fetch_missing_posters(conn, tmp_path / "assets", KEY, c) == 0
+    assert rec.requests == []
+    assert work(conn)["poster_asset"] == "l"
+
+
+async def test_link_lookup_for_work_with_local_poster(conn, tmp_path):
+    conn.execute("INSERT INTO asset (hash, source) VALUES ('l', 'local')")
+    conn.execute("UPDATE work SET poster_source = 'local', poster_asset = 'l' "
+                 "WHERE imdb_id = 'tt0000001'")
+    rec = Recorder(find={"movie_results": [{"id": 9, "poster_path": "/abc.jpg"}]})
+    rev0 = work(conn)["rev"]
+    async with client_for(rec) as c:
+        assert await fetch_missing_tmdb_links(conn, KEY, c) == 1
+    w = work(conn)
+    assert w["tmdb_url"] == "https://www.themoviedb.org/movie/9"
+    assert w["poster_asset"] == "l" and w["rev"] > rev0
+    assert len(rec.requests) == 1  # aucune image téléchargée
+
+
+async def test_link_lookup_tried_once(conn, tmp_path):
+    conn.execute("UPDATE work SET poster_source = 'local' WHERE imdb_id = 'tt0000001'")
+    rec = Recorder(status=404)
+    async with client_for(rec) as c:
+        await fetch_missing_tmdb_links(conn, KEY, c)
+        await fetch_missing_tmdb_links(conn, KEY, c)
+    assert len(rec.requests) == 1
+    assert conn.execute("SELECT COUNT(*) FROM meta WHERE key LIKE 'tmdb_link_tried:%'"
+                        ).fetchone()[0] == 1
+
+
+async def test_poster_pass_404_means_no_second_find_in_link_pass(conn, tmp_path):
+    rec = Recorder(status=404)
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+        assert await fetch_missing_tmdb_links(conn, KEY, c) == 0
+    assert len(rec.requests) == 1
+
+
+async def test_link_pass_ignores_works_without_poster_history(conn, tmp_path):
+    rec = Recorder()
+    async with client_for(rec) as c:  # ni locale ni tentée par la passe des affiches
+        assert await fetch_missing_tmdb_links(conn, KEY, c) == 0
+    assert rec.requests == []
+
+
+@pytest.mark.parametrize("status", [429, 401])
+async def test_abort_is_signalled(conn, tmp_path, status):
+    outcome = {}
+    async with client_for(Recorder(status=status)) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome["aborted"] is True
+
+
+@pytest.mark.parametrize("status,unusable", [(401, True), (403, True), (429, False),
+                                             (404, False), (200, False)])
+async def test_unusable_signalled_for_refused_key_only(conn, tmp_path, status, unusable):
+    outcome = {}
+    async with client_for(Recorder(status=status)) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome.get("unusable", False) is unusable
+
+
+async def test_unusable_signalled_without_network(conn, tmp_path):
+    def handler(request):
+        raise httpx.ConnectError("pas de réseau", request=request)
+
+    outcome = {}
+    async with client_for(handler) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c, outcome=outcome)
+    assert outcome["unusable"] is True and outcome["aborted"] is True
+
+
+async def test_unchanged_url_takes_no_revision(conn, tmp_path):
+    conn.execute("UPDATE work SET tmdb_url = 'https://www.themoviedb.org/movie/5' "
+                 "WHERE imdb_id = 'tt0000001'")
+    before = work(conn)["rev"]
+    rev0 = conn.execute("SELECT value FROM meta WHERE key='revision'").fetchone()[0]
+    rec = Recorder(find={"movie_results": [{"id": 5, "poster_path": None}]})
+    async with client_for(rec) as c:
+        await fetch_missing_posters(conn, tmp_path / "assets", KEY, c)
+    assert work(conn)["rev"] == before
+    assert conn.execute("SELECT value FROM meta WHERE key='revision'"
+                        ).fetchone()[0] == rev0

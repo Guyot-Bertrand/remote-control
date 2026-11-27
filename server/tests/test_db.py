@@ -18,10 +18,10 @@ def user_version(path) -> int:
 
 def test_fresh_db_gets_schema_version(tmp_path):
     open_db(tmp_path / "rc.db").close()
-    assert SCHEMA_VERSION == 3
-    assert user_version(tmp_path / "rc.db") == 3
+    assert SCHEMA_VERSION == 4
+    assert user_version(tmp_path / "rc.db") == 4
     open_db(tmp_path / "rc.db").close()  # réouverture sans changement
-    assert user_version(tmp_path / "rc.db") == 3
+    assert user_version(tmp_path / "rc.db") == 4
 
 
 def make_too_new(path):
@@ -72,9 +72,11 @@ def make_v1(path) -> None:
     c.close()
 
 
-def test_fresh_database_is_v3(tmp_path):
+def test_fresh_database_is_v4(tmp_path):
     conn = open_db(tmp_path / "rc.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert {"ratings_json", "tmdb_url", "poster_source"} <= {
+        r[1] for r in conn.execute("PRAGMA table_info(work)")}
     cols = {r[1] for r in conn.execute("PRAGMA table_info(media_file)")}
     assert {"audio_langs_json", "subtitle_langs_json", "width", "height", "duration_s"} <= cols
     assert "medium" in {r[1] for r in conn.execute("PRAGMA table_info(work)")}
@@ -86,12 +88,13 @@ def test_fresh_database_is_v3(tmp_path):
 def test_v1_database_migrates(tmp_path):
     make_v1(tmp_path / "rc.db")
     conn = open_db(tmp_path / "rc.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
     assert conn.execute("SELECT medium FROM work").fetchone()[0] is None
+    assert conn.execute("SELECT ratings_json FROM work").fetchone()[0] == "[]"
     assert conn.execute("SELECT value FROM meta WHERE key='needs_reimport'").fetchone()[0] == "1"
     conn.close()
     conn = open_db(tmp_path / "rc.db")  # réouverture : pas de nouvelle migration
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
     conn.close()
 
 
@@ -114,6 +117,39 @@ def test_schema_v3_and_indexes_on_existing_db(tmp_path):
     c.execute("PRAGMA user_version = 2")  # base v2 sans l'index de la v3
     c.close()
     conn = open_db(tmp_path / "rc.db")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
     assert "media_file_work" in {r[1] for r in conn.execute("PRAGMA index_list(media_file)")}
+    conn.close()
+
+
+def make_v3(path) -> None:
+    """Base v3 : schéma actuel sans les colonnes de la v4."""
+    open_db(path).close()
+    c = sqlite3.connect(path)
+    for col in ("ratings_json", "tmdb_url", "poster_source"):
+        c.execute(f"ALTER TABLE work DROP COLUMN {col}")
+    for i, (key, asset, source) in enumerate(
+            [("a", "h1", "Films/A.jpg"), ("b", "h2", "tmdb"), ("c", None, None)], 1):
+        c.execute("INSERT INTO work_identity (id, type, key) VALUES (?, 'film', ?)", (i, key))
+        c.execute("INSERT INTO work (id, type, key, title_fr, directors_json, genres_json,"
+                  " cast_json, tags_json, episodic, poster_asset, content_hash, rev)"
+                  " VALUES (?, 'film', ?, ?, '[]', '[]', '[]', '[]', 0, ?, 'h', 1)",
+                  (i, key, key.upper(), asset))
+        if asset:
+            c.execute("INSERT INTO asset (hash, source) VALUES (?, ?)", (asset, source))
+    c.commit()
+    c.execute("PRAGMA user_version = 3")
+    c.close()
+
+
+def test_v3_database_migrates_to_v4(tmp_path):
+    make_v3(tmp_path / "rc.db")
+    conn = open_db(tmp_path / "rc.db")
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+    rows = {r["key"]: r for r in conn.execute("SELECT * FROM work")}
+    assert rows["a"]["poster_source"] == "local"
+    assert rows["b"]["poster_source"] == "tmdb"
+    assert rows["c"]["poster_source"] is None
+    assert all(r["ratings_json"] == "[]" and r["tmdb_url"] is None for r in rows.values())
+    assert conn.execute("SELECT value FROM meta WHERE key='needs_reimport'").fetchone()[0] == "1"
     conn.close()

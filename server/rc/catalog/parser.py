@@ -7,6 +7,7 @@ from rc.catalog.model import (
     CollectionRef,
     ParsedEpisode,
     ParsedGroup,
+    ParsedRating,
     ParsedSeason,
     ParsedWork,
     ParseResult,
@@ -30,6 +31,15 @@ KNOWN_CODES = frozenset("GB TG GN GD GL GM GC GS MN MI MC MP MD MF MQ MG RN RF R
 _SEP = re.compile(r"\s;(?:\s+|$)")
 _IMDB = re.compile(r"imdb\.com/title/(tt\d+)")
 _YEAR_IN_KEY = re.compile(r"\[(\d{4})")
+_NOTE = re.compile(r"^\d+(?:\.\d+)?$")
+_FIXED_NAMES = {
+    "IM": "IMDb",
+    "SC": "Sens Critique",
+    "WK": "Wikipédia",
+    "NP": "Note personnelle",
+    "NT": "Note technique",
+}
+_RATING_RANK = {"IM": 0, "SC": 1, "SC@": 2, "WK": 3, "NP": 4, "NT": 5}
 _DURATION = re.compile(r"^(\d+)h(\d{1,2})$")
 
 
@@ -44,6 +54,8 @@ class _State:
         self.season: tuple[int, int] | None = None
         # vidéos de l'œuvre courante avec le numéro de saison ouverte à ce moment
         self.entries: list[tuple[VideoFile, int | None]] = []
+        # code de source (QS) -> nom affiché
+        self.sources: dict[str, str] = {}
 
 
 Handler = Callable[[_State, list[str]], None]
@@ -140,11 +152,47 @@ def _on_mp(st: _State, f: list[str]) -> None:
         st.work.synopsis = " ; ".join(f[1:])
 
 
+def _rating_rank(code: str) -> int | None:
+    if code in _RATING_RANK:
+        return _RATING_RANK[code]
+    if code.startswith("SC@") and len(code) > 3:
+        return _RATING_RANK["SC@"]
+    return None
+
+
+def _on_qs(st: _State, f: list[str]) -> None:
+    code, label = _field(f, 1), _field(f, 2)
+    if not code or not label:
+        return
+    if "/" in label:
+        label = label.split("/", 1)[1]
+    st.sources[code] = label.split("(", 1)[0].strip() or code
+
+
 def _on_mq(st: _State, f: list[str]) -> None:
-    if st.work:
-        m = _IMDB.search(" ; ".join(f))
-        if m:
-            st.work.imdb_id = m.group(1)
+    w = st.work
+    if not w:
+        return
+    m = _IMDB.search(" ; ".join(f))
+    if m and w.imdb_id is None:
+        w.imdb_id = m.group(1)
+    # découpe tolérante (« ;7.0 », champ vide) : locale aux lignes MQ. Limitée à trois
+    # champs (code ; note ; reste) : un « ; » dans l'URL ne la coupe pas.
+    g = [x.strip() for x in re.split(r"\s*;\s*", ";".join(f[1:]), maxsplit=2)]
+    code = _field(g, 0)
+    if _rating_rank(code) is None or any(r.code == code for r in w.ratings):
+        return
+    raw = _field(g, 1)
+    url = _field(g, 2)
+    w.ratings.append(
+        ParsedRating(
+            code=code,
+            name=_FIXED_NAMES.get(code) or st.sources.get(code, code),
+            # Wikipédia : un lien, jamais une note
+            value=float(raw) if code != "WK" and _NOTE.match(raw) else None,
+            url=url if url.startswith("http") else None,
+        )
+    )
 
 
 def _on_mg(st: _State, f: list[str]) -> None:
@@ -230,6 +278,7 @@ def _finalize(st: _State) -> None:
     entries, st.entries = st.entries, []
     if not w:
         return
+    w.ratings.sort(key=lambda r: _rating_rank(r.code))  # stable : ordre du fichier
     playable = [(v, s) for v, s in entries if v.playable]
     w.episodic = (
         w.type == "serie"
@@ -304,7 +353,7 @@ HANDLERS: dict[str, Handler] = {
     "RN": _accept,
     "RF": _accept,
     "RC": _accept,
-    "QS": _accept,
+    "QS": _on_qs,
 }
 
 

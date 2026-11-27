@@ -200,13 +200,24 @@ svg { flex-shrink: 0; display: block; }
 .work-title.very-long { font-size: 56px; }
 .work-vo { font-family: var(--rc-font-display); font-style: italic; font-size: 36px; color: var(--rc-text-2); margin-top: 10px; line-height: 1.2; }
 .work-meta { display: flex; flex-direction: column; gap: 8px; font-size: var(--tv-fs-meta); color: var(--rc-text-2); }
+.ratings { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; font-size: 26px; }
+.rating {
+  display: inline-flex; gap: 12px; padding: 6px 16px; border-radius: 999px;
+  background: var(--rc-surface-2); border: 1px solid var(--rc-line);
+}
+.rating-name { color: var(--rc-text-3); }
+.rating b { font-weight: 700; color: var(--rc-text); }
+.rating-main b { color: var(--rc-accent); }
 .resume { display: flex; align-items: center; gap: 24px; }
 .resume-label { display: flex; align-items: center; gap: 14px; font-size: 32px; font-weight: 500; color: var(--rc-accent-strong); }
 .resume .bar { width: 320px; }
 .seen-line { display: flex; align-items: center; gap: 14px; font-size: 32px; font-weight: 500; color: var(--rc-seen); }
+/* Au plus 7 lignes ; rétréci par la colonne quand la place manque, il ne garde que des
+   lignes entières (fitSynopsis, sheets.js). */
 .synopsis {
   font-size: var(--tv-fs-body); line-height: 1.5; color: var(--rc-text); text-wrap: pretty;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 7; overflow: hidden;
+  min-height: 0;
 }
 .cast { font-size: 30px; line-height: 1.45; color: var(--rc-text-2); }
 .work-foot { margin-top: auto; display: flex; flex-direction: column; gap: 22px; }

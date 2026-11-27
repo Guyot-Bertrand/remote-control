@@ -46,6 +46,14 @@ class CollectionRef:
 
 
 @dataclass
+class ParsedRating:
+    code: str
+    name: str
+    value: float | None
+    url: str | None
+
+
+@dataclass
 class ParsedWork:
     type: str
     key: str
@@ -69,6 +77,7 @@ class ParsedWork:
     episodic: bool
     line_no: int
     media: list[str] = field(default_factory=list)
+    ratings: list[ParsedRating] = field(default_factory=list)
 
 
 @dataclass

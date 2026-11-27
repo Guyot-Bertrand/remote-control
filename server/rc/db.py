@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 SCHEMA = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 3  # PRAGMA user_version de la base créée par schema.sql
+SCHEMA_VERSION = 4  # PRAGMA user_version de la base créée par schema.sql
 
 
 # Colonnes ajoutées par la version 2 (table, colonne, type).
@@ -18,6 +18,13 @@ _V2_COLUMNS = (
     ("media_file", "width", "INTEGER"),
     ("media_file", "height", "INTEGER"),
     ("media_file", "duration_s", "REAL"),
+)
+
+# Colonnes ajoutées par la version 4.
+_V4_COLUMNS = (
+    ("work", "ratings_json", "TEXT NOT NULL DEFAULT '[]'"),
+    ("work", "tmdb_url", "TEXT"),
+    ("work", "poster_source", "TEXT"),  # 'local' | 'tmdb' | 'frame'
 )
 
 
@@ -41,6 +48,8 @@ def open_db(path: Path, check_same_thread: bool = True) -> sqlite3.Connection:
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
         if version == 1:
             _migrate_v1_to_v2(conn)
+        if 1 <= version <= 3:
+            _migrate_to_v4(conn)
         if version < SCHEMA_VERSION:
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     except BaseException:
@@ -49,13 +58,31 @@ def open_db(path: Path, check_same_thread: bool = True) -> sqlite3.Connection:
     return conn
 
 
-def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
-    """Ajoute les colonnes de la v2 puis demande un réimport complet du catalogue
-    (le médium des œuvres n'existe pas dans une base v1)."""
-    for table, column, decl in _V2_COLUMNS:
+def _add_columns(conn: sqlite3.Connection, columns) -> None:
+    for table, column, decl in columns:
         existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
+    """Ajoute les colonnes de la v2 puis demande un réimport complet du catalogue
+    (le médium des œuvres n'existe pas dans une base v1)."""
+    _add_columns(conn, _V2_COLUMNS)
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('needs_reimport', '1')")
+
+
+def _migrate_to_v4(conn: sqlite3.Connection) -> None:
+    """Ajoute les notes, le lien TMDB et la provenance des affiches ; la provenance
+    des affiches déjà ingérées se déduit de `asset.source`. Les notes ne sont pas
+    encore lues : réimport complet demandé."""
+    _add_columns(conn, _V4_COLUMNS)
+    conn.execute(
+        "UPDATE work SET poster_source = (SELECT CASE WHEN a.source = 'tmdb' "
+        "THEN 'tmdb' ELSE 'local' END FROM asset a WHERE a.hash = work.poster_asset) "
+        "WHERE poster_asset IS NOT NULL")
+    conn.execute("UPDATE work SET poster_source = 'local' "
+                 "WHERE poster_asset IS NOT NULL AND poster_source IS NULL")
     conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('needs_reimport', '1')")
 
 

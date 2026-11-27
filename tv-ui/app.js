@@ -176,7 +176,11 @@ function activeEpisode() {
 function mount(html) {
   stage.innerHTML = html;
   guardPosters(stage);
+  fitSynopsis(stage);
 }
+
+// Polices chargées après coup : les lignes changent de largeur, le résumé est remesuré.
+if (document.fonts) document.fonts.addEventListener('loadingdone', () => fitSynopsis(stage));
 
 /** Copie figée d'une image chargée, à sa taille affichée : elle reste visible dans
     l'écran qui s'efface pendant que l'image elle-même passe dans le nouvel écran. */
@@ -238,6 +242,7 @@ function mountFade(html) {
   next.addEventListener('animationend', (ev) => { if (ev.target === next) finish(); });
   setTimeout(finish, FADE_MS + 100); // onglet caché, animations réduites : pas d'animationend
   stage.appendChild(next);
+  fitSynopsis(next);
 }
 
 async function load(state) {

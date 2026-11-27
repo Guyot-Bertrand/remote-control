@@ -13,7 +13,7 @@ from rc import app as app_mod
 from rc.app import create_app, mdns_announce, refresh_once
 from rc.catalog.parser import parse_catalog
 from rc.config import Config
-from rc.db import current_revision, next_revision, open_db
+from rc.db import SCHEMA_VERSION, current_revision, next_revision, open_db
 from rc.player.session import PlayRequest
 from rc.fake_tree import make_fake_tree
 
@@ -366,6 +366,71 @@ async def test_tmdb_failure_does_not_block_publish(setup, monkeypatch):
     assert any(e["type"] == "catalog" for e in events)
 
 
+async def test_tmdb_step_runs_link_pass_after_posters(setup, monkeypatch):
+    state, _ = setup
+    calls = []
+
+    async def posters(*a, **k):
+        calls.append("posters")
+        return 0
+
+    async def links(*a, **k):
+        calls.append("links")
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = ""
+    await app_mod._tmdb_step(state)
+    assert calls == []
+    state.config.tmdb_api_key = "k"
+    await app_mod._tmdb_step(state)
+    assert calls == ["posters", "links"]
+
+
+async def test_tmdb_step_skips_link_pass_when_aborted(setup, monkeypatch):
+    state, _ = setup
+    calls = []
+
+    async def posters(*a, outcome=None, **k):
+        outcome["aborted"] = True
+        return 0
+
+    async def links(*a, **k):
+        calls.append("links")
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = "k"
+    await app_mod._tmdb_step(state)
+    assert calls == []
+
+
+async def test_tmdb_step_records_unusable_tmdb(setup, monkeypatch):
+    state, _ = setup
+    outcomes = iter([{"aborted": True, "unusable": True}, {"aborted": True},
+                     {}, {"aborted": True, "unusable": True}])
+
+    async def posters(*a, outcome=None, **k):
+        outcome.update(next(outcomes))
+        return 0
+
+    async def links(*a, **k):
+        return 0
+
+    monkeypatch.setattr(app_mod, "fetch_missing_posters", posters)
+    monkeypatch.setattr(app_mod, "fetch_missing_tmdb_links", links)
+    state.config.tmdb_api_key = "k"
+    assert state.tmdb_unusable is False
+    seen = []
+    for _ in range(4):
+        await app_mod._tmdb_step(state)
+        seen.append(state.tmdb_unusable)
+    # clé refusée ou réseau absent → vrai ; limite (429) → inchangé ; tour abouti → faux
+    assert seen == [True, True, False, True]
+
+
 BAD_LINES = "".join(f"ZZ ; bizarre {i}\n" for i in range(25))
 
 
@@ -529,7 +594,7 @@ def test_v1_database_migrates_and_reimports(setup):
         assert restored.conn.execute(
             "SELECT value FROM meta WHERE key='needs_reimport'").fetchone() is None
         expected = len(parse_catalog(FIXTURE.read_text(encoding="utf-8")).works)
-        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert restored.conn.execute(
             "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
         assert works(restored) == expected

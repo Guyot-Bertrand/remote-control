@@ -34,8 +34,9 @@ def _auth(api_key: str) -> tuple[dict[str, str], dict[str, str]]:
     return {}, {"api_key": api_key}
 
 
-async def _find_poster_path(client: httpx.AsyncClient, imdb_id: str,
-                            api_key: str) -> str | None:
+async def _find(client: httpx.AsyncClient, imdb_id: str,
+                api_key: str) -> tuple[str | None, str | None]:
+    """(chemin de l'affiche, URL de la fiche TMDB) du résultat retenu."""
     headers, extra = _auth(api_key)
     resp = await client.get(
         f"{API}/find/{imdb_id}",
@@ -45,12 +46,27 @@ async def _find_poster_path(client: httpx.AsyncClient, imdb_id: str,
         raise RateLimited
     resp.raise_for_status()
     data = resp.json()
-    for kind in ("movie_results", "tv_results"):
+    chosen: tuple[str, dict] | None = None
+    for kind, segment in (("movie_results", "movie"), ("tv_results", "tv")):
         for item in data.get(kind) or []:
-            path = item.get("poster_path") if isinstance(item, dict) else None
-            if isinstance(path, str):
-                return path if POSTER_RE.fullmatch(path) else None
-    return None
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("poster_path"), str):
+                chosen = (segment, item)
+                break
+            if chosen is None:
+                chosen = (segment, item)
+        if chosen and isinstance(chosen[1].get("poster_path"), str):
+            break
+    if chosen is None:
+        return None, None
+    segment, item = chosen
+    path = item.get("poster_path")
+    path = path if isinstance(path, str) and POSTER_RE.fullmatch(path) else None
+    ident = item.get("id")
+    url = (f"https://www.themoviedb.org/{segment}/{ident}"
+           if isinstance(ident, int) and not isinstance(ident, bool) else None)
+    return path, url
 
 
 async def _download(client: httpx.AsyncClient, poster_path: str) -> bytes:
@@ -95,17 +111,21 @@ def _missing(conn: sqlite3.Connection, row: sqlite3.Row,
 async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
                                 api_key: str, client: httpx.AsyncClient,
                                 limit: int = 20,
-                                indexes: dict[str, dict[str, Path]] | None = None) -> int:
+                                indexes: dict[str, dict[str, Path]] | None = None,
+                                outcome: dict | None = None) -> int:
+    """`outcome["aborted"]` devient vrai si le passage est interrompu (429, clé, réseau) ;
+    `outcome["unusable"]` aussi pour une clé refusée ou un réseau indisponible."""
     if not api_key:
         return 0
     rows = conn.execute(
-        "SELECT id, imdb_id, poster_relpath FROM work "
-        "WHERE imdb_id IS NOT NULL AND poster_asset IS NULL "
+        "SELECT id, imdb_id, poster_relpath, poster_source FROM work "
+        "WHERE imdb_id IS NOT NULL "
+        "AND (poster_asset IS NULL OR poster_source = 'frame') "
         "AND NOT EXISTS (SELECT 1 FROM meta WHERE key = 'tmdb_tried:' || work.id) "
         "ORDER BY id").fetchall()
     rows = [r for r in rows if _missing(conn, r, indexes or {})][:limit]
     tried: list[int] = []
-    done: list[tuple[int, str]] = []
+    results: dict[int, list[str | None]] = {}  # id -> [affiche, url]
     tmp_root = assets_dir.parent / "tmp"
     try:
         for row in rows:
@@ -117,11 +137,68 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
             # Seule une issue définitive (aucune correspondance, 404, image illisible)
             # marque l'œuvre ; un incident passager laisse un nouvel essai possible.
             try:
-                path = await _find_poster_path(client, imdb_id, api_key)
+                path, url = await _find(client, imdb_id, api_key)
+                if url:
+                    results[row["id"]] = [None, url]
                 if path:
                     data = await _download(client, path)
                     h = await asyncio.to_thread(_process, data, assets_dir, tmp_root)
-                    done.append((row["id"], h))
+                    results.setdefault(row["id"], [None, None])[0] = h
+            except RateLimited:
+                log.warning("TMDB : limite atteinte, passage interrompu")
+                if outcome is not None:
+                    outcome["aborted"] = True
+                break
+            except httpx.TransportError as exc:
+                log.warning("TMDB : réseau indisponible (%s), passage interrompu",
+                            type(exc).__name__)
+                if outcome is not None:
+                    outcome["aborted"] = outcome["unusable"] = True
+                break
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                if status in (401, 403):
+                    log.warning("TMDB : clé refusée (HTTP %d), passage interrompu", status)
+                    if outcome is not None:
+                        outcome["aborted"] = outcome["unusable"] = True
+                    break
+                log.warning("TMDB : affiche indisponible pour %s (HTTP %d)", imdb_id, status)
+                if status != 404:
+                    continue  # erreur passagère du service : nouvel essai plus tard
+            except Exception as exc:  # réponse ou image illisible : une seule tentative
+                log.warning("TMDB : affiche indisponible pour %s (%s)",
+                            imdb_id, type(exc).__name__)
+            tried.append(row["id"])
+    finally:
+        _commit(conn, tried, results, "tmdb_tried")  # + « lien cherché » : /find fait
+        with contextlib.suppress(OSError):
+            tmp_root.rmdir()  # seulement s'il est vide
+    return sum(1 for h, _ in results.values() if h)
+
+
+async def fetch_missing_tmdb_links(conn: sqlite3.Connection, api_key: str,
+                                   client: httpx.AsyncClient, limit: int = 20) -> int:
+    """Recherche d'identifiant seule : l'URL de la fiche des œuvres sans lien."""
+    if not api_key:
+        return 0
+    rows = conn.execute(
+        "SELECT id, imdb_id FROM work WHERE imdb_id IS NOT NULL AND tmdb_url IS NULL "
+        "AND (poster_source = 'local' OR EXISTS (SELECT 1 FROM meta "
+        "WHERE key = 'tmdb_tried:' || work.id)) "
+        "AND NOT EXISTS (SELECT 1 FROM meta WHERE key = 'tmdb_link_tried:' || work.id) "
+        "ORDER BY id LIMIT ?", (limit,)).fetchall()
+    tried: list[int] = []
+    results: dict[int, list[str | None]] = {}
+    try:
+        for row in rows:
+            imdb_id = (row["imdb_id"] or "").strip()
+            if not IMDB_RE.fullmatch(imdb_id):
+                tried.append(row["id"])
+                continue
+            try:
+                _, url = await _find(client, imdb_id, api_key)
+                if url:
+                    results[row["id"]] = [None, url]
             except RateLimited:
                 log.warning("TMDB : limite atteinte, passage interrompu")
                 break
@@ -134,34 +211,46 @@ async def fetch_missing_posters(conn: sqlite3.Connection, assets_dir: Path,
                 if status in (401, 403):
                     log.warning("TMDB : clé refusée (HTTP %d), passage interrompu", status)
                     break
-                log.warning("TMDB : affiche indisponible pour %s (HTTP %d)", imdb_id, status)
+                log.warning("TMDB : lien indisponible pour %s (HTTP %d)", imdb_id, status)
                 if status != 404:
-                    continue  # erreur passagère du service : nouvel essai plus tard
-            except Exception as exc:  # réponse ou image illisible : une seule tentative
-                log.warning("TMDB : affiche indisponible pour %s (%s)",
+                    continue
+            except Exception as exc:
+                log.warning("TMDB : lien indisponible pour %s (%s)",
                             imdb_id, type(exc).__name__)
             tried.append(row["id"])
     finally:
-        _commit(conn, tried, done)
-        with contextlib.suppress(OSError):
-            tmp_root.rmdir()  # seulement s'il est vide
-    return len(done)
+        _commit(conn, tried, results, "tmdb_link_tried")
+    return len(results)
 
 
 def _commit(conn: sqlite3.Connection, tried: list[int],
-            done: list[tuple[int, str]]) -> None:
-    if not tried:
+            results: dict[int, list[str | None]], marker: str) -> None:
+    if not tried and not results:
         return
     conn.execute("BEGIN IMMEDIATE")
     try:
-        rev = next_revision(conn) if done else None
+        rev: int | None = None
         for work_id in tried:
             conn.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, '1')",
-                         (f"tmdb_tried:{work_id}",))
-        for work_id, h in done:
-            conn.execute("INSERT OR IGNORE INTO asset (hash, source) VALUES (?, 'tmdb')", (h,))
-            conn.execute("UPDATE work SET poster_asset = ?, rev = ? WHERE id = ?",
-                         (h, rev, work_id))
+                         (f"{marker}:{work_id}",))
+            if marker == "tmdb_tried":  # le /find a eu lieu : inutile de le refaire
+                conn.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?, '1')",
+                             (f"tmdb_link_tried:{work_id}",))
+        for work_id, (h, url) in results.items():
+            if h:
+                rev = rev or next_revision(conn)
+                conn.execute("INSERT OR IGNORE INTO asset (hash, source) VALUES (?, 'tmdb')",
+                             (h,))
+                conn.execute("UPDATE work SET poster_asset = ?, poster_source = 'tmdb', "
+                             "rev = ? WHERE id = ?", (h, rev, work_id))
+            if url:
+                changed = conn.execute(
+                    "SELECT 1 FROM work WHERE id = ? AND tmdb_url IS NOT ?",
+                    (work_id, url)).fetchone()
+                if changed:
+                    rev = rev or next_revision(conn)
+                    conn.execute("UPDATE work SET tmdb_url = ?, rev = ? WHERE id = ?",
+                                 (url, rev, work_id))
         conn.execute("COMMIT")
     except BaseException:
         conn.execute("ROLLBACK")

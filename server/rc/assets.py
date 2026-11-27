@@ -124,8 +124,8 @@ def ingest_posters(conn: sqlite3.Connection, assets_dir: Path,
         for work_id, relpath, h in done:
             conn.execute("INSERT OR IGNORE INTO asset (hash, source) VALUES (?, ?)",
                          (h, relpath))
-            conn.execute("UPDATE work SET poster_asset = ?, rev = ? WHERE id = ?",
-                         (h, rev, work_id))
+            conn.execute("UPDATE work SET poster_asset = ?, poster_source = 'local', rev = ? "
+                         "WHERE id = ?", (h, rev, work_id))
         conn.execute("COMMIT")
     except BaseException:
         conn.execute("ROLLBACK")

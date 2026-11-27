@@ -1942,7 +1942,45 @@
      "duration": 5940.0,
      "watched": false,
      "media_file_id": 7
-    }
+    },
+    "ratings": [
+     {
+      "code": "IM",
+      "name": "IMDb",
+      "value": 7.0,
+      "url": null
+     },
+     {
+      "code": "SC",
+      "name": "Sens Critique",
+      "value": 6.2,
+      "url": null
+     },
+     {
+      "code": "SC@es",
+      "name": "Éric Schwald",
+      "value": 8,
+      "url": null
+     },
+     {
+      "code": "SC@ag",
+      "name": "Antoine Goya",
+      "value": 7,
+      "url": null
+     },
+     {
+      "code": "NP",
+      "name": "Note personnelle",
+      "value": 7,
+      "url": null
+     },
+     {
+      "code": "WK",
+      "name": "Wikipédia",
+      "value": null,
+      "url": null
+     }
+    ]
    }
   }
  },
@@ -4783,5 +4821,156 @@
    ]
   },
   "pause": null
+ },
+ "work-notes-many": {
+  "work_id": null,
+  "season_id": null,
+  "message": null,
+  "screen": "view",
+  "view": {
+   "phone_id": "apercu",
+   "seq": 1,
+   "screen": "work",
+   "title": null,
+   "subtitle": null,
+   "filter": null,
+   "query": null,
+   "work_id": 12,
+   "season_id": null,
+   "episode_id": null,
+   "media_file_id": null,
+   "collection_id": null,
+   "audio_track": null,
+   "subtitle_track": null,
+   "items": [],
+   "anchor": null,
+   "position": null,
+   "sections": []
+  },
+  "pause": null,
+  "fetch": {
+   "/api/works/12": {
+    "id": 12,
+    "type": "film",
+    "title_fr": "Ava",
+    "title_vo": "Ava",
+    "year": 2017,
+    "duration_min": 99,
+    "genres": [
+     "comédie dramatique"
+    ],
+    "directors": [
+     "Léa Mysius"
+    ],
+    "cast": [
+     "Noée Abita",
+     "Laure Calamy",
+     "Juan Cano"
+    ],
+    "synopsis": "Ava, 13 ans, est en vacances au bord de l'océan quand elle apprend qu'elle va perdre la vue plus vite que prévu. Tandis que sa mère s'efforce de lui offrir un été léger, Ava apprend à vivre dans le noir, s'attache à un grand chien noir et à son maître en fuite.",
+    "collections": [
+     {
+      "id": 4,
+      "name": "Les 1000 plus grands films de tous les temps [2020]",
+      "rank": "2017"
+     }
+    ],
+    "media_files": [
+     {
+      "id": 7,
+      "quality": "FHD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/7.mkv",
+      "audio_langs": [
+       "fr",
+       "en"
+      ],
+      "subtitle_langs": [
+       "fr"
+      ],
+      "width": 1920,
+      "height": 1080,
+      "duration_s": 5940.0
+     },
+     {
+      "id": 8,
+      "quality": "HD",
+      "present": true,
+      "volume_label": "Films 1",
+      "relpath": "x/8.mkv",
+      "audio_langs": [
+       "fr"
+      ],
+      "subtitle_langs": [],
+      "width": 1280,
+      "height": 720,
+      "duration_s": 5940.0
+     }
+    ],
+    "tags": [
+     "[FR]"
+    ],
+    "poster": null,
+    "medium": null,
+    "seasons": [],
+    "progress": {
+     "position": 4320.0,
+     "duration": 5940.0,
+     "watched": false,
+     "media_file_id": 7
+    },
+    "ratings": [
+     {
+      "code": "IM",
+      "name": "IMDb",
+      "value": 7.0,
+      "url": null
+     },
+     {
+      "code": "SC",
+      "name": "Sens Critique",
+      "value": 6.2,
+      "url": null
+     },
+     {
+      "code": "SC@a0",
+      "name": "Éric Schwald",
+      "value": 8,
+      "url": null
+     },
+     {
+      "code": "SC@a1",
+      "name": "Antoine Goya",
+      "value": 7.5,
+      "url": null
+     },
+     {
+      "code": "SC@a2",
+      "name": "Marie Dupont",
+      "value": 9,
+      "url": null
+     },
+     {
+      "code": "SC@a3",
+      "name": "Jean-Luc Martin",
+      "value": 6,
+      "url": null
+     },
+     {
+      "code": "SC@a4",
+      "name": "Sophie Bernard",
+      "value": 7,
+      "url": null
+     },
+     {
+      "code": "SC@a5",
+      "name": "Pierre Lefèvre",
+      "value": 8.5,
+      "url": null
+     }
+    ]
+   }
+  }
  }
 }

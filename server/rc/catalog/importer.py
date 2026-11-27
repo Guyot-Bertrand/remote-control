@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from rc.catalog.model import ParsedWork, ParseResult, VideoFile
@@ -83,6 +83,7 @@ def _payload(w: ParsedWork) -> dict:
             for e in w.episodes
         ],
         "collections": [{"name": c.name, "rank": c.rank} for c in w.collections],
+        "ratings": [asdict(r) for r in w.ratings],
     }
 
 
@@ -187,13 +188,26 @@ def _sync_files(conn, work_id: int, wanted: dict[tuple, dict], rev: int) -> None
     conn.executemany("DELETE FROM media_file WHERE id = ?", [(i,) for i in gone])
 
 
+def _forget_tmdb(conn, work_id: int) -> None:
+    """IMDb changé : ce que TMDB avait trouvé ne vaut plus, la recherche est refaite.
+    Une affiche locale ou extraite reste (l'extraite sera remplacée par TMDB)."""
+    conn.execute("DELETE FROM meta WHERE key IN (?, ?)",
+                 (f"tmdb_tried:{work_id}", f"tmdb_link_tried:{work_id}"))
+    conn.execute("UPDATE work SET tmdb_url = NULL, "
+                 "poster_asset = CASE WHEN poster_source = 'tmdb' THEN NULL "
+                 "ELSE poster_asset END, "
+                 "poster_source = CASE WHEN poster_source = 'tmdb' THEN NULL "
+                 "ELSE poster_source END WHERE id = ?", (work_id,))
+
+
 def _write_work(conn, work_id: int, p: dict, content_hash: str,
                 collection_ids: dict[str, int], rev: int) -> None:
+    old = conn.execute("SELECT imdb_id FROM work WHERE id = ?", (work_id,)).fetchone()
     conn.execute(
         "INSERT INTO work (id, type, key, title_fr, title_vo, title_alt, year, "
         "duration_min, episode_count, directors_json, genres_json, cast_json, synopsis, "
-        "imdb_id, tags_json, episodic, poster_relpath, medium, content_hash, rev) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "imdb_id, tags_json, episodic, poster_relpath, medium, ratings_json, content_hash, "
+        "rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (id) DO UPDATE SET type = excluded.type, key = excluded.key, "
         "title_fr = excluded.title_fr, title_vo = excluded.title_vo, "
         "title_alt = excluded.title_alt, year = excluded.year, "
@@ -203,14 +217,20 @@ def _write_work(conn, work_id: int, p: dict, content_hash: str,
         "imdb_id = excluded.imdb_id, tags_json = excluded.tags_json, "
         "episodic = excluded.episodic, poster_asset = CASE WHEN "
         "poster_relpath IS excluded.poster_relpath THEN poster_asset ELSE NULL END, "
+        "poster_source = CASE WHEN "
+        "poster_relpath IS excluded.poster_relpath THEN poster_source ELSE NULL END, "
         "poster_relpath = excluded.poster_relpath, medium = excluded.medium, "
+        "ratings_json = excluded.ratings_json, "
         "content_hash = excluded.content_hash, rev = excluded.rev",
         (work_id, p["type"], p["key"], p["title_fr"], p["title_vo"], p["title_alt"],
          p["year"], p["duration_min"], p["episode_count"], _dumps(p["directors"]),
          _dumps(p["genres"]), _dumps(p["cast"]), p["synopsis"], p["imdb_id"],
-         _dumps(p["tags"]), int(p["episodic"]), p["poster_relpath"], p["medium"], content_hash, rev),
+         _dumps(p["tags"]), int(p["episodic"]), p["poster_relpath"], p["medium"],
+         json.dumps(p["ratings"], ensure_ascii=False), content_hash, rev),
     )
     _unbury(conn, "work", work_id)
+    if old is not None and old["imdb_id"] != p["imdb_id"]:
+        _forget_tmdb(conn, work_id)
 
     season_ids = _sync_rows(
         conn, "season", "work_id", work_id, "label",

@@ -41,6 +41,22 @@ function versionPills(w, readable) {
     .map((r) => `<div class="pills">${r}</div>`).join('');
 }
 
+// Pastilles de notes (arbitrage 24) : IM, SC et SC@xx ayant une valeur, jamais NP, NT ni WK.
+function fmtRating(code, value) {
+  const n = Number(value);
+  const text = code === 'IM' || code === 'SC' ? n.toFixed(1) : String(Math.round(n * 10) / 10);
+  return text.replace('.', ',');
+}
+function ratingPills(ratings) {
+  return (ratings || [])
+    .filter((r) => (r.code === 'IM' || r.code === 'SC' || String(r.code).startsWith('SC@'))
+      && r.value !== null && r.value !== undefined && Number.isFinite(Number(r.value)))
+    .map((r) => `<span class="rating${r.code === 'IM' || r.code === 'SC' ? ' rating-main' : ''}">`
+      + `<span class="rating-name">${esc(r.name || r.code)}</span>`
+      + `<b>${fmtRating(r.code, r.value)}</b></span>`)
+    .join('');
+}
+
 /** Fiche d'une œuvre ; `pause` : vidéo en pause dans le coin d'état ; `enter` : entrée
     animée (pas lors d'une mise à jour de la même fiche). */
 function renderWork(w, { pause = null, enter = true } = {}) {
@@ -75,6 +91,7 @@ function renderWork(w, { pause = null, enter = true } = {}) {
     + `<span>${esc(c.name)}</span></div>`)).join('');
   const pills = versionPills(w, readable);
   const directors = (w.directors || []).join(', ');
+  const rated = ratingPills(w.ratings);
 
   return `<div class="screen work">
 ${poster(w.poster, title, w.year)}
@@ -89,6 +106,7 @@ ${differs(w.title_vo, title) ? `<div class="work-vo">${esc(w.title_vo)}</div>` :
 <span>${esc(joinDot([w.year, fmtMinutes(w.duration_min), genres]))}</span>
 ${directors ? `<span><span class="muted">${STAGED.has(w.type) ? 'Mise en scène' : 'Réalisation'} : </span>${esc(directors)}</span>` : ''}
 </div>
+${rated ? `<div class="ratings">${rated}</div>` : ''}
 ${status}${progress}
 ${w.synopsis ? `<p class="synopsis">${esc(w.synopsis)}</p>` : ''}
 ${cast.length ? `<div class="cast"><span class="muted">Avec </span>${esc(cast.join(', '))}</div>` : ''}
@@ -96,6 +114,27 @@ ${cast.length ? `<div class="cast"><span class="muted">Avec </span>${esc(cast.jo
 ${colls ? `<div class="colls">${colls}</div>` : ''}
 ${pills ? `<div class="versions">${pills}</div>` : ''}
 </div></div></div>`;
+}
+
+/** Résumé de la fiche : la colonne le rétrécit quand la place manque (pastilles de
+    notes, reprise…). Il garde alors autant de lignes entières qu'il en tient, jamais une
+    demi-ligne ; s'il n'en tient aucune, il disparaît. À rappeler une fois l'écran dans la
+    page (mesure) et après le chargement des polices. */
+function fitSynopsis(root) {
+  root.querySelectorAll('.synopsis').forEach((el) => {
+    el.style.removeProperty('-webkit-line-clamp');
+    el.style.removeProperty('max-height');
+    el.style.removeProperty('display');
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    if (!lh) return;
+    const lines = Math.floor((el.clientHeight + 0.5) / lh);
+    if (lines < 1) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.webkitLineClamp = String(lines);
+    el.style.maxHeight = `${lines * lh}px`;
+  });
 }
 
 // Saison (maquette 4b) : trois colonnes de huit lignes sous l'en-tête et le coin d'état.

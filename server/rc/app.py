@@ -35,7 +35,7 @@ from rc.mirror import MirrorService
 from rc.player.base import Player
 from rc.player.mpv import MpvPlayer
 from rc.player.session import PlaybackService, TvController
-from rc.tmdb import fetch_missing_posters
+from rc.tmdb import fetch_missing_posters, fetch_missing_tmdb_links
 from rc.volumes import (Volume, VolumeUnreadable, build_index, find_catalog_source,
                         list_volumes, locate_files)
 
@@ -66,6 +66,9 @@ class AppState:
     refused: Stat | None = None  # dernière version refusée (avertie une seule fois)
     published_revision: int | None = None  # dernière révision annoncée aux clients
     poster_failures: set = field(default_factory=set)  # affiches illisibles (inchangées)
+    # Clé TMDB refusée ou réseau indisponible au dernier tour TMDB ; faux dès qu'un tour
+    # aboutit. Les images extraites n'attendent alors plus TMDB (remplacées plus tard).
+    tmdb_unusable: bool = False
     playback: PlaybackService | None = None
 
 
@@ -257,9 +260,16 @@ async def _tmdb_step(state: AppState) -> None:
         return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
+            outcome: dict = {}
             await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
                                         state.config.tmdb_api_key, client,
-                                        indexes=state.indexes)
+                                        indexes=state.indexes, outcome=outcome)
+            if outcome.get("unusable"):
+                state.tmdb_unusable = True
+            elif not outcome.get("aborted"):
+                state.tmdb_unusable = False  # tour abouti ; une limite (429) n'y change rien
+            if not outcome.get("aborted"):
+                await fetch_missing_tmdb_links(state.conn, state.config.tmdb_api_key, client)
     except Exception:
         log.exception("secours TMDB en échec, tour poursuivi")
 
