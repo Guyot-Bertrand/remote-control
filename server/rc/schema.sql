@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS work (
     poster_relpath TEXT,
     poster_asset TEXT NULL,
     medium TEXT,
+    ratings_json TEXT NOT NULL DEFAULT '[]',
+    tmdb_url TEXT,
+    poster_source TEXT,
     content_hash TEXT NOT NULL,
     rev INTEGER NOT NULL
 );

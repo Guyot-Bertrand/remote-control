@@ -200,3 +200,30 @@ def test_interrupted_write_leaves_no_partial_asset(tmp_path, monkeypatch):
     (d,) = (tmp_path / "assets").iterdir()
     assert "tv.jpg" not in [p.name for p in d.iterdir()]
     assert all(not p.name.startswith(".") and "tmp" not in p.name for p in d.iterdir())
+
+
+def test_local_poster_sets_source_local(conn, tmp_path):
+    indexes, _ = setup(conn, tmp_path)
+    assert ava(conn)["poster_source"] is None
+    ingest_posters(conn, tmp_path / "assets", indexes)
+    assert ava(conn)["poster_source"] == "local"
+
+
+@pytest.mark.parametrize("source", ["frame", "tmdb"])
+def test_local_poster_replaces_frame_and_tmdb(conn, tmp_path, source):
+    text = FIXTURE.read_text(encoding="utf-8")
+    result = parse_catalog(text)
+    disk = tmp_path / "DISK1"
+    disk.mkdir()
+    make_fake_tree(result, disk)
+    indexes = {"U1": build_index(disk)}
+    without_af = text.replace("MF ; AF ; Ava [2017] [0h01].jpg\n", "")
+    import_catalog(conn, parse_catalog(without_af), {})
+    conn.execute("UPDATE work SET poster_asset = 'x', poster_source = ? "
+                 "WHERE key = 'Ava [2017]'", (source,))
+    import_catalog(conn, result, {})  # la ligne AF apparaît
+    row = ava(conn)
+    assert row["poster_asset"] is None and row["poster_source"] is None
+    ingest_posters(conn, tmp_path / "assets", indexes)
+    row = ava(conn)
+    assert row["poster_asset"] not in (None, "x") and row["poster_source"] == "local"

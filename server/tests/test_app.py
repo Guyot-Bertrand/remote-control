@@ -13,7 +13,7 @@ from rc import app as app_mod
 from rc.app import create_app, mdns_announce, refresh_once
 from rc.catalog.parser import parse_catalog
 from rc.config import Config
-from rc.db import current_revision, next_revision, open_db
+from rc.db import SCHEMA_VERSION, current_revision, next_revision, open_db
 from rc.player.session import PlayRequest
 from rc.fake_tree import make_fake_tree
 
@@ -529,7 +529,7 @@ def test_v1_database_migrates_and_reimports(setup):
         assert restored.conn.execute(
             "SELECT value FROM meta WHERE key='needs_reimport'").fetchone() is None
         expected = len(parse_catalog(FIXTURE.read_text(encoding="utf-8")).works)
-        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert restored.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert restored.conn.execute(
             "SELECT COUNT(*) FROM work WHERE title_fr = 'Périmée'").fetchone()[0] == 0  # réimport depuis la copie
         assert works(restored) == expected

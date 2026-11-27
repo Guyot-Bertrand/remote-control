@@ -14,7 +14,7 @@ from rc.probe import MediaTracks
 
 _JSON_SUFFIX = "_json"
 _BOOLS = {"episodic", "present", "watched"}
-_HIDDEN = {"rev", "content_hash", "poster_relpath", "poster_asset"}
+_HIDDEN = {"rev", "content_hash", "poster_relpath", "poster_asset", "poster_source"}
 DELETED_KINDS = ("work", "season", "episode", "media_file", "collection")
 _WORK_SUMMARY = ("id", "type", "key", "title_fr", "title_vo", "year", "episodic", "poster")
 

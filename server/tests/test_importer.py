@@ -262,3 +262,35 @@ def test_import_stores_medium(conn):
     assert medium("Alien, le huitieme passager [1979]") == "DVD"
     assert medium("Mixte [2001]") is None
     assert medium("Ava [2017]") is None
+
+
+def test_import_writes_ratings_json(conn):
+    import json
+    from test_parser_works import RATINGS_SAMPLE
+    import_catalog(conn, parse(RATINGS_SAMPLE), {})
+    row = conn.execute("SELECT ratings_json, tmdb_url FROM work").fetchone()
+    assert json.loads(row["ratings_json"]) == [
+        {"code": "IM", "name": "IMDb", "value": 7.0,
+         "url": "https://www.imdb.com/title/tt5974624/"},
+        {"code": "SC", "name": "Sens Critique", "value": 6.2,
+         "url": "https://www.senscritique.com/film/ava/123"},
+        {"code": "SC@ES", "name": "Éric Schwald", "value": 8.0, "url": None},
+        {"code": "SC@ZZ", "name": "Divers", "value": None, "url": None},
+        {"code": "WK", "name": "Wikipédia", "value": None,
+         "url": "https://fr.wikipedia.org/wiki/Ava"},
+        {"code": "NP", "name": "Note personnelle", "value": 7.0, "url": None},
+    ]
+    assert row["tmdb_url"] is None
+    import_catalog(conn, parse("MN ; film ; A [2000] ; A ; *\n"), {}, force=True)
+    assert conn.execute("SELECT ratings_json FROM work").fetchone()[0] == "[]"
+
+
+def test_rating_change_bumps_work_revision(conn):
+    from test_parser_works import RATINGS_SAMPLE
+    import_catalog(conn, parse(RATINGS_SAMPLE), {})
+    before = conn.execute("SELECT rev, content_hash FROM work").fetchone()
+    import_catalog(conn, parse(RATINGS_SAMPLE.replace("MQ ; SC ; 6.2", "MQ ; SC ; 6.5")), {})
+    after = conn.execute("SELECT rev, content_hash, ratings_json FROM work").fetchone()
+    assert after["rev"] > before["rev"]
+    assert after["content_hash"] != before["content_hash"]
+    assert '"value": 6.5' in after["ratings_json"]
