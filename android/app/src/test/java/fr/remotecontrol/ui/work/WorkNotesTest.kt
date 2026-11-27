@@ -73,4 +73,13 @@ class WorkNotesTest {
     @Test fun nothing_gives_null() {
         assertNull(notesUi(emptyList(), null))
     }
+
+    @Test fun hyphenated_first_name() {
+        assertEquals("J.-P. Dupont", notesUi(listOf(r("SC@JP", "Jean-Pierre Dupont", 7.0)), null)!!.pills.single().label)
+    }
+
+    @Test fun first_duplicate_code_wins() {
+        val ui = notesUi(listOf(r("NP", "a", 7.0), r("NP", "b", 5.0)), null)!!
+        assertEquals(listOf("Ma note" to "très bien"), ui.personal)
+    }
 }

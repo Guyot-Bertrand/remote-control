@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -29,6 +31,8 @@ import fr.remotecontrol.net.RatingDto
 import fr.remotecontrol.ui.common.Texts
 import fr.remotecontrol.ui.theme.Inter
 import fr.remotecontrol.ui.theme.RcColors
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 data class RatingPill(val label: String, val value: String, val accent: Boolean)
@@ -38,18 +42,20 @@ data class NoteLink(val label: String, val url: String)
 data class NotesUi(val personal: List<Pair<String, String>>, val pills: List<RatingPill>, val links: List<NoteLink>)
 
 private fun decimal(v: Double): String =
-    if (v == Math.rint(v)) v.toInt().toString() else String.format(Locale.FRANCE, "%s", v).replace('.', ',')
+    DecimalFormat("0.##", DecimalFormatSymbols(Locale.FRANCE)).format(v)
 
 private fun personalWord(v: Double): String = Texts.personalScale[v.toInt()]?.takeIf { v == Math.rint(v) } ?: decimal(v)
 
 private fun shortName(name: String): String {
     val parts = name.trim().split(Regex("\\s+"))
-    return if (parts.size < 2) name.trim() else "${parts.first().first()}. ${parts.drop(1).joinToString(" ")}"
+    if (parts.size < 2) return name.trim()
+    val initials = parts.first().split('-').filter { it.isNotEmpty() }.joinToString("-") { "${it.first()}." }
+    return "$initials ${parts.drop(1).joinToString(" ")}"
 }
 
 /** Données de la section « notes et liens » ; nul si rien à afficher. */
 fun notesUi(ratings: List<RatingDto>, tmdbUrl: String?): NotesUi? {
-    val byCode = ratings.associateBy { it.code }
+    val byCode = ratings.distinctBy { it.code }.associateBy { it.code }
     val personal = listOf("NP" to Texts.myRating, "NT" to Texts.technicalRating)
         .mapNotNull { (code, label) -> byCode[code]?.value?.let { label to personalWord(it) } }
     val pills = buildList {
@@ -96,7 +102,7 @@ fun WorkNotes(ui: NotesUi, onOpen: (String) -> Unit) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ui.links.forEach { l ->
                     Text(
-                        "${l.label} ↗",
+                        buildAnnotatedString { append(l.label); append(" ↗") },
                         style = small.copy(fontWeight = FontWeight.Medium),
                         color = RcColors.accent,
                         modifier = Modifier
@@ -104,6 +110,7 @@ fun WorkNotes(ui: NotesUi, onOpen: (String) -> Unit) {
                             .clip(RoundedCornerShape(10.dp))
                             .background(RcColors.surface2)
                             .clickable(role = Role.Button) { onOpen(l.url) }
+                            .clearAndSetSemantics { contentDescription = l.label }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     )
                 }

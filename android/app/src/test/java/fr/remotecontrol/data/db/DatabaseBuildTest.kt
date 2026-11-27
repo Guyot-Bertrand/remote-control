@@ -59,6 +59,7 @@ class DatabaseBuildTest {
         }
         val opened = buildDatabase(context, name).also { db = it }
         assertNull(opened.metaDao().get("sync.revision"))
+        assertEquals(0, opened.catalogDao().workCount())
         assertEquals(3, opened.openHelper.readableDatabase.version)
     }
 }
