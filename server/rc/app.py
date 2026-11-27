@@ -35,7 +35,7 @@ from rc.mirror import MirrorService
 from rc.player.base import Player
 from rc.player.mpv import MpvPlayer
 from rc.player.session import PlaybackService, TvController
-from rc.tmdb import fetch_missing_posters
+from rc.tmdb import fetch_missing_posters, fetch_missing_tmdb_links
 from rc.volumes import (Volume, VolumeUnreadable, build_index, find_catalog_source,
                         list_volumes, locate_files)
 
@@ -260,6 +260,7 @@ async def _tmdb_step(state: AppState) -> None:
             await fetch_missing_posters(state.conn, state.config.data_dir / "assets",
                                         state.config.tmdb_api_key, client,
                                         indexes=state.indexes)
+            await fetch_missing_tmdb_links(state.conn, state.config.tmdb_api_key, client)
     except Exception:
         log.exception("secours TMDB en échec, tour poursuivi")
 
