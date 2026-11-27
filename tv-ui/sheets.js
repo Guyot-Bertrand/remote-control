@@ -43,6 +43,22 @@ function versionPills(w, readable) {
 
 /** Fiche d'une œuvre ; `pause` : vidéo en pause dans le coin d'état ; `enter` : entrée
     animée (pas lors d'une mise à jour de la même fiche). */
+// Pastilles de notes (arbitrage 24) : IM, SC et SC@xx ayant une valeur, jamais NP, NT ni WK.
+function fmtRating(code, value) {
+  const n = Number(value);
+  const text = code === 'IM' || code === 'SC' ? n.toFixed(1) : String(Math.round(n * 10) / 10);
+  return text.replace('.', ',');
+}
+function ratingPills(ratings) {
+  return (ratings || [])
+    .filter((r) => (r.code === 'IM' || r.code === 'SC' || String(r.code).startsWith('SC@'))
+      && r.value !== null && r.value !== undefined && Number.isFinite(Number(r.value)))
+    .map((r) => `<span class="rating${r.code === 'IM' || r.code === 'SC' ? ' rating-main' : ''}">`
+      + `<span class="rating-name">${esc(r.name || r.code)}</span>`
+      + `<b>${fmtRating(r.code, r.value)}</b></span>`)
+    .join('');
+}
+
 function renderWork(w, { pause = null, enter = true } = {}) {
   const readable = readableVersions(w.media_files);
   const title = w.title_fr;
@@ -75,6 +91,7 @@ function renderWork(w, { pause = null, enter = true } = {}) {
     + `<span>${esc(c.name)}</span></div>`)).join('');
   const pills = versionPills(w, readable);
   const directors = (w.directors || []).join(', ');
+  const rated = ratingPills(w.ratings);
 
   return `<div class="screen work">
 ${poster(w.poster, title, w.year)}
@@ -89,6 +106,7 @@ ${differs(w.title_vo, title) ? `<div class="work-vo">${esc(w.title_vo)}</div>` :
 <span>${esc(joinDot([w.year, fmtMinutes(w.duration_min), genres]))}</span>
 ${directors ? `<span><span class="muted">${STAGED.has(w.type) ? 'Mise en scène' : 'Réalisation'} : </span>${esc(directors)}</span>` : ''}
 </div>
+${rated ? `<div class="ratings">${rated}</div>` : ''}
 ${status}${progress}
 ${w.synopsis ? `<p class="synopsis">${esc(w.synopsis)}</p>` : ''}
 ${cast.length ? `<div class="cast"><span class="muted">Avec </span>${esc(cast.join(', '))}</div>` : ''}
